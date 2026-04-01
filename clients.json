@@ -1,0 +1,20 @@
+[
+  {
+    "client_name": "Nous Dynamics ADS 01",
+    "ad_account_id": "act_612130408391811",
+    "group_id": "120363425753103827@g.us",
+    "enabled": true
+  },
+  {
+    "client_name": "Casal Pediatra",
+    "ad_account_id": "act_937664461840456",
+    "group_id": "120363373559249742@g.us",
+    "enabled": true
+  },
+  {
+    "client_name": "Yevent Ads",
+    "ad_account_id": "act_1589362001742728",
+    "group_id": "120363310180345095@g.us",
+    "enabled": true
+  }
+]

@@ -1,0 +1,30 @@
+# Credenciais OAuth do Google (sensíveis)
+token.json
+credentials.json
+
+# Arquivos temporários (sempre regeneráveis)
+.tmp/
+
+# Variáveis de ambiente (pode conter tokens)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Sistema
+.DS_Store
+Thumbs.db

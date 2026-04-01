@@ -1,0 +1,30 @@
+# Evolution API Configuration
+EVOLUTION_SERVER_URL=https://evo.nousdynamics.com/
+EVOLUTION_API_KEY=
+EVOLUTION_INSTANCE=
+
+# Meta Marketing API Configuration
+META_ACCESS_TOKEN=
+META_BUSINESS_ID=2126303521185590
+
+# Optional: Rate limiting and retry configuration
+MAX_RETRIES=3
+RETRY_DELAY_SECONDS=300
+
+# Optional: DRY_RUN mode (quando true, não envia WhatsApp; apenas gera e salva em .tmp/)
+DRY_RUN=false
+
+TZ=America/Sao_Paulo
+
+# INSTRUÇÕES:
+# 1. Copie este arquivo para .env
+# 2. Preencha todas as variáveis obrigatórias com seus valores reais
+# 3. O arquivo .env está no .gitignore por segurança
+# 
+# IMPORTANTE - Modo Multi-Client:
+# - META_BUSINESS_ID: ID do Business Manager (empresa no Meta Business)
+#   O sistema usará este ID para listar todas as contas de anúncios do Business
+# - Configure os clientes no arquivo clients.json na raiz do projeto
+#   Cada cliente deve ter: client_name, ad_account_id, group_id (WhatsApp), enabled
+# - META_AD_ACCOUNT_ID não é mais obrigatório (uso individual)
+# - EVOLUTION_GROUP_ID não é mais obrigatório (vem por cliente no clients.json)
