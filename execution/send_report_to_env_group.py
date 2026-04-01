@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from execution.main_scheduler import NextNousReporter
+from execution.main_scheduler import P12RelatoriosReporter
 
 
 def _normalize_act(raw: str) -> str:
@@ -105,7 +105,7 @@ def main() -> None:
     print(f"Conta: {ad_account_id}")
     print(f"Grupo: {group_id}")
 
-    reporter = NextNousReporter()
+    reporter = P12RelatoriosReporter()
     ok = reporter.generate_and_send_report_for_client(
         client_name,
         ad_account_id,

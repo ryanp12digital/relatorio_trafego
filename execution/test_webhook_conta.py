@@ -108,7 +108,7 @@ def main() -> None:
         "evento": "teste_dados_conta",
         "descricao": descricao,
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "origem": "relatorio_trafego",
+        "origem": "p12_relatorios",
         "ad_account_id": ad_account_id,
         "periodo_a": period_a_start,
         "periodo_b": period_b_start,

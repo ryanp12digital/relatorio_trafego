@@ -31,6 +31,6 @@ UTC_END=$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u '+%Y-%m-%d %H:%M:
 } >> "$LOG"
 
 # Uma linha no stdout do container (facil de achar nos logs do painel)
-echo "[NextNous] main_scheduler concluido exit=$EC em $UTC_END"
+echo "[P12Relatorios] main_scheduler concluido exit=$EC em $UTC_END"
 
 exit "$EC"

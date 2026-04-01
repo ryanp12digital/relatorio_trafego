@@ -1,4 +1,4 @@
-# Checklist de Configuração - Next Nous
+# Checklist de Configuração - P12 Relatorios
 
 ## Pré-requisitos
 - [ ] Python 3.8+ instalado
@@ -90,4 +90,4 @@
 ## Suporte
 - Consultar diretivas em `directives/` para detalhes específicos
 - Verificar logs em `.tmp/execution.log` para erros
-- Consultar `AGENTE_NEXT_NOUS.md` para especificação técnica completa
+- Consultar `AGENTE_P12_RELATORIOS.md` para especificação técnica completa

@@ -29,8 +29,7 @@ RUN echo 'SHELL=/bin/sh' > /etc/crontabs/root \
     && echo '0 10 * * * /app/scripts/cron_daily_report.sh' >> /etc/crontabs/root
 
 # Torna o entrypoint executável
-# O entrypoint.sh sincroniza variáveis de ambiente do Easypanel para .env,
-# garantindo que o cron tenha acesso às credenciais (Meta, Evolution API, etc.)
+# entrypoint.sh: sincroniza variáveis do Easypanel para .env (P12 Relatorios)
 RUN chmod +x entrypoint.sh
 
 # Define o entrypoint como comando inicial

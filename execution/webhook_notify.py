@@ -1,5 +1,6 @@
 """
-Notificações HTTP para webhook (ex.: n8n) em falhas da automação de relatório.
+Notificações HTTP para webhook (ex.: n8n) em falhas da automação P12 Relatorios.
+Campo origem nos payloads: p12_relatorios.
 """
 
 from __future__ import annotations
@@ -61,7 +62,7 @@ def notify_meta_token_expirado(
         "evento": "meta_token_expirado",
         "descricao": descricao,
         "timestamp": _now_iso_utc(),
-        "origem": "relatorio_trafego",
+        "origem": "p12_relatorios",
     }
     if meta_error_code is not None:
         payload["meta_error_code"] = meta_error_code
@@ -87,7 +88,7 @@ def notify_erro_automacao(
         "evento": "erro_automacao",
         "descricao": descricao,
         "timestamp": _now_iso_utc(),
-        "origem": "relatorio_trafego",
+        "origem": "p12_relatorios",
     }
     if tipo_excecao:
         payload["tipo_excecao"] = tipo_excecao

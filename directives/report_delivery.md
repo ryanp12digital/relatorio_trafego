@@ -78,7 +78,7 @@ Contém análise comparativa e criativo campeão:
 
 ### Formatação da Mensagem
 
-#### Regras de Formatação (Persona Next Nous)
+#### Regras de Formatação (P12 Relatorios)
 - **Proibido**: Emojis
 - **Permitido**: Markdown (negrito, listas, quebras de linha)
 - **Tom**: Formal, minimalista, preciso e levemente irônico
@@ -155,7 +155,7 @@ Todos os eventos são registrados em `.tmp/execution.log`:
 
 ```python
 from execution.evolution_client import get_evolution_client
-from execution.main_scheduler import NextNousReporter
+from execution.main_scheduler import P12RelatoriosReporter
 
 # Envio direto
 client = get_evolution_client()
@@ -169,7 +169,7 @@ else:
     print("Falha ao enviar mensagem")
 
 # Envio completo via orquestrador
-reporter = NextNousReporter()
+reporter = P12RelatoriosReporter()
 success = reporter.generate_and_send_report()
 ```
 

@@ -1,5 +1,5 @@
 """
-Orquestrador principal do sistema Next Nous.
+Orquestrador principal do P12 Relatorios (Meta Ads via WhatsApp).
 
 Este script coordena a coleta de dados, processamento, formatação e envio
 do relatório diário de performance do Meta Ads.
@@ -41,15 +41,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class NextNousReporter:
+class P12RelatoriosReporter:
     """
-    Classe principal para geração e envio de relatórios Next Nous.
+    Classe principal para geração e envio de relatórios P12 Relatorios.
 
     Mensagens ao cliente: texto curto, direto, com data e métricas (negrito estilo WhatsApp).
     """
     
     def __init__(self):
-        """Inicializa o reporter Next Nous."""
+        """Inicializa o reporter P12 Relatorios."""
         self._webhook_token_expiry_sent = False
         self._webhook_meta_auth_other_sent = False
         try:
@@ -69,7 +69,7 @@ class NextNousReporter:
             self.dry_run = os.getenv('DRY_RUN', 'false').lower() == 'true'
                 
         except Exception as e:
-            logger.error(f"Erro ao inicializar NextNousReporter: {str(e)}")
+            logger.error(f"Erro ao inicializar P12RelatoriosReporter: {str(e)}")
             raise
     
     def get_period_dates(self) -> tuple[str, str, str, str]:
@@ -405,7 +405,7 @@ class NextNousReporter:
             True se pelo menos um relatório foi enviado com sucesso, False caso contrário
         """
         try:
-            logger.info("Iniciando geração de relatórios Next Nous multi-client")
+            logger.info("Iniciando geração de relatórios P12 Relatorios (multi-client)")
             if not self.business_id:
                 logger.error("META_BUSINESS_ID é obrigatória para generate_and_send_report().")
                 notify_erro_automacao(
@@ -561,7 +561,7 @@ def main():
         env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
         load_dotenv(env_path)
         
-        reporter = NextNousReporter()
+        reporter = P12RelatoriosReporter()
         success = reporter.generate_and_send_report()
         
         if success:
@@ -582,3 +582,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# Nome de classe legado (imports antigos)
+NextNousReporter = P12RelatoriosReporter

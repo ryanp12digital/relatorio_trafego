@@ -1,19 +1,17 @@
-# Gestor de Tráfego - Next Nous
+# P12 Relatorios
 
 Sistema automatizado de relatórios de performance do Meta Ads via WhatsApp.
 
 Projeto baseado na arquitetura de 3 camadas para maximizar confiabilidade e separação de responsabilidades.
 
-## Projeto: Next Nous (Meta Ads Report)
+## Projeto: P12 Relatorios (Meta Ads)
 
-Agente automatizado que:
+Automação que:
 - Coleta dados de performance do Meta Ads via Marketing API
 - Calcula métricas e comparações entre períodos
-- Identifica criativos campeões
-- Envia relatórios formatados via WhatsApp (Evolution API)
+- Envia relatórios objetivos (data + métricas) via WhatsApp (Evolution API)
 
-**Persona**: Fusão entre eficiência analítica (Jarvis) e sobriedade (Alfred)  
-**Tom**: Formal, minimalista, preciso e levemente irônico
+**Identificação em webhooks / logs:** `p12_relatorios` / `P12 Relatorios`.
 
 ## Estrutura do Projeto
 
