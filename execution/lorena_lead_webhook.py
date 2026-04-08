@@ -109,21 +109,170 @@ def _build_respostas_text(mappable: List[Dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def _unwrap_json_strings(raw: Any, max_depth: int = 8) -> Any:
+    """Make às vezes envia JSON duplo (string que contém JSON)."""
+    cur = raw
+    for _ in range(max_depth):
+        if not isinstance(cur, str):
+            break
+        s = cur.strip().lstrip("\ufeff")
+        if not s:
+            cur = None
+            break
+        try:
+            cur = json.loads(s)
+        except json.JSONDecodeError:
+            break
+    return cur
+
+
+def _is_meta_lead_body(d: Dict[str, Any]) -> bool:
+    """Objeto de lead Meta (com ou sem envelope externo)."""
+    if not isinstance(d.get("data"), dict):
+        return False
+    data = d["data"]
+    if d.get("leadgenId") is not None:
+        return True
+    if isinstance(d.get("mappable_field_data"), list):
+        return True
+    if "email" in data or "nome_completo" in data or "telefone" in data:
+        return True
+    return False
+
+
+def _coerce_inner_body(val: Any) -> Optional[Dict[str, Any]]:
+    """Campo `body` do envelope pode vir dict ou string JSON."""
+    if isinstance(val, dict):
+        return val
+    if isinstance(val, str):
+        unwrapped = _unwrap_json_strings(val)
+        if isinstance(unwrapped, dict):
+            return unwrapped
+    return None
+
+
+def _extract_lead_from_envelope_item(item: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(item, dict):
+        return None
+    if "body" in item:
+        inner = _coerce_inner_body(item.get("body"))
+        if inner and _is_meta_lead_body(inner):
+            return inner
+        if isinstance(inner, dict) and isinstance(inner.get("data"), dict):
+            return inner
+    if _is_meta_lead_body(item):
+        return item
+    return None
+
+
 def normalize_lead_bodies(raw: Any) -> List[Dict[str, Any]]:
-    """Extrai lista de objetos `body` do payload Make (array envelope ou objeto único)."""
+    """
+    Extrai lista de objetos lead (conteúdo de `body` no envelope Make).
+
+    Aceita:
+    - array de envelopes `[{ "body": { lead... } }, ...]`
+    - objeto envelope único `{ "body": { lead... } }`
+    - lead direto `{ "leadgenId", "data", "mappable_field_data" }`
+    - `body` como string JSON
+    - wrappers opcionais: chave `data` / `items` / `results` com array
+    """
     if raw is None:
         return []
+
+    raw = _unwrap_json_strings(raw)
+
+    if isinstance(raw, dict):
+        # Não usar a chave "data" aqui: no lead Meta `data` já é o objeto do formulário.
+        for wrap_key in ("items", "results", "records", "bundles"):
+            inner = raw.get(wrap_key)
+            if isinstance(inner, list):
+                return normalize_lead_bodies(inner)
+            if isinstance(inner, dict):
+                sub = normalize_lead_bodies(inner)
+                if sub:
+                    return sub
+
+        one = _extract_lead_from_envelope_item(raw)
+        if one:
+            return [one]
+        return []
+
     if isinstance(raw, list):
         out: List[Dict[str, Any]] = []
         for item in raw:
-            if isinstance(item, dict) and "body" in item and isinstance(item["body"], dict):
-                out.append(item["body"])
+            lead = _extract_lead_from_envelope_item(item)
+            if lead:
+                out.append(lead)
         return out
-    if isinstance(raw, dict):
-        body = raw.get("body")
-        if isinstance(body, dict):
-            return [body]
+
     return []
+
+
+def _mappable_from_data(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Se o Make não mandar mappable_field_data, monta a partir de `data`."""
+    rows: List[Dict[str, Any]] = []
+    for k, v in data.items():
+        rows.append({"name": str(k), "value": v})
+    return rows
+
+
+def parse_incoming_payload() -> Tuple[Optional[Any], str]:
+    """
+    Lê JSON do POST com fallbacks (Make varia Content-Type e encoding).
+
+    Returns:
+        (parsed, "") em sucesso, ou (None, codigo_erro).
+    """
+    raw = request.get_json(silent=True, force=True)
+
+    if raw is None:
+        text: Optional[str] = None
+        try:
+            text = request.get_data(as_text=True)
+        except Exception:
+            text = None
+        if (not text) and request.data:
+            try:
+                text = request.data.decode("utf-8-sig")
+            except UnicodeDecodeError:
+                text = None
+        if text:
+            text = text.lstrip("\ufeff").strip()
+        if text:
+            try:
+                raw = json.loads(text)
+            except json.JSONDecodeError:
+                raw = None
+
+    if raw is None and request.form:
+        for key in ("body", "payload", "data", "json", "items"):
+            val = request.form.get(key)
+            if not val:
+                continue
+            try:
+                raw = json.loads(val)
+            except json.JSONDecodeError:
+                raw = _unwrap_json_strings(val.strip())
+            if raw is not None:
+                break
+
+    if raw is None:
+        return None, "invalid_json"
+
+    raw = _unwrap_json_strings(raw)
+    if raw is None:
+        return None, "invalid_json"
+    if not isinstance(raw, (dict, list)):
+        return None, "invalid_json"
+
+    return raw, ""
+
+
+def _ensure_mappable(body: Dict[str, Any], data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    mappable = body.get("mappable_field_data")
+    if isinstance(mappable, list) and len(mappable) > 0:
+        return mappable
+    return _mappable_from_data(data)
 
 
 def _resolve_group_id() -> Optional[str]:
@@ -163,9 +312,7 @@ def _check_webhook_secret() -> Optional[Tuple[Any, int]]:
 
 def _format_lead_message(body: Dict[str, Any]) -> str:
     data = body.get("data") if isinstance(body.get("data"), dict) else {}
-    mappable = body.get("mappable_field_data")
-    if not isinstance(mappable, list):
-        mappable = []
+    mappable = _ensure_mappable(body, data)
 
     nome = _format_field_value(data.get("nome_completo")) or _mappable_lookup(
         mappable, "nome_completo"
@@ -216,23 +363,41 @@ def lorena_new_lead():
         f"content_length={request.content_length}"
     )
 
-    raw = request.get_json(silent=True)
+    raw, parse_err = parse_incoming_payload()
     if raw is None:
+        ct = request.content_type or ""
+        has_form = bool(request.form)
         _wh_log(
             "POST /lorena-new-lead | ERRO_JSON | "
-            f"ip={_client_ip()} | corpo nao e JSON valido",
+            f"ip={_client_ip()} | content_type={ct!r} | form_keys={list(request.form.keys()) if has_form else []} | "
+            f"motivo={parse_err}",
             level=logging.WARNING,
         )
-        return jsonify({"ok": False, "error": "invalid_json"}), 400
+        return jsonify(
+            {
+                "ok": False,
+                "error": parse_err,
+                "hint": "Envie JSON (array ou objeto) com lead em body ou lead direto; "
+                "string JSON dupla e form field body/payload/data aceitos.",
+            }
+        ), 400
 
     bodies = normalize_lead_bodies(raw)
     if not bodies:
         _wh_log(
             "POST /lorena-new-lead | ERRO_PAYLOAD | "
-            f"ip={_client_ip()} | sem objeto body no envelope (Make)",
+            f"ip={_client_ip()} | tipo_raiz={type(raw).__name__} | "
+            "nao foi possivel extrair lead (body ou objeto Meta)",
             level=logging.WARNING,
         )
-        return jsonify({"ok": False, "error": "missing_body", "hint": "expected array of {body: {...}} or {body: {...}}"}), 400
+        return jsonify(
+            {
+                "ok": False,
+                "error": "missing_body",
+                "hint": "Esperado: [{...,'body':{leadgenId,data,mappable_field_data}}] ou "
+                "{body:{...}} ou lead direto com data + leadgenId/mappable_field_data.",
+            }
+        ), 400
 
     _wh_log(
         "POST /lorena-new-lead | PAYLOAD_OK | "
