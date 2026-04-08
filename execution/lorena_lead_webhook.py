@@ -96,6 +96,7 @@ def _format_field_value(v: Any) -> str:
 
 
 def _build_respostas_text(mappable: List[Dict[str, Any]]) -> str:
+    """Uma linha por campo: `nome_campo: valor` (sem negrito)."""
     lines: List[str] = []
     for row in mappable:
         if not isinstance(row, dict):
@@ -104,7 +105,7 @@ def _build_respostas_text(mappable: List[Dict[str, Any]]) -> str:
         if not name or name in _EXCLUDE_RESPOSTAS:
             continue
         val = _format_field_value(row.get("value"))
-        lines.append(f"*{name}:* {val}")
+        lines.append(f"{name}: {val}")
     return "\n".join(lines)
 
 
@@ -181,10 +182,14 @@ def _format_lead_message(body: Dict[str, Any]) -> str:
         respostas = "(nenhuma resposta adicional)"
 
     msg = (
-        f"*Nome do Lead:* {nome or '(não informado)'}\n"
-        f"*WhatsApp do Lead:* {wa_link}\n"
-        f"*E-mail do Lead:* {email or '(não informado)'}\n"
-        f"*Respostas do Lead:*\n{respostas}"
+        f"Nome do Lead: {nome or '(não informado)'}\n"
+        f"WhatsApp do Lead: {wa_link}\n"
+        f"E-mail do Lead: {email or '(não informado)'}\n"
+        f"\n"
+        f"==========\n"
+        f"\n"
+        f"Respostas do Lead:\n"
+        f"{respostas}"
     )
     if len(msg) > _WHATSAPP_MSG_MAX:
         cut = _WHATSAPP_MSG_MAX - 20
