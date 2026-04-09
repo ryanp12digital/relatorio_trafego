@@ -9,7 +9,8 @@ if [ -f /app/.env ]; then
 else
     # 2. Cria .env a partir de variáveis de ambiente (se disponíveis)
     # Formato correto: KEY=value (sem prefixos ou exports)
-    printenv | grep -E '^(EVOLUTION_|META_|MAX_RETRIES|RETRY_DELAY_SECONDS|ERROR_WEBHOOK_|DRY_RUN|TZ|LORENA_|WEBHOOK_)=' > /app/.env 2>/dev/null
+    # Inclui variáveis do relatório (REPORT_*, DEFAULT_REPORT_TIMEZONE, FORCE_WEEKLY_REPORT) e Meta (META_* já cobre atribuição).
+    printenv | grep -E '^(EVOLUTION_|META_|MAX_RETRIES|RETRY_DELAY_SECONDS|ERROR_WEBHOOK_|DRY_RUN|TZ|LORENA_|WEBHOOK_|REPORT_|DEFAULT_REPORT_TIMEZONE|FORCE_WEEKLY_REPORT)=' > /app/.env 2>/dev/null
     
     if [ -s /app/.env ]; then
         echo "P12 Relatorios: .env criado a partir de variáveis de ambiente"
@@ -36,7 +37,7 @@ echo "P12 Relatorios: Webhook Lorena no stdout (filtro: P12_LORENA_WEBHOOK) e em
 # 5. Inicia o daemon do cron em foreground
 # -l 8 = log minimo do busybox crond (evita "wakeup dt=60" e dump da crontab a cada minuto no stdout)
 # Saida interna do crond vai para .tmp/crond.log; cada execucao do job detalha em .tmp/cron.log
-echo "P12 Relatorios: Iniciando agendamento (Cron diario 10:00 TZ do container)..."
+echo "P12 Relatorios: Iniciando agendamento (Cron segunda-feira 10:00 TZ do container)..."
 echo "P12 Relatorios: Logs do job: /app/.tmp/cron.log | daemon crond: /app/.tmp/crond.log"
 touch /app/.tmp/crond.log
 exec /usr/sbin/crond -f -l 8 -L /app/.tmp/crond.log

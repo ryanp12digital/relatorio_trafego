@@ -38,7 +38,11 @@ LOG_PREFIX = "[P12_LORENA_WEBHOOK]"
 
 _EXCLUDE_RESPOSTAS = frozenset({"nome_completo", "email", "telefone"})
 _WHATSAPP_MSG_MAX = 4000
-DEFAULT_LEAD_WHATSAPP = "+55 71 9106-5853"
+
+
+def _default_lead_whatsapp() -> str:
+    """Número exibido quando o lead não informa telefone (configurável no Easypanel)."""
+    return (os.getenv("LORENA_DEFAULT_LEAD_WHATSAPP") or "+55 71 9106-5853").strip()
 
 
 def _wh_log(message: str, level: int = logging.INFO) -> None:
@@ -86,7 +90,7 @@ def _format_whatsapp_line(raw_phone: Optional[str]) -> str:
     digits = _digits_only(raw_phone)
     if digits:
         return f"https://wa.me/{digits}"
-    return DEFAULT_LEAD_WHATSAPP
+    return _default_lead_whatsapp()
 
 
 def _mappable_lookup(mappable: List[Dict[str, Any]], name: str) -> str:

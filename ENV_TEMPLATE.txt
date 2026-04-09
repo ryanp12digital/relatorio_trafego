@@ -27,6 +27,8 @@ REPORT_RESULT_ACTION_TYPE=lead
 ERROR_WEBHOOK_URL=
 
 TZ=America/Sao_Paulo
+# Timezone para "é segunda-feira?" e fallback quando a conta Meta não expõe timezone_name
+DEFAULT_REPORT_TIMEZONE=America/Sao_Paulo
 
 # Relatorio semanal: cron na segunda 10:00 (Dockerfile). Forcar envio em qualquer dia (teste):
 # FORCE_WEEKLY_REPORT=1
@@ -38,6 +40,8 @@ WEBHOOK_PORT=8080
 LORENA_LEAD_GROUP_ID=
 # Se preenchido, o Make deve enviar o mesmo valor em X-Webhook-Secret ou Authorization: Bearer <valor>
 LORENA_LEAD_WEBHOOK_SECRET=
+# Texto exibido em "WhatsApp do Lead:" quando o formulário não traz telefone (link wa.me só se vier número no lead)
+LORENA_DEFAULT_LEAD_WHATSAPP=+55 71 9106-5853
 
 # INSTRUÇÕES:
 # 1. Copie este arquivo para .env
@@ -51,3 +55,8 @@ LORENA_LEAD_WEBHOOK_SECRET=
 #   (um objeto por cliente: client_name, ad_account_id, group_id, enabled)
 # - No Docker/Easypanel: clients.json vai na imagem (git) ou monte um volume em /app/clients.json
 # - META_AD_ACCOUNT_ID / EVOLUTION_GROUP_ID: opcionais (scripts manuais e testes)
+#
+# PRODUÇÃO (Easypanel) — conferir também:
+# - META_ACTION_REPORT_TIME, META_ATTRIBUTION_WINDOWS, REPORT_RESULT_ACTION_TYPE (alinhamento com Ads Manager)
+# - WEBHOOK_PORT mapeado no proxy HTTPS; LORENA_LEAD_WEBHOOK_SECRET se quiser proteger o POST
+# - LORENA_DEFAULT_LEAD_WHATSAPP e LORENA_LEAD_GROUP_ID (opcional; senão usa clients.json)
