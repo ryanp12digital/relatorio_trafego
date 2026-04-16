@@ -33,15 +33,20 @@ DEFAULT_REPORT_TIMEZONE=America/Sao_Paulo
 # Relatorio semanal: cron na segunda 10:00 (Dockerfile). Forcar envio em qualquer dia (teste):
 # FORCE_WEEKLY_REPORT=1
 
-# Webhook leads Lorena (Make -> POST /lorena-new-lead -> WhatsApp grupo)
+# Webhook leads Meta multi-cliente (Make -> POST /meta-new-lead -> WhatsApp grupo)
 # Porta HTTP interna do container (mapear no Easypanel para HTTPS).
 WEBHOOK_PORT=8080
-# ID do grupo WhatsApp. Se vazio, usa group_id de "Lorena Carvalho" em clients.json (sincronize ao mudar o grupo).
-LORENA_LEAD_GROUP_ID=
-# Se preenchido, o Make deve enviar o mesmo valor em X-Webhook-Secret ou Authorization: Bearer <valor>
-LORENA_LEAD_WEBHOOK_SECRET=
+# Segredo do webhook. Se preenchido, o Make deve enviar o mesmo valor em:
+# X-Webhook-Secret ou Authorization: Bearer <valor>.
+META_LEAD_WEBHOOK_SECRET=
 # Opcional: texto em "WhatsApp do Lead:" só quando o lead não tem número válido (sem dígitos).
 # Deixe vazio para mostrar "(não informado)" — use só se quiser um contato fixo operacional.
+META_LEAD_FALLBACK_WHATSAPP=
+
+# Compatibilidade legada (opcional):
+# - Se META_LEAD_WEBHOOK_SECRET estiver vazio, o webhook aceita LORENA_LEAD_WEBHOOK_SECRET.
+# - Se META_LEAD_FALLBACK_WHATSAPP estiver vazio, o webhook usa LORENA_FALLBACK_WHATSAPP.
+LORENA_LEAD_WEBHOOK_SECRET=
 LORENA_FALLBACK_WHATSAPP=
 
 # INSTRUÇÕES:
@@ -59,5 +64,6 @@ LORENA_FALLBACK_WHATSAPP=
 #
 # PRODUÇÃO (Easypanel) — conferir também:
 # - META_ACTION_REPORT_TIME, META_ATTRIBUTION_WINDOWS, REPORT_RESULT_ACTION_TYPE (alinhamento com Ads Manager)
-# - WEBHOOK_PORT mapeado no proxy HTTPS; LORENA_LEAD_WEBHOOK_SECRET se quiser proteger o POST
-# - LORENA_FALLBACK_WHATSAPP (opcional) e LORENA_LEAD_GROUP_ID (opcional; senão usa clients.json)
+# - WEBHOOK_PORT mapeado no proxy HTTPS; META_LEAD_WEBHOOK_SECRET para proteger o POST
+# - META_LEAD_FALLBACK_WHATSAPP opcional (senão mostra "(não informado)")
+# - Para roteamento de leads: cadastre no clients.json -> meta_page_id, lead_group_id, lead_template

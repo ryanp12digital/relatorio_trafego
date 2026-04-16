@@ -5,7 +5,7 @@ WORKDIR /app
 # Instala timezone data
 RUN apk add --no-cache tzdata
 
-# Porta do webhook Make -> leads Lorena (mapear no Easypanel)
+# Porta do webhook Make -> leads Meta (mapear no Easypanel)
 EXPOSE 8080
 
 # Define timezone para São Paulo
