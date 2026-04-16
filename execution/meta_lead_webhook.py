@@ -329,6 +329,8 @@ def _resolve_lead_route(page_id: str) -> Optional[Dict[str, str]]:
         return None
     clients = _load_clients()
     for c in clients:
+        if c.get("enabled", True) is False:
+            continue
         cid = str(c.get("meta_page_id", "")).strip()
         if cid != page_id:
             continue
@@ -501,6 +503,7 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
     dry = os.getenv("DRY_RUN", "false").lower() == "true"
     sent = 0
     errors: List[str] = []
+    skipped: List[str] = []
 
     for idx, event in enumerate(events):
         body = event["body"]
@@ -509,19 +512,19 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
         if not route and allow_legacy_lorena_fallback and not page_id:
             route = _resolve_legacy_lorena_route()
         if not route:
-            errors.append(f"lead_index_{idx}: page_id_nao_mapeado ({page_id or 'vazio'})")
+            skipped.append(f"lead_index_{idx}: page_id_nao_mapeado ({page_id or 'vazio'})")
             _wh_log(
-                f"LEAD_{idx} | ERRO_ROUTE | page_id_nao_mapeado={page_id or 'vazio'}",
-                level=logging.ERROR,
+                f"LEAD_{idx} | IGNORADO_ROUTE | page_id_nao_mapeado={page_id or 'vazio'}",
+                level=logging.WARNING,
             )
             continue
 
         group_id = route["group_id"]
         if not group_id:
-            errors.append(f"lead_index_{idx}: group_id_ausente ({route['client_name']})")
+            skipped.append(f"lead_index_{idx}: group_id_ausente ({route['client_name']})")
             _wh_log(
-                f"LEAD_{idx} | ERRO_CONFIG | group_id_ausente | cliente={route['client_name']}",
-                level=logging.ERROR,
+                f"LEAD_{idx} | IGNORADO_CONFIG | group_id_ausente | cliente={route['client_name']}",
+                level=logging.WARNING,
             )
             continue
 
@@ -556,10 +559,10 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
             f"POST {endpoint_label} | RESPOSTA_500 | sent={sent} | erros={len(errors)}",
             level=logging.ERROR,
         )
-        return jsonify({"ok": False, "sent": sent, "errors": errors}), 500
+        return jsonify({"ok": False, "sent": sent, "skipped": skipped, "errors": errors}), 500
 
-    _wh_log(f"POST {endpoint_label} | CONCLUIDO_OK | sent={sent}")
-    return jsonify({"ok": True, "sent": sent}), 200
+    _wh_log(f"POST {endpoint_label} | CONCLUIDO_OK | sent={sent} | skipped={len(skipped)}")
+    return jsonify({"ok": True, "sent": sent, "skipped": skipped}), 200
 
 
 @app.route("/meta-new-lead", methods=["POST"])
