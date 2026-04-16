@@ -1,6 +1,7 @@
 # Credenciais OAuth do Google (sensíveis)
 token.json
 credentials.json
+client_secret.json
 
 # Arquivos temporários (sempre regeneráveis)
 .tmp/

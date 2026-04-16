@@ -1,0 +1,24 @@
+[
+  {
+    "id": "practical_life_jardim_prudencia",
+    "client_name": "Practical Life Jardim Prudencia",
+    "google_customer_id": "253-906-3374",
+    "group_id": "120363419835081376@g.us",
+    "enabled": true,
+    "primary_conversions": [
+      "Formulário",
+      "WhatsApp",
+      "Ligação"
+    ],
+    "notes": "Cliente ativo de referência. Use este padrão para novos cadastros."
+  },
+  {
+    "id": "modelo_novo_cliente",
+    "client_name": "MODELO - DUPLICAR ESTE BLOCO",
+    "google_customer_id": "000-000-0000",
+    "group_id": "000000000000000000@g.us",
+    "enabled": false,
+    "primary_conversions": [],
+    "notes": "Passo 1: duplicar este bloco. Passo 2: preencher client_name/google_customer_id/group_id. Passo 3: enabled=true."
+  }
+]

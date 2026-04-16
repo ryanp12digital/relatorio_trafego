@@ -23,7 +23,8 @@ execution/                  # Scripts Python determinísticos
 │   ├── data_processor.py   # Cálculos e comparações
 │   ├── main_scheduler.py   # Orquestrador principal
 │   ├── meta_lead_webhook.py    # HTTP POST leads Make -> WhatsApp (multi-cliente)
-│   └── geral_lead_webhook.py   # Wrapper com nome geral (compatibilidade)
+│   ├── geral_lead_webhook.py   # Wrapper com nome geral (compatibilidade)
+│   └── google_report_scheduler.py # Relatório Google Ads -> WhatsApp (google_clients.json)
 directives/                 # SOPs em Markdown
 │   ├── meta_ads_fetch.md       # Como buscar dados na API
 │   ├── metrics_calculation.md  # Lógica de cálculo e comparação
@@ -102,6 +103,28 @@ python execution/list_ad_accounts.py
 | Envio manual para um grupo do `.env` (teste) | `python execution/send_report_to_env_group.py` — ver docstring do script |
 
 Cada entrada em `clients.json` é independente: uma linha de negócio = uma conta de anúncios + um `group_id` do WhatsApp.
+
+### Clientes Google Ads (arquivo separado)
+
+Para contas Google Ads, use `google_clients.json` (separado do `clients.json` da Meta):
+
+```json
+[
+  {
+    "client_name": "Practical Life Jardim Prudencia",
+    "google_customer_id": "253-906-3374",
+    "group_id": "120363419835081376@g.us",
+    "enabled": true,
+    "primary_conversions": ["Formulário", "WhatsApp", "Ligação"]
+  }
+]
+```
+
+Executar teste de envio (mesmo com métricas zeradas):
+
+```bash
+python execution/google_report_scheduler.py --force-send-zero --customer-id 253-906-3374
+```
 
 ### Deploy no servidor (Docker)
 
