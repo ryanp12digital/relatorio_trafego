@@ -40,8 +40,9 @@ WEBHOOK_PORT=8080
 LORENA_LEAD_GROUP_ID=
 # Se preenchido, o Make deve enviar o mesmo valor em X-Webhook-Secret ou Authorization: Bearer <valor>
 LORENA_LEAD_WEBHOOK_SECRET=
-# Texto exibido em "WhatsApp do Lead:" quando o formulário não traz telefone (link wa.me só se vier número no lead)
-LORENA_DEFAULT_LEAD_WHATSAPP=+55 71 9106-5853
+# Opcional: texto em "WhatsApp do Lead:" só quando o lead não tem número válido (sem dígitos).
+# Deixe vazio para mostrar "(não informado)" — use só se quiser um contato fixo operacional.
+LORENA_FALLBACK_WHATSAPP=
 
 # INSTRUÇÕES:
 # 1. Copie este arquivo para .env
@@ -59,4 +60,4 @@ LORENA_DEFAULT_LEAD_WHATSAPP=+55 71 9106-5853
 # PRODUÇÃO (Easypanel) — conferir também:
 # - META_ACTION_REPORT_TIME, META_ATTRIBUTION_WINDOWS, REPORT_RESULT_ACTION_TYPE (alinhamento com Ads Manager)
 # - WEBHOOK_PORT mapeado no proxy HTTPS; LORENA_LEAD_WEBHOOK_SECRET se quiser proteger o POST
-# - LORENA_DEFAULT_LEAD_WHATSAPP e LORENA_LEAD_GROUP_ID (opcional; senão usa clients.json)
+# - LORENA_FALLBACK_WHATSAPP (opcional) e LORENA_LEAD_GROUP_ID (opcional; senão usa clients.json)

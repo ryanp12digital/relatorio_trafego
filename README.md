@@ -110,7 +110,7 @@ No **Easypanel** (ou similar):
 1. Defina variáveis de ambiente equivalentes ao `.env` (o [`entrypoint.sh`](entrypoint.sh) gera `/app/.env` a partir delas se não houver arquivo montado). O entrypoint copia também `REPORT_*`, `DEFAULT_REPORT_TIMEZONE`, `FORCE_WEEKLY_REPORT` e todo `META_*` (inclui atribuição).
 2. Garanta **`META_BUSINESS_ID`** e **`META_ACCESS_TOKEN`** — sem Business ID o fluxo multi-client do cron aborta.
 3. Para números alinhados ao Ads Manager, defina em produção: **`META_ACTION_REPORT_TIME`**, **`META_ATTRIBUTION_WINDOWS`**, **`REPORT_RESULT_ACTION_TYPE`** (ver `ENV_TEMPLATE.txt`).
-4. Webhook de leads: mapear **`WEBHOOK_PORT`** (ex. 8080) no HTTPS; opcional **`LORENA_LEAD_WEBHOOK_SECRET`**; **`LORENA_DEFAULT_LEAD_WHATSAPP`** quando o lead não traz telefone.
+4. Webhook de leads: mapear **`WEBHOOK_PORT`** (ex. 8080) no HTTPS; opcional **`LORENA_LEAD_WEBHOOK_SECRET`**; **`LORENA_FALLBACK_WHATSAPP`** só se quiser um texto fixo quando o lead não tiver telefone com dígitos.
 5. Para **incluir cliente novo**: edite `clients.json`, faça commit/deploy de nova imagem **ou** monte um volume só em `/app/clients.json` para mudar sem rebuild.
 6. Logs no container:
    - **`.tmp/cron.log`** — saída do `main_scheduler` e blocos `INICIO`/`FIM` com horário UTC e `exit_code` (gerado por `scripts/cron_daily_report.sh`).
@@ -126,7 +126,7 @@ O container sobe um servidor HTTP em background (porta **`WEBHOOK_PORT`**, padr�
 - **Rota:** `POST /lorena-new-lead`
 - **URL pública (após mapear a porta no Easypanel):** `https://<domínio-do-app>/lorena-new-lead`
 
-**Variáveis de ambiente:** ver `ENV_TEMPLATE.txt` (`LORENA_LEAD_GROUP_ID`, `LORENA_LEAD_WEBHOOK_SECRET`, `LORENA_DEFAULT_LEAD_WHATSAPP`, `WEBHOOK_PORT`). Se `LORENA_LEAD_GROUP_ID` estiver vazio, usa o `group_id` do cliente **Lorena Carvalho** em `clients.json`.
+**Variáveis de ambiente:** ver `ENV_TEMPLATE.txt` (`LORENA_LEAD_GROUP_ID`, `LORENA_LEAD_WEBHOOK_SECRET`, `LORENA_FALLBACK_WHATSAPP`, `WEBHOOK_PORT`). Se `LORENA_LEAD_GROUP_ID` estiver vazio, usa o `group_id` do cliente **Lorena Carvalho** em `clients.json`.
 
 **Payload:** o Make pode enviar o JSON no formato envelope (array de objetos com `body`, contendo `data` e `mappable_field_data`, como no lead Meta). O servidor monta a mensagem WhatsApp (nome, link `wa.me` a partir de `telefone`, e-mail, bloco de respostas).
 

@@ -40,11 +40,6 @@ _EXCLUDE_RESPOSTAS = frozenset({"nome_completo", "email", "telefone"})
 _WHATSAPP_MSG_MAX = 4000
 
 
-def _default_lead_whatsapp() -> str:
-    """Número exibido quando o lead não informa telefone (configurável no Easypanel)."""
-    return (os.getenv("LORENA_DEFAULT_LEAD_WHATSAPP") or "+55 71 9106-5853").strip()
-
-
 def _wh_log(message: str, level: int = logging.INFO) -> None:
     """Log com prefixo fixo para grep no painel (ex.: filtro P12_LORENA_WEBHOOK)."""
     logger.log(level, "%s %s", LOG_PREFIX, message)
@@ -83,14 +78,18 @@ def _digits_only(phone: Optional[str]) -> str:
 
 def _format_whatsapp_line(raw_phone: Optional[str]) -> str:
     """
-    Monta linha de WhatsApp para mensagem.
-    - Se telefone do lead vier preenchido: usa link wa.me desse número.
-    - Se vier vazio: usa número padrão informado pelo time.
+    Sempre o número do lead: link wa.me só quando houver dígitos no payload.
+    Texto dummy da Meta (sem dígitos) não deve ser trocado por número fixo de teste.
+
+    Opcional: LORENA_FALLBACK_WHATSAPP — só usado se definido e o lead não tiver telefone válido.
     """
     digits = _digits_only(raw_phone)
     if digits:
         return f"https://wa.me/{digits}"
-    return _default_lead_whatsapp()
+    fallback = (os.getenv("LORENA_FALLBACK_WHATSAPP") or "").strip()
+    if fallback:
+        return fallback
+    return "(não informado)"
 
 
 def _mappable_lookup(mappable: List[Dict[str, Any]], name: str) -> str:
