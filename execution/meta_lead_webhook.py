@@ -13,6 +13,7 @@ import logging
 import os
 import re
 import sys
+import requests
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
@@ -38,6 +39,8 @@ app = Flask(__name__)
 LOG_PREFIX = "[P12_META_LEAD_WEBHOOK]"
 _EXCLUDE_RESPOSTAS = frozenset({"nome_completo", "email", "telefone", "page_id", "pageId"})
 _WHATSAPP_MSG_MAX = 4000
+_META_GRAPH_BASE_URL = "https://graph.facebook.com/v18.0"
+_FORM_NAME_CACHE: Dict[str, str] = {}
 
 
 def _emoji_for_log(message: str) -> str:
@@ -92,6 +95,28 @@ def _fallback_whatsapp_text() -> str:
     if fallback:
         return fallback
     return (os.getenv("LORENA_FALLBACK_WHATSAPP") or "").strip()
+
+
+def _meta_access_token() -> str:
+    return (os.getenv("META_ACCESS_TOKEN") or "").strip()
+
+
+def _graph_get_object_fields(object_id: str, fields: str) -> Dict[str, Any]:
+    token = _meta_access_token()
+    if not token or not object_id or not fields:
+        return {}
+    try:
+        response = requests.get(
+            f"{_META_GRAPH_BASE_URL}/{object_id}",
+            params={"fields": fields, "access_token": token},
+            timeout=10,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data if isinstance(data, dict) else {}
+    except Exception as e:
+        logger.warning("Falha ao consultar Graph API para object_id=%s: %s", object_id, e)
+        return {}
 
 
 def _format_whatsapp_line(raw_phone: Optional[str]) -> str:
@@ -406,23 +431,69 @@ def _base_message_fields(body: Dict[str, Any]) -> Dict[str, str]:
 def _extract_form_name(body: Dict[str, Any]) -> str:
     data = body.get("data") if isinstance(body.get("data"), dict) else {}
     mappable = _ensure_mappable(body, data)
-    return (
-        _first_non_empty(
-            data.get("form_name"),
-            data.get("formName"),
-            data.get("formulario"),
-            data.get("formulário"),
-            data.get("nome_formulario"),
-            data.get("nome_form"),
-            _mappable_lookup(mappable, "form_name"),
-            _mappable_lookup(mappable, "formName"),
-            _mappable_lookup(mappable, "formulario"),
-            _mappable_lookup(mappable, "formulário"),
-            _mappable_lookup(mappable, "nome_formulario"),
-            _mappable_lookup(mappable, "nome_form"),
-        )
-        or "(nao informado)"
+    name_from_payload = _first_non_empty(
+        data.get("form_name"),
+        data.get("formName"),
+        data.get("formulario"),
+        data.get("formulário"),
+        data.get("nome_formulario"),
+        data.get("nome_form"),
+        body.get("form_name"),
+        body.get("formName"),
+        body.get("formulario"),
+        body.get("formulário"),
+        body.get("nome_formulario"),
+        body.get("nome_form"),
+        _mappable_lookup(mappable, "form_name"),
+        _mappable_lookup(mappable, "formName"),
+        _mappable_lookup(mappable, "formulario"),
+        _mappable_lookup(mappable, "formulário"),
+        _mappable_lookup(mappable, "nome_formulario"),
+        _mappable_lookup(mappable, "nome_form"),
     )
+    if name_from_payload:
+        return name_from_payload
+
+    # Fallback robusto: resolve nome do formulário na Graph API via form_id/leadgenId.
+    form_id = _first_non_empty(
+        body.get("form_id"),
+        body.get("formId"),
+        body.get("leadgen_form_id"),
+        data.get("form_id"),
+        data.get("formId"),
+        data.get("leadgen_form_id"),
+        _mappable_lookup(mappable, "form_id"),
+        _mappable_lookup(mappable, "formId"),
+        _mappable_lookup(mappable, "leadgen_form_id"),
+    )
+    if form_id:
+        if form_id in _FORM_NAME_CACHE:
+            return _FORM_NAME_CACHE[form_id]
+        form_obj = _graph_get_object_fields(form_id, "name")
+        form_name = _first_non_empty(form_obj.get("name"))
+        if form_name:
+            _FORM_NAME_CACHE[form_id] = form_name
+            return form_name
+
+    leadgen_id = _first_non_empty(body.get("leadgenId"), body.get("leadgen_id"), data.get("leadgenId"), data.get("leadgen_id"))
+    if leadgen_id:
+        lead_obj = _graph_get_object_fields(leadgen_id, "form_id")
+        lead_form_id = _first_non_empty(lead_obj.get("form_id"))
+        if lead_form_id:
+            if lead_form_id in _FORM_NAME_CACHE:
+                return _FORM_NAME_CACHE[lead_form_id]
+            form_obj = _graph_get_object_fields(lead_form_id, "name")
+            form_name = _first_non_empty(form_obj.get("name"))
+            if form_name:
+                _FORM_NAME_CACHE[lead_form_id] = form_name
+                return form_name
+
+    logger.warning(
+        "Nao foi possivel resolver nome do formulario. form_id=%s leadgen_id=%s",
+        form_id or "(vazio)",
+        leadgen_id or "(vazio)",
+    )
+    return "(nao informado)"
 
 
 def _truncate_message(msg: str) -> str:
