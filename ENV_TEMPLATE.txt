@@ -34,6 +34,12 @@ META_BUSINESS_ID=
 WEBHOOK_PORT=8080
 META_LEAD_WEBHOOK_SECRET=
 
+# Webhook Evolution → catálogo de grupos na Pulseboard (POST /evolution-webhook no mesmo host/porta do webhook ou da dashboard).
+# Na Evolution, enviar o mesmo valor no header X-Webhook-Secret ou Authorization: Bearer <valor>.
+EVOLUTION_CATALOG_WEBHOOK_SECRET=
+# Só dev local: 1/true permite receber webhook sem secret (nunca em produção).
+# EVOLUTION_CATALOG_ALLOW_INSECURE=
+
 # -----------------------------------------------------------------------------
 # Dashboard (Pulseboard) — porta interna; no Easypanel expor HTTPS para esta porta
 # -----------------------------------------------------------------------------

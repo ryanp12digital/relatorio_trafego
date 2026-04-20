@@ -1,6 +1,7 @@
 const state = {
   metaClients: [],
   googleClients: [],
+  catalogGroups: [],
   templates: { channels: {}, variables: {}, filters: {} },
   eventsByClient: new Map(),
   eventStream: null,
@@ -683,13 +684,136 @@ function bindTabs() {
     meta: document.getElementById("tab-meta"),
     google: document.getElementById("tab-google"),
     templates: document.getElementById("tab-templates"),
+    groups: document.getElementById("tab-groups"),
   };
   buttons.forEach((btn) => {
     btn.addEventListener("click", () => {
       buttons.forEach((b) => b.classList.remove("is-active"));
       btn.classList.add("is-active");
-      Object.values(panels).forEach((p) => p.classList.remove("is-active"));
+      Object.values(panels).forEach((p) => p?.classList.remove("is-active"));
       panels[btn.dataset.tab]?.classList.add("is-active");
+      if (btn.dataset.tab === "groups") {
+        fetchCatalogGroups().catch((e) => console.error(e));
+      }
+    });
+  });
+}
+
+async function fetchCatalogGroups() {
+  const fb = document.getElementById("catalogGroupsFeedback");
+  if (fb) fb.textContent = "";
+  const res = await dashFetch(apiUrl("/api/catalog-groups"));
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    if (fb) fb.textContent = data.error || "Falha ao carregar grupos.";
+    return;
+  }
+  state.catalogGroups = Array.isArray(data.groups) ? data.groups : [];
+  renderCatalogGroups();
+}
+
+function renderCatalogGroups() {
+  const wrap = document.getElementById("catalogGroupsWrap");
+  if (!wrap) return;
+  const rows = state.catalogGroups;
+  if (!rows.length) {
+    wrap.innerHTML = `<p class="catalog-empty">Nenhum grupo catalogado ainda. Envie mensagens no grupo com o webhook ativo.</p>`;
+    return;
+  }
+  const esc = (s) =>
+    String(s ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  const head = `<table class="catalog-table"><thead><tr>
+    <th>Nome</th><th>JID</th><th>Última actividade</th><th>Evento</th><th>Monitorar</th><th></th>
+  </tr></thead><tbody>`;
+  const body = rows
+    .map((g) => {
+      const jid = esc(g.group_jid);
+      const rawSub = String(g.subject || "").trim();
+      const subVal = esc(rawSub);
+      const la = esc(g.last_activity_at || "");
+      const ev = esc(g.last_event_type || "");
+      const mon = !!g.monitoring_enabled;
+      return `<tr data-group-jid="${jid}">
+        <td><input type="text" class="catalog-subject-input" value="${subVal}" data-jid="${jid}" placeholder="Nome do grupo" /></td>
+        <td><code class="catalog-jid">${jid}</code></td>
+        <td class="catalog-muted">${la ? new Date(la).toLocaleString("pt-BR") : "—"}</td>
+        <td class="catalog-muted">${ev || "—"}</td>
+        <td><label class="catalog-toggle"><input type="checkbox" class="catalog-mon" data-jid="${jid}" ${mon ? "checked" : ""} /><span>Activo</span></label></td>
+        <td class="catalog-actions">
+          <button type="button" class="small ghost catalog-copy" data-jid="${jid}">Copiar JID</button>
+          <button type="button" class="small ghost catalog-refresh" data-jid="${jid}">Nome API</button>
+          <button type="button" class="small primary catalog-save-sub" data-jid="${jid}">Guardar nome</button>
+        </td>
+      </tr>`;
+    })
+    .join("");
+  wrap.innerHTML = head + body + `</tbody></table>`;
+
+  wrap.querySelectorAll(".catalog-copy").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const j = btn.getAttribute("data-jid");
+      if (j) navigator.clipboard?.writeText(j).catch(() => {});
+    });
+  });
+  wrap.querySelectorAll(".catalog-refresh").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const j = btn.getAttribute("data-jid");
+      if (!j) return;
+      btn.disabled = true;
+      try {
+        const res = await dashFetch(apiUrl("/api/catalog-groups/refresh"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ group_jid: j }),
+        });
+        const data = await res.json().catch(() => ({}));
+        const fb = document.getElementById("catalogGroupsFeedback");
+        if (!res.ok) {
+          if (fb) fb.textContent = data.error || "Falha ao atualizar nome.";
+        } else if (fb) {
+          fb.textContent = data.fetched ? "Nome actualizado pela Evolution." : "API não devolveu subject.";
+        }
+        await fetchCatalogGroups();
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+  wrap.querySelectorAll(".catalog-mon").forEach((cb) => {
+    cb.addEventListener("change", async () => {
+      const j = cb.getAttribute("data-jid");
+      if (!j) return;
+      const res = await dashFetch(apiUrl("/api/catalog-groups"), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ group_jid: j, monitoring_enabled: cb.checked }),
+      });
+      if (!res.ok) {
+        cb.checked = !cb.checked;
+        const fb = document.getElementById("catalogGroupsFeedback");
+        if (fb) fb.textContent = "Falha ao guardar monitoramento.";
+      }
+    });
+  });
+  wrap.querySelectorAll(".catalog-save-sub").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const j = btn.getAttribute("data-jid");
+      if (!j) return;
+      const row = btn.closest("tr");
+      const inp = row?.querySelector(".catalog-subject-input");
+      const subject = (inp?.value || "").trim();
+      const res = await dashFetch(apiUrl("/api/catalog-groups"), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ group_jid: j, subject }),
+      });
+      const fb = document.getElementById("catalogGroupsFeedback");
+      if (fb) fb.textContent = res.ok ? "Nome guardado." : "Falha ao guardar nome.";
+      if (res.ok) await fetchCatalogGroups();
     });
   });
 }
@@ -703,6 +827,8 @@ function bindUI() {
   document.getElementById("refreshBtn").addEventListener("click", fetchMetaClients);
   document.getElementById("refreshGoogleBtn").addEventListener("click", fetchGoogleClients);
   document.getElementById("refreshTemplatesBtn").addEventListener("click", fetchTemplates);
+  const rCat = document.getElementById("refreshCatalogGroupsBtn");
+  if (rCat) rCat.addEventListener("click", () => fetchCatalogGroups().catch((e) => console.error(e)));
   document.getElementById("previewBtn").addEventListener("click", generateTemplatePreview);
   document.getElementById("tplChannel").addEventListener("change", (ev) => renderTemplateVariables(ev.target.value));
   setupChipFields(document.getElementById("newClientForm"), ["lead_exclude_fields", "lead_exclude_contains"]);

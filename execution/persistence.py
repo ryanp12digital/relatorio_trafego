@@ -10,18 +10,23 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
 from execution.project_paths import (
+    catalog_groups_json_path,
     clients_json_path,
+    ensure_data_dir,
     google_clients_json_path,
     message_templates_json_path,
 )
 
 logger = logging.getLogger(__name__)
 _DB_BOOTSTRAPPED = False
+_CATALOG_JSON_LOCK = threading.RLock()
 
 try:
     import psycopg
@@ -433,3 +438,292 @@ def ensure_db_ready() -> None:
         seed_from_json_files_if_empty()
     except Exception as e:
         logger.warning("Falha ao preparar dados no Postgres: %s", e)
+
+
+def _catalog_row_from_db(r: Dict[str, Any]) -> Dict[str, Any]:
+    la = r.get("last_activity_at")
+    ua = r.get("updated_at")
+    return {
+        "group_jid": str(r.get("group_jid") or ""),
+        "subject": str(r.get("subject") or ""),
+        "monitoring_enabled": bool(r.get("monitoring_enabled", True)),
+        "last_activity_at": la.isoformat() if hasattr(la, "isoformat") else str(la or ""),
+        "last_event_type": str(r.get("last_event_type") or ""),
+        "last_push_name": str(r.get("last_push_name") or ""),
+        "last_preview": str(r.get("last_preview") or ""),
+        "updated_at": ua.isoformat() if hasattr(ua, "isoformat") else str(ua or ""),
+    }
+
+
+def _load_catalog_json() -> List[Dict[str, Any]]:
+    path = catalog_groups_json_path()
+    if not os.path.isfile(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        return raw if isinstance(raw, list) else []
+    except (OSError, json.JSONDecodeError):
+        return []
+
+
+def _save_catalog_json(rows: List[Dict[str, Any]]) -> None:
+    ensure_data_dir()
+    path = catalog_groups_json_path()
+    with _CATALOG_JSON_LOCK:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(rows, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+
+
+def list_catalog_groups() -> List[Dict[str, Any]]:
+    if db_enabled():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT group_jid, subject, monitoring_enabled, last_activity_at,
+                           last_event_type, last_push_name, last_preview, updated_at
+                    FROM whatsapp_catalog_groups
+                    ORDER BY last_activity_at DESC
+                    """
+                )
+                return [_catalog_row_from_db(dict(r)) for r in cur.fetchall()]
+    rows = _load_catalog_json()
+    rows.sort(key=lambda x: str(x.get("last_activity_at") or ""), reverse=True)
+    return rows
+
+
+def get_catalog_group(group_jid: str) -> Optional[Dict[str, Any]]:
+    gj = (group_jid or "").strip()
+    if not gj:
+        return None
+    if db_enabled():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT group_jid, subject, monitoring_enabled, last_activity_at,
+                           last_event_type, last_push_name, last_preview, updated_at
+                    FROM whatsapp_catalog_groups WHERE group_jid = %s
+                    """,
+                    (gj,),
+                )
+                r = cur.fetchone()
+                return _catalog_row_from_db(dict(r)) if r else None
+    for row in _load_catalog_json():
+        if str(row.get("group_jid", "")).strip() == gj:
+            return row
+    return None
+
+
+def catalog_group_should_process(group_jid: str) -> bool:
+    """False se grupo existe e monitoring_enabled=false; True se novo ou monitoring ligado."""
+    row = get_catalog_group(group_jid)
+    if row is None:
+        return True
+    return bool(row.get("monitoring_enabled", True))
+
+
+def upsert_catalog_group_activity(
+    group_jid: str,
+    *,
+    event_type: str = "",
+    push_name: str = "",
+    preview: str = "",
+) -> bool:
+    """
+    Regista actividade no grupo. Retorna False se monitoring desligado (não altera).
+    """
+    gj = (group_jid or "").strip()
+    if not gj or not gj.endswith("@g.us"):
+        return False
+    if not catalog_group_should_process(gj):
+        return False
+    et = (event_type or "")[:120]
+    pn = (push_name or "")[:200]
+    pv = (preview or "")[:500]
+    if db_enabled():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT monitoring_enabled FROM whatsapp_catalog_groups WHERE group_jid = %s",
+                    (gj,),
+                )
+                ex = cur.fetchone()
+                if ex and not bool(ex.get("monitoring_enabled", True)):
+                    return False
+                cur.execute(
+                    """
+                    INSERT INTO whatsapp_catalog_groups (
+                      group_jid, subject, monitoring_enabled, last_activity_at,
+                      last_event_type, last_push_name, last_preview, updated_at
+                    ) VALUES (%s, '', true, now(), %s, %s, %s, now())
+                    ON CONFLICT (group_jid) DO UPDATE SET
+                      last_activity_at = now(),
+                      last_event_type = EXCLUDED.last_event_type,
+                      last_push_name = EXCLUDED.last_push_name,
+                      last_preview = EXCLUDED.last_preview,
+                      updated_at = now()
+                    WHERE whatsapp_catalog_groups.monitoring_enabled = true
+                    """,
+                    (gj, et, pn, pv),
+                )
+        return True
+    with _CATALOG_JSON_LOCK:
+        rows = _load_catalog_json()
+        idx = next((i for i, r in enumerate(rows) if str(r.get("group_jid", "")).strip() == gj), None)
+        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+        if idx is not None:
+            if not bool(rows[idx].get("monitoring_enabled", True)):
+                return False
+            rows[idx]["last_activity_at"] = now_iso
+            rows[idx]["last_event_type"] = et
+            rows[idx]["last_push_name"] = pn
+            rows[idx]["last_preview"] = pv
+            rows[idx]["updated_at"] = now_iso
+        else:
+            rows.append(
+                {
+                    "group_jid": gj,
+                    "subject": "",
+                    "monitoring_enabled": True,
+                    "last_activity_at": now_iso,
+                    "last_event_type": et,
+                    "last_push_name": pn,
+                    "last_preview": pv,
+                    "updated_at": now_iso,
+                }
+            )
+        _save_catalog_json(rows)
+    return True
+
+
+def update_catalog_group_subject(group_jid: str, subject: str) -> None:
+    gj = (group_jid or "").strip()
+    sub = (subject or "").strip()[:500]
+    if not gj:
+        return
+    if db_enabled():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE whatsapp_catalog_groups
+                    SET subject = %s, updated_at = now()
+                    WHERE group_jid = %s
+                    """,
+                    (sub, gj),
+                )
+        return
+    with _CATALOG_JSON_LOCK:
+        rows = _load_catalog_json()
+        for r in rows:
+            if str(r.get("group_jid", "")).strip() == gj:
+                r["subject"] = sub
+                r["updated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+                break
+        else:
+            rows.append(
+                {
+                    "group_jid": gj,
+                    "subject": sub,
+                    "monitoring_enabled": True,
+                    "last_activity_at": "",
+                    "last_event_type": "",
+                    "last_push_name": "",
+                    "last_preview": "",
+                    "updated_at": "",
+                }
+            )
+        _save_catalog_json(rows)
+
+
+def set_catalog_group_monitoring(group_jid: str, enabled: bool) -> None:
+    gj = (group_jid or "").strip()
+    if not gj:
+        return
+    if db_enabled():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO whatsapp_catalog_groups (group_jid, monitoring_enabled, updated_at)
+                    VALUES (%s, %s, now())
+                    ON CONFLICT (group_jid) DO UPDATE SET
+                      monitoring_enabled = EXCLUDED.monitoring_enabled,
+                      updated_at = now()
+                    """,
+                    (gj, bool(enabled)),
+                )
+        return
+    with _CATALOG_JSON_LOCK:
+        rows = _load_catalog_json()
+        for r in rows:
+            if str(r.get("group_jid", "")).strip() == gj:
+                r["monitoring_enabled"] = bool(enabled)
+                r["updated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+                _save_catalog_json(rows)
+                return
+        rows.append(
+            {
+                "group_jid": gj,
+                "subject": "",
+                "monitoring_enabled": bool(enabled),
+                "last_activity_at": "",
+                "last_event_type": "",
+                "last_push_name": "",
+                "last_preview": "",
+                "updated_at": "",
+            }
+        )
+        _save_catalog_json(rows)
+
+
+def patch_catalog_group_manual(
+    group_jid: str,
+    *,
+    subject: Optional[str] = None,
+    monitoring_enabled: Optional[bool] = None,
+) -> Optional[Dict[str, Any]]:
+    """Atualiza subject e/ou monitoring; retorna linha actualizada ou None se não existir (BD)."""
+    gj = (group_jid or "").strip()
+    if not gj:
+        return None
+    if db_enabled():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1 FROM whatsapp_catalog_groups WHERE group_jid = %s", (gj,))
+                if not cur.fetchone():
+                    return None
+                if subject is not None:
+                    cur.execute(
+                        "UPDATE whatsapp_catalog_groups SET subject = %s, updated_at = now() WHERE group_jid = %s",
+                        ((subject or "").strip()[:500], gj),
+                    )
+                if monitoring_enabled is not None:
+                    cur.execute(
+                        """
+                        UPDATE whatsapp_catalog_groups
+                        SET monitoring_enabled = %s, updated_at = now()
+                        WHERE group_jid = %s
+                        """,
+                        (bool(monitoring_enabled), gj),
+                    )
+        return get_catalog_group(gj)
+    with _CATALOG_JSON_LOCK:
+        rows = _load_catalog_json()
+        found = None
+        for r in rows:
+            if str(r.get("group_jid", "")).strip() == gj:
+                found = r
+                break
+        if not found:
+            return None
+        if subject is not None:
+            found["subject"] = (subject or "").strip()[:500]
+        if monitoring_enabled is not None:
+            found["monitoring_enabled"] = bool(monitoring_enabled)
+        found["updated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+        _save_catalog_json(rows)
+    return get_catalog_group(gj)

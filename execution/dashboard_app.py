@@ -24,6 +24,7 @@ from urllib.parse import quote
 from flask import Flask, Response, jsonify, redirect, render_template, request, session, url_for
 
 from execution import persistence
+from execution.evolution_catalog_webhook import process_evolution_catalog_payload
 from execution.project_paths import (
     clients_json_path,
     ensure_data_dir,
@@ -447,6 +448,8 @@ def dashboard_auth_gate_response() -> Optional[Any]:
         return None
     if raw.rstrip("/") in ("/api/health", "/dash/api/health"):
         return None
+    if raw.rstrip("/") == "/evolution-webhook":
+        return None
     base = raw.rstrip("/") or "/"
     if base in ("/login", "/dash/login", "/logout", "/dash/logout"):
         return None
@@ -502,6 +505,93 @@ def logout() -> Any:
 @app.get("/api/health")
 def api_health() -> Any:
     return jsonify({"ok": True, "db": persistence.db_enabled()})
+
+
+def evolution_catalog_webhook_view() -> Any:
+    """POST público (secret); usado pela dashboard e pelo meta_lead_webhook."""
+    raw = request.get_json(silent=True, force=True)
+    if raw is None:
+        try:
+            text = request.get_data(as_text=True)
+        except Exception:
+            text = ""
+        if text:
+            text = text.lstrip("\ufeff").strip()
+            try:
+                raw = json.loads(text)
+            except json.JSONDecodeError:
+                raw = None
+    if raw is None:
+        return jsonify({"ok": False, "error": "invalid_json"}), 400
+    hdr = (request.headers.get("X-Webhook-Secret") or "").strip()
+    auth = request.headers.get("Authorization") or ""
+    bearer = ""
+    if auth.lower().startswith("bearer "):
+        bearer = auth[7:].strip()
+    body, status = process_evolution_catalog_payload(raw, header_secret=hdr, auth_bearer=bearer)
+    return jsonify(body), status
+
+
+@app.post("/evolution-webhook")
+def evolution_catalog_webhook_route() -> Any:
+    return evolution_catalog_webhook_view()
+
+
+@app.get("/api/catalog-groups")
+def api_catalog_groups_list() -> Any:
+    persistence.ensure_db_ready()
+    rows = persistence.list_catalog_groups()
+    return jsonify({"ok": True, "groups": rows})
+
+
+@app.patch("/api/catalog-groups")
+def api_catalog_groups_patch() -> Any:
+    persistence.ensure_db_ready()
+    payload = request.get_json(silent=True) or {}
+    gj = str(payload.get("group_jid") or "").strip()
+    if not gj:
+        return jsonify({"ok": False, "error": "group_jid_obrigatorio"}), 400
+    sub = payload.get("subject")
+    mon = payload.get("monitoring_enabled")
+    sub_opt = str(sub).strip() if sub is not None else None
+    mon_opt: Optional[bool] = None
+    if mon is not None:
+        mon_opt = bool(mon)
+    updated = persistence.patch_catalog_group_manual(
+        gj,
+        subject=sub_opt if sub is not None else None,
+        monitoring_enabled=mon_opt,
+    )
+    if updated is None:
+        return jsonify({"ok": False, "error": "grupo_nao_encontrado"}), 404
+    return jsonify({"ok": True, "group": updated})
+
+
+@app.post("/api/catalog-groups/refresh")
+def api_catalog_groups_refresh() -> Any:
+    persistence.ensure_db_ready()
+    payload = request.get_json(silent=True) or {}
+    gj = str(payload.get("group_jid") or "").strip()
+    if not gj or not gj.endswith("@g.us"):
+        return jsonify({"ok": False, "error": "group_jid_invalido"}), 400
+    try:
+        from execution.evolution_client import get_evolution_client
+
+        client = get_evolution_client()
+        info = client.fetch_group_info(gj)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 503
+    if not info:
+        return jsonify({"ok": False, "error": "findGroupInfos_sem_dados"}), 502
+    sub = (
+        str(info.get("subject") or "")
+        or str(info.get("name") or "")
+        or str(info.get("groupName") or "")
+    ).strip()
+    if sub:
+        persistence.update_catalog_group_subject(gj, sub)
+    row = persistence.get_catalog_group(gj)
+    return jsonify({"ok": True, "group": row, "fetched": bool(sub)})
 
 
 @app.get("/")

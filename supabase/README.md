@@ -6,6 +6,8 @@ No painel Supabase: **SQL Editor** → cole o conteúdo de `migrations/001_initi
 
 > O MCP do Cursor com `read_only=true` **não** executa `CREATE TABLE`. Ou usas o SQL Editor, ou alteras a URL do MCP no Cursor para `read_only=false` (se a tua organização permitir).
 
+Para a **aba Grupos WhatsApp** (catálogo via webhook Evolution), executa também `migrations/002_whatsapp_catalog_groups.sql` (tabela `whatsapp_catalog_groups`).
+
 ## 2. Connection string (Easypanel)
 
 **Project Settings → Database** → copiar a URI do **Transaction pooler** (modo **Transaction**, porta típica **6543**).

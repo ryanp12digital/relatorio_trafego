@@ -11,6 +11,7 @@ import requests
 import time
 import logging
 from typing import Any, Dict, Optional, Tuple
+from urllib.parse import quote
 
 # Configuração de logging
 log_file = os.path.join(os.path.dirname(__file__), '..', '.tmp', 'execution.log')
@@ -228,6 +229,42 @@ class EvolutionAPIClient:
                     raise
         
         return False
+
+    def fetch_group_info(self, group_jid: str) -> Optional[Dict[str, Any]]:
+        """
+        GET /group/findGroupInfos/{instance}?groupJid=... (Evolution v2).
+        Retorna dict com id, subject, etc., ou None se 404/erro.
+        """
+        gj = (group_jid or "").strip()
+        if not gj:
+            return None
+        url = f"{self.base_url}/group/findGroupInfos/{quote(self.instance, safe='')}"
+        try:
+            resp = requests.get(
+                url,
+                headers=self.headers,
+                params={"groupJid": gj, "getParticipants": "false"},
+                timeout=20,
+            )
+            if resp.status_code == 404:
+                return None
+            resp.raise_for_status()
+            data = resp.json()
+        except requests.RequestException as e:
+            logger.warning("findGroupInfos falhou para %s: %s", gj, e)
+            return None
+        except ValueError as e:
+            logger.warning("findGroupInfos JSON inválido para %s: %s", gj, e)
+            return None
+
+        if not isinstance(data, dict):
+            return None
+        inner = data.get("data")
+        if isinstance(inner, dict) and (inner.get("id") or inner.get("subject") is not None):
+            return inner
+        if data.get("id") or data.get("subject") is not None:
+            return data
+        return None
 
 
 def get_evolution_client() -> EvolutionAPIClient:

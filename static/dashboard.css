@@ -972,6 +972,73 @@ textarea {
   }
 }
 
+.catalog-groups-wrap {
+  overflow-x: auto;
+}
+
+.catalog-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.catalog-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.catalog-table th,
+.catalog-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 10px 8px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.catalog-table th {
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+}
+
+.catalog-subject-input {
+  width: min(280px, 100%);
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #0b0f16;
+  color: var(--text);
+  font: inherit;
+}
+
+.catalog-jid {
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.catalog-muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.catalog-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.catalog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 @media (max-width: 760px) {
   .stats {
     grid-template-columns: repeat(2, minmax(130px, 1fr));

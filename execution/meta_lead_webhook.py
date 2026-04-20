@@ -1207,12 +1207,32 @@ def dash_api_events_stream() -> Response:
     return dashboard_module.api_events_stream()
 
 
+@app.post("/evolution-webhook")
+def meta_evolution_catalog_webhook() -> Any:
+    return dashboard_module.evolution_catalog_webhook_view()
+
+
+@app.get("/dash/api/catalog-groups")
+def dash_api_catalog_groups_list():
+    return dashboard_module.api_catalog_groups_list()
+
+
+@app.patch("/dash/api/catalog-groups")
+def dash_api_catalog_groups_patch():
+    return dashboard_module.api_catalog_groups_patch()
+
+
+@app.post("/dash/api/catalog-groups/refresh")
+def dash_api_catalog_groups_refresh():
+    return dashboard_module.api_catalog_groups_refresh()
+
+
 def main() -> None:
     _load_env()
     port = int(os.getenv("WEBHOOK_PORT", "8080"))
     _wh_log(
         "SERVICO_INICIADO | "
-        f"escutando 0.0.0.0:{port} | rotas POST /meta-new-lead e /lorena-new-lead (legado) | dashboard em /dash"
+        f"escutando 0.0.0.0:{port} | POST /meta-new-lead | dashboard /dash | catálogo grupos POST /evolution-webhook"
     )
     logging.getLogger("werkzeug").setLevel(logging.WARNING)
     app.run(host="0.0.0.0", port=port, threaded=True)

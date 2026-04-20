@@ -33,3 +33,7 @@ def google_clients_json_path() -> str:
 
 def message_templates_json_path() -> str:
     return os.path.join(DATA_DIR, "message_templates.json")
+
+
+def catalog_groups_json_path() -> str:
+    return os.path.join(DATA_DIR, "catalog_groups.json")
