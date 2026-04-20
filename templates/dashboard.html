@@ -66,7 +66,15 @@
             </label>
             <label>
               Template lead
-              <input name="lead_template" placeholder="default / lorena / personalizado" value="default" />
+              <select
+                name="lead_template"
+                id="newClientLeadTemplate"
+                class="field-select lead-template-select"
+                required
+              >
+                <option value="default">Carregando…</option>
+              </select>
+              <span class="field-hint">Integrados ou templates criados na aba Templates.</span>
             </label>
             <label>
               Excluir perguntas (CSV)
@@ -294,7 +302,7 @@
             <div><dt>Grupo relatório</dt><dd class="f-group_id"></dd></div>
             <div><dt>Page ID</dt><dd class="f-meta_page_id"></dd></div>
             <div><dt>Grupo lead</dt><dd class="f-lead_group_id"></dd></div>
-            <div><dt>Template</dt><dd class="f-lead_template"></dd></div>
+            <div><dt>Template lead</dt><dd class="f-lead_template"></dd></div>
             <div><dt>Enabled</dt><dd class="f-enabled"></dd></div>
           </dl>
           <div class="checks"></div>
@@ -303,78 +311,93 @@
             <button data-scenario="send_fail" class="small action-warn">Harness falha envio</button>
             <button data-scenario="route_fail" class="small action-err">Harness falha rota</button>
           </div>
-          <form class="edit-form hidden">
-            <label>
-              Nome
-              <input name="client_name" required />
-            </label>
-            <label>
-              Conta Meta
-              <input name="ad_account_id" required />
-            </label>
-            <label>
-              Grupo relatório
-              <input name="group_id" required />
-            </label>
-            <label>
-              Meta page id
-              <input name="meta_page_id" />
-            </label>
-            <label>
-              Grupo lead
-              <input name="lead_group_id" />
-            </label>
-            <label>
-              Telefone lead
-              <input name="lead_phone_number" />
-            </label>
-            <label>
-              Template lead
-              <input name="lead_template" />
-            </label>
-            <label>
-              Excluir perguntas (CSV)
-              <div class="chips-control" data-chip-for="lead_exclude_fields">
-                <div class="chips-list"></div>
-                <input
-                  type="text"
-                  class="chips-entry"
-                  placeholder="Digite uma palavra-chave e pressione Enter"
-                />
+          <form class="edit-form edit-sheet hidden">
+            <header class="edit-sheet-head">
+              <h4 class="edit-sheet-title">Editar cliente Meta</h4>
+              <p class="edit-sheet-sub">Ajuste envio de lead, template e filtros de campos do formulário.</p>
+            </header>
+            <div class="edit-field-grid">
+              <label class="edit-field">
+                Nome
+                <input name="client_name" required autocomplete="organization" />
+              </label>
+              <label class="edit-field">
+                Conta Meta
+                <input name="ad_account_id" required placeholder="act_…" spellcheck="false" />
+              </label>
+              <label class="edit-field">
+                Grupo relatório
+                <input name="group_id" required placeholder="…@g.us" spellcheck="false" />
+              </label>
+              <label class="edit-field">
+                Meta page id
+                <input name="meta_page_id" inputmode="numeric" placeholder="ID numérico da página" />
+              </label>
+              <label class="edit-field">
+                Grupo lead
+                <input name="lead_group_id" placeholder="…@g.us" spellcheck="false" />
+              </label>
+              <label class="edit-field">
+                Telefone lead
+                <input name="lead_phone_number" inputmode="tel" placeholder="Opcional" />
+              </label>
+              <label class="edit-field edit-field--full">
+                Template lead
+                <select name="lead_template" class="field-select lead-template-select" required></select>
+                <span class="field-hint">Padrão integrado ou template personalizado da aba Templates.</span>
+              </label>
+            </div>
+            <div class="edit-section">
+              <h5 class="edit-section-title">Filtros do bloco “Formulário”</h5>
+              <p class="edit-section-desc">Tags: digite e pressione Enter. Remove linhas antes do envio ao WhatsApp.</p>
+              <div class="edit-field-grid edit-field-grid--filters">
+                <label class="edit-field edit-field--full">
+                  Excluir perguntas (nome exato)
+                  <div class="chips-control" data-chip-for="lead_exclude_fields">
+                    <div class="chips-list"></div>
+                    <input
+                      type="text"
+                      class="chips-entry"
+                      placeholder="Digite uma palavra-chave e pressione Enter"
+                    />
+                  </div>
+                  <input type="hidden" name="lead_exclude_fields" />
+                </label>
+                <label class="edit-field edit-field--full">
+                  Excluir se o nome contiver
+                  <div class="chips-control" data-chip-for="lead_exclude_contains">
+                    <div class="chips-list"></div>
+                    <input
+                      type="text"
+                      class="chips-entry"
+                      placeholder="Digite uma palavra-chave e pressione Enter"
+                    />
+                  </div>
+                  <input type="hidden" name="lead_exclude_contains" />
+                </label>
+                <label class="edit-field edit-field--full">
+                  Excluir por regex
+                  <div class="chips-control" data-chip-for="lead_exclude_regex">
+                    <div class="chips-list"></div>
+                    <input
+                      type="text"
+                      class="chips-entry"
+                      placeholder="Digite uma regex e pressione Enter"
+                    />
+                  </div>
+                  <input type="hidden" name="lead_exclude_regex" />
+                </label>
               </div>
-              <input type="hidden" name="lead_exclude_fields" />
-            </label>
-            <label>
-              Excluir se contiver (CSV)
-              <div class="chips-control" data-chip-for="lead_exclude_contains">
-                <div class="chips-list"></div>
-                <input
-                  type="text"
-                  class="chips-entry"
-                  placeholder="Digite uma palavra-chave e pressione Enter"
-                />
+            </div>
+            <div class="edit-bar">
+              <label class="check edit-check">
+                <input type="checkbox" name="enabled" />
+                <span>Automação ativa</span>
+              </label>
+              <div class="edit-actions">
+                <button type="submit" class="btn-edit-save">Salvar alterações</button>
+                <button type="button" class="btn-edit-cancel" data-action="cancel-edit">Cancelar</button>
               </div>
-              <input type="hidden" name="lead_exclude_contains" />
-            </label>
-            <label>
-              Excluir por regex (CSV)
-              <div class="chips-control" data-chip-for="lead_exclude_regex">
-                <div class="chips-list"></div>
-                <input
-                  type="text"
-                  class="chips-entry"
-                  placeholder="Digite uma regex e pressione Enter"
-                />
-              </div>
-              <input type="hidden" name="lead_exclude_regex" />
-            </label>
-            <label class="check">
-              <input type="checkbox" name="enabled" />
-              <span>Automação ativa</span>
-            </label>
-            <div class="edit-actions">
-              <button type="submit" class="small action-ok">Salvar</button>
-              <button type="button" class="small ghost" data-action="cancel-edit">Cancelar</button>
             </div>
             <p class="edit-feedback"></p>
           </form>

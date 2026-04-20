@@ -170,8 +170,8 @@ h1 {
 .new-client-grid {
   margin-top: 14px;
   display: grid;
-  grid-template-columns: repeat(4, minmax(170px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  gap: 12px;
 }
 
 label {
@@ -421,32 +421,178 @@ dd {
   border-color: rgba(129, 168, 255, 0.9);
 }
 
-.edit-form {
-  margin-top: 12px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(9, 12, 19, 0.8);
-  padding: 10px;
-  display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(2, minmax(180px, 1fr));
+.edit-form.edit-sheet {
+  margin-top: 16px;
+  border: 1px solid rgba(129, 168, 255, 0.28);
+  border-radius: 16px;
+  background: linear-gradient(165deg, rgba(10, 14, 22, 0.96), rgba(11, 16, 28, 0.9));
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  padding: clamp(14px, 2.5vw, 22px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 2vw, 18px);
 }
 
 .edit-form.hidden {
   display: none;
 }
 
-.edit-actions {
+.edit-sheet:not(.hidden) {
+  animation: editSheetIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes editSheetIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .edit-sheet:not(.hidden) {
+    animation: none;
+  }
+}
+
+.edit-sheet-head {
+  border-bottom: 1px solid rgba(42, 48, 66, 0.95);
+  padding-bottom: 12px;
+}
+
+.edit-sheet-title {
+  margin: 0;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: clamp(26px, 4vw, 34px);
+  letter-spacing: 0.04em;
+  color: #f2f5fc;
+  line-height: 1;
+}
+
+.edit-sheet-sub {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  text-transform: none;
+  max-width: 52ch;
+}
+
+.edit-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: 12px 14px;
+}
+
+.edit-field-grid--filters {
+  margin-top: 8px;
+}
+
+.edit-field {
+  display: grid;
+  gap: 6px;
+}
+
+.edit-field--full {
   grid-column: 1 / -1;
+}
+
+.edit-section {
+  border: 1px solid rgba(42, 48, 66, 0.8);
+  border-radius: 14px;
+  padding: 14px 14px 12px;
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.edit-section-title {
+  margin: 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #9aa6c4;
+  font-weight: 800;
+}
+
+.edit-section-desc {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: none;
+}
+
+.edit-bar {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.edit-check {
+  margin: 0;
+}
+
+.edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.field-select {
+  cursor: pointer;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, #9eb7ff 50%),
+    linear-gradient(135deg, #9eb7ff 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% + 3px), calc(100% - 14px) calc(50% + 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 36px;
+}
+
+.field-hint {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: none;
+  line-height: 1.35;
+}
+
+.btn-edit-save,
+.btn-edit-cancel {
+  border-radius: 12px;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-edit-save {
+  border: none;
+  background: linear-gradient(118deg, rgba(58, 247, 214, 0.4), rgba(129, 168, 255, 0.55));
+  color: #05080f;
+  box-shadow: 0 4px 22px rgba(58, 247, 214, 0.15);
+}
+
+.btn-edit-save:hover {
+  filter: brightness(1.07);
+}
+
+.btn-edit-cancel {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+
+.btn-edit-cancel:hover {
+  border-color: rgba(129, 168, 255, 0.45);
 }
 
 .edit-feedback {
   margin: 0;
   color: var(--muted);
   font-size: 12px;
-  grid-column: 1 / -1;
   min-height: 16px;
 }
 
@@ -733,5 +879,23 @@ textarea {
   }
   .meta-grid {
     grid-template-columns: 1fr;
+  }
+  .edit-field-grid {
+    grid-template-columns: 1fr;
+  }
+  .edit-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .edit-actions {
+    width: 100%;
+  }
+  .edit-actions .btn-edit-save,
+  .edit-actions .btn-edit-cancel {
+    flex: 1;
+    min-width: 0;
+  }
+  .chips-entry {
+    min-width: 120px;
   }
 }

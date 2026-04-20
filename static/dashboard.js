@@ -35,6 +35,80 @@ function stringifyCsv(values) {
   return uniqueKeepOrder(values).join(", ");
 }
 
+/** IDs de template Meta Lead conhecidos no backend (integrados). */
+const META_LEAD_BUILTIN_IDS = ["default", "lorena", "pratical_life"];
+
+function metaLeadTemplateBucket() {
+  const ch = state.templates?.channels?.meta_lead;
+  return ch && typeof ch === "object" ? ch : {};
+}
+
+/** Preenche o select `lead_template` com integrados e templates do arquivo/API. */
+function populateLeadTemplateSelect(selectEl, currentValue) {
+  if (!selectEl) return;
+  const cur = String(currentValue || "default").trim() || "default";
+  const bucket = metaLeadTemplateBucket();
+  selectEl.innerHTML = "";
+
+  const mkOptgroup = (label) => {
+    const og = document.createElement("optgroup");
+    og.label = label;
+    return og;
+  };
+
+  const builtinOg = mkOptgroup("Integrados");
+  META_LEAD_BUILTIN_IDS.forEach((id) => {
+    const entry = bucket[id];
+    const text = entry?.name || id;
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = text;
+    builtinOg.appendChild(opt);
+  });
+  selectEl.appendChild(builtinOg);
+
+  const customIds = Object.keys(bucket)
+    .filter((id) => !META_LEAD_BUILTIN_IDS.includes(id))
+    .sort((a, b) => {
+      const na = (bucket[a]?.name || a).toLowerCase();
+      const nb = (bucket[b]?.name || b).toLowerCase();
+      return na.localeCompare(nb, "pt-BR");
+    });
+
+  if (customIds.length) {
+    const customOg = mkOptgroup("Personalizados (aba Templates)");
+    customIds.forEach((id) => {
+      const entry = bucket[id];
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = entry?.name ? `${entry.name} · ${id}` : id;
+      customOg.appendChild(opt);
+    });
+    selectEl.appendChild(customOg);
+  }
+
+  const known = new Set([...META_LEAD_BUILTIN_IDS, ...Object.keys(bucket)]);
+  if (!known.has(cur)) {
+    const orphan = document.createElement("option");
+    orphan.value = cur;
+    orphan.textContent = `ID salvo no cliente (não listado): ${cur}`;
+    selectEl.insertBefore(orphan, selectEl.firstChild);
+  }
+  selectEl.value = cur;
+}
+
+function refreshLeadTemplateSelects() {
+  const newSel = document.getElementById("newClientLeadTemplate");
+  if (newSel) populateLeadTemplateSelect(newSel, newSel.value || "default");
+
+  document.querySelectorAll('.edit-form select[name="lead_template"]').forEach((sel) => {
+    const card = sel.closest(".client-card");
+    const cid = card?.dataset?.clientId;
+    const client = state.metaClients.find((c) => String(c.id) === String(cid));
+    populateLeadTemplateSelect(sel, client?.lead_template || sel.value || "default");
+  });
+}
+
 function ensureChipControl(form, fieldName) {
   const hidden = form.querySelector(`input[name="${fieldName}"]`);
   const control = form.querySelector(`.chips-control[data-chip-for="${fieldName}"]`);
@@ -218,7 +292,7 @@ function renderMetaClients() {
     editForm.elements.meta_page_id.value = client.meta_page_id || "";
     editForm.elements.lead_group_id.value = client.lead_group_id || "";
     editForm.elements.lead_phone_number.value = client.lead_phone_number || "";
-    editForm.elements.lead_template.value = client.lead_template || "default";
+    populateLeadTemplateSelect(editForm.querySelector('select[name="lead_template"]'), client.lead_template);
     editForm.elements.lead_exclude_fields.value = (client.lead_exclude_fields || []).join(", ");
     editForm.elements.lead_exclude_contains.value = (client.lead_exclude_contains || []).join(", ");
     editForm.elements.lead_exclude_regex.value = (client.lead_exclude_regex || []).join(", ");
@@ -418,6 +492,7 @@ async function fetchTemplates() {
   renderTemplateVariables(document.getElementById("tplChannel").value);
   renderTemplatesCatalog();
   renderFiltersForm();
+  refreshLeadTemplateSelects();
 }
 
 async function submitNewMetaClient(ev) {
@@ -441,6 +516,7 @@ async function submitNewMetaClient(ev) {
   feedback.textContent = "Cliente Meta adicionado com sucesso.";
   form.reset();
   form.querySelector('input[name="enabled"]').checked = true;
+  populateLeadTemplateSelect(document.getElementById("newClientLeadTemplate"), "default");
   setupChipFields(form, ["lead_exclude_fields", "lead_exclude_contains"]);
   await fetchMetaClients();
 }
