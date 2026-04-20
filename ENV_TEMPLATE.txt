@@ -32,6 +32,9 @@ META_BUSINESS_ID=
 
 # Webhook Make → leads Meta (POST /meta-new-lead). Mapear HTTPS → WEBHOOK_PORT
 WEBHOOK_PORT=8080
+# HTTP: Waitress (recomendado). false = servidor Flask de desenvolvimento.
+USE_WAITRESS=1
+# Health check sem auth: GET http://<host>:8080/health (configure no Easypanel em vez de POST vazio em /meta-new-lead).
 META_LEAD_WEBHOOK_SECRET=
 
 # Webhook Evolution → catálogo de grupos na Pulseboard (POST /evolution-webhook no mesmo host/porta do webhook ou da dashboard).

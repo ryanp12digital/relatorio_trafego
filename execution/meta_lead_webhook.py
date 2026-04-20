@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from execution.evolution_client import get_evolution_client
 from execution import dashboard_app as dashboard_module
+from execution.flask_server import serve_flask_app
 from execution.live_events import publish_event
 from execution.message_templates import get_filter_rules, get_template_content, render_template_text
 from execution.project_paths import clients_json_path
@@ -332,6 +333,9 @@ def _unwrap_json_strings(raw: Any, max_depth: int = 8) -> Any:
 
 
 def _is_meta_lead_body(d: Dict[str, Any]) -> bool:
+    fd = d.get("field_data")
+    if isinstance(fd, list) and len(fd) > 0:
+        return True
     data = d.get("data")
     if not isinstance(data, dict):
         return False
@@ -352,6 +356,43 @@ def _coerce_inner_body(val: Any) -> Optional[Dict[str, Any]]:
         if isinstance(unwrapped, dict):
             return unwrapped
     return None
+
+
+def _inject_field_data_as_mappable(body: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Converte resposta Meta (Graph) com `field_data` [{name, values}] em
+    `data` + `mappable_field_data` usados pelo resto do pipeline.
+    """
+    fd = body.get("field_data")
+    if not isinstance(fd, list) or not fd:
+        return body
+    mappable_existing = body.get("mappable_field_data")
+    if isinstance(mappable_existing, list) and len(mappable_existing) > 0:
+        return body
+    data_existing = body.get("data")
+    if isinstance(data_existing, dict) and len(data_existing) > 0:
+        return body  # ja ha campos em data (nao sobrescrever)
+    data: Dict[str, Any] = {}
+    mappable: List[Dict[str, Any]] = []
+    for row in fd:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("name", "")).strip()
+        if not name:
+            continue
+        values = row.get("values")
+        if isinstance(values, list) and len(values) > 0:
+            val = values[0]
+        else:
+            val = row.get("value")
+        data[name] = val
+        mappable.append({"name": name, "value": val})
+    if not mappable:
+        return body
+    out = dict(body)
+    out["data"] = data
+    out["mappable_field_data"] = mappable
+    return out
 
 
 def _first_non_empty(*values: Any) -> str:
@@ -378,11 +419,20 @@ def _extract_lead_event(item: Any) -> Optional[Dict[str, Any]]:
     if not isinstance(item, dict):
         return None
 
+    # Make (HTTP): raiz com "json" = lead, sem "body"
+    if "body" not in item and isinstance(item.get("json"), dict):
+        page_outer = _first_non_empty(item.get("page_id"), item.get("pageId"))
+        synthetic: Dict[str, Any] = {"body": item["json"]}
+        if page_outer:
+            synthetic["page_id"] = page_outer
+        return _extract_lead_event(synthetic)
+
     # Envelope no formato {"body": {...}, ...}
     if "body" in item:
         inner = _coerce_inner_body(item.get("body"))
         if not inner:
             return None
+        inner = _inject_field_data_as_mappable(inner)
         page_id = _first_non_empty(
             item.get("page_id"),
             item.get("pageId"),
@@ -393,6 +443,7 @@ def _extract_lead_event(item: Any) -> Optional[Dict[str, Any]]:
         return None
 
     # Lead direto
+    item = _inject_field_data_as_mappable(item)
     if _is_meta_lead_body(item):
         return {"body": item, "page_id": _extract_page_id_from_dict(item)}
     return None
@@ -845,6 +896,8 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
 
     events = normalize_lead_events(raw)
     if not events:
+        if raw in ({}, []):
+            return jsonify({"ok": True, "ignored": True, "reason": "empty_payload"}), 200
         _wh_log(f"POST {endpoint_label} | ERRO_PAYLOAD | nenhum lead extraido", level=logging.WARNING)
         _emit_runtime_event(
             stage="ERRO_PAYLOAD",
@@ -1083,6 +1136,12 @@ def lorena_new_lead_legacy():
     return response, status
 
 
+@app.get("/health")
+def meta_service_health() -> Any:
+    """Health check HTTP (porta 8080) sem autenticacao — use no Easypanel em vez de POST /meta-new-lead."""
+    return jsonify({"ok": True, "service": "meta_lead_webhook"}), 200
+
+
 @app.before_request
 def _dash_proxy_auth() -> Optional[Any]:
     path = request.path or ""
@@ -1232,10 +1291,10 @@ def main() -> None:
     port = int(os.getenv("WEBHOOK_PORT", "8080"))
     _wh_log(
         "SERVICO_INICIADO | "
-        f"escutando 0.0.0.0:{port} | POST /meta-new-lead | dashboard /dash | catálogo grupos POST /evolution-webhook"
+        f"escutando 0.0.0.0:{port} | GET /health | POST /meta-new-lead | dashboard /dash | "
+        f"catalogo grupos POST /evolution-webhook"
     )
-    logging.getLogger("werkzeug").setLevel(logging.WARNING)
-    app.run(host="0.0.0.0", port=port, threaded=True)
+    serve_flask_app(app, port=port)
 
 
 if __name__ == "__main__":

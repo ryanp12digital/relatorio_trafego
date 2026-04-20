@@ -3,4 +3,5 @@ python-dotenv>=1.0.0
 pytz>=2023.3
 tzdata>=2024.1
 flask>=3.0.0
+waitress>=3.0.0
 psycopg[binary]>=3.2.0

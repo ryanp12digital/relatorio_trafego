@@ -31,6 +31,7 @@ from flask import Flask, Response, jsonify, redirect, render_template, request, 
 
 from execution import persistence
 from execution.evolution_catalog_webhook import process_evolution_catalog_payload
+from execution.flask_server import serve_flask_app
 from execution.project_paths import (
     clients_json_path,
     ensure_data_dir,
@@ -452,7 +453,7 @@ def dashboard_auth_gate_response() -> Optional[Any]:
     raw = request.path or ""
     if raw.startswith("/static/"):
         return None
-    if raw.rstrip("/") in ("/api/health", "/dash/api/health"):
+    if raw.rstrip("/") in ("/api/health", "/dash/api/health", "/health"):
         return None
     if raw.rstrip("/") == "/evolution-webhook":
         return None
@@ -511,6 +512,12 @@ def logout() -> Any:
 @app.get("/api/health")
 def api_health() -> Any:
     return jsonify({"ok": True, "db": persistence.db_enabled()})
+
+
+@app.get("/health")
+def root_health() -> Any:
+    """Mesmo contrato que /api/health (probes na raiz da porta 8091)."""
+    return api_health()
 
 
 def evolution_catalog_webhook_view() -> Any:
@@ -992,7 +999,7 @@ def main() -> None:
         status="info",
         detail=f"Dashboard iniciada na porta {port}",
     )
-    app.run(host="0.0.0.0", port=port, threaded=True)
+    serve_flask_app(app, port=port)
 
 
 if __name__ == "__main__":

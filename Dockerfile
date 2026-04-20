@@ -4,6 +4,8 @@ WORKDIR /app
 
 # Imports `from execution.*` ao correr scripts em /app/execution/*.py
 ENV PYTHONPATH=/app
+ENV PYTHONUTF8=1
+ENV USE_WAITRESS=1
 
 # Instala timezone data
 RUN apk add --no-cache tzdata
