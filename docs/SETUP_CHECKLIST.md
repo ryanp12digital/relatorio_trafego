@@ -42,7 +42,7 @@
 - [ ] Confirmar recebimento de mensagens no grupo WhatsApp
 
 ### 5. Agendamento Automático
-- [ ] Seguir instruções em `CRON_SETUP.md`
+- [ ] Seguir instruções em `docs/CRON_SETUP.md`
 - [ ] Configurar cron/task scheduler para execução diária às 10:00 AM
 - [ ] Testar execução agendada
 - [ ] Verificar logs após primeira execução automática
@@ -51,7 +51,8 @@
 
 ### Estrutura de Arquivos
 - [ ] `execution/` com todos os scripts Python
-- [ ] `directives/` com todas as diretivas Markdown
+- [ ] `data/` com `clients.json` (e opcionalmente `google_clients.json`, `message_templates.json`)
+- [ ] `docs/directives/` com todas as diretivas Markdown
 - [ ] `.tmp/` criado (para logs)
 - [ ] `.env` configurado (não versionado)
 
@@ -88,6 +89,6 @@
 - Verificar variáveis de ambiente carregadas corretamente
 
 ## Suporte
-- Consultar diretivas em `directives/` para detalhes específicos
+- Consultar diretivas em `docs/directives/` para detalhes específicos
 - Verificar logs em `.tmp/execution.log` para erros
-- Consultar `AGENTE_P12_RELATORIOS.md` para especificação técnica completa
+- Consultar `docs/AGENTE_P12_RELATORIOS.md` para especificação técnica completa

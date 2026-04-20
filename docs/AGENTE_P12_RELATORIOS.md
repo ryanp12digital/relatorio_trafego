@@ -37,11 +37,15 @@ Este documento define as regras de implementação para o projeto **P12 Relatori
 
 /
 ├── .env                        # Credenciais e IDs
-├── clients.json                # Multi-cliente: conta Meta + grupo WhatsApp
-├── directives/                 # Camada 1: SOPs (Markdown)
-│   ├── meta_ads_fetch.md
-│   ├── metrics_calculation.md
-│   └── report_delivery.md
+├── data/                       # JSON: Meta, Google, templates de mensagem
+│   ├── clients.json
+│   ├── google_clients.json
+│   └── message_templates.json
+├── docs/                       # Documentação e Camada 1 (SOPs)
+│   └── directives/
+│       ├── meta_ads_fetch.md
+│       ├── metrics_calculation.md
+│       └── report_delivery.md
 ├── execution/                  # Camada 3: Scripts (Python)
 │   ├── meta_client.py
 │   ├── evolution_client.py
@@ -56,7 +60,7 @@ Este documento define as regras de implementação para o projeto **P12 Relatori
 
 ### Passo 1: Configuração de Ambiente
 1. Validar variáveis no `.env` (Evolution, Meta Token, Business ID para multi-client).
-2. Preencher `clients.json` para cada cliente.
+2. Preencher `data/clients.json` para cada cliente (ou usar Postgres + dashboard).
 
 ### Passo 2: Camada de Execução
 1. meta_client.py: insights conta + anúncios com spend, retries e erros de token.
@@ -65,10 +69,10 @@ Este documento define as regras de implementação para o projeto **P12 Relatori
 4. main_scheduler.py: orquestra coleta, formata relatório P12 Relatorios e envia.
 
 ### Passo 3: Diretivas (SOPs)
-1. Manter `directives/*.md` alinhados aos scripts e limites de API.
+1. Manter `docs/directives/*.md` alinhados aos scripts e limites de API.
 
 ### Passo 4: Agendamento
-1. Cron diário (ex.: 10:00) — ver Dockerfile / CRON_SETUP.md.
+1. Cron diário (ex.: 10:00) — ver Dockerfile / `docs/CRON_SETUP.md`.
 
 ## 5. TRATAMENTO DE ERROS (SELF-ANNEALING)
 

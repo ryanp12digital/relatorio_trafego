@@ -10,6 +10,8 @@ import re
 from copy import deepcopy
 from typing import Any, Dict
 
+from execution.project_paths import ensure_data_dir, message_templates_json_path
+
 _VAR_RE = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}")
 
 DEFAULT_TEMPLATES: Dict[str, Dict[str, Dict[str, str]]] = {
@@ -78,10 +80,10 @@ TEMPLATE_VARIABLES: Dict[str, Dict[str, str]] = {
         "client_name": "Nome do cliente",
         "page_id": "ID da página Meta",
         "template_id": "ID do template aplicado",
-        "nome": "Nome do lead",
+        "nome": "Nome do lead (nome_completo, nome, full_name ou name no payload)",
         "email": "Email do lead",
-        "whatsapp": "Link/contato WhatsApp",
-        "telefone_digitos": "Telefone em formato só dígitos",
+        "whatsapp": "Link wa.me (telefone, phone_number, phone, mobile ou celular)",
+        "telefone_digitos": "Telefone só dígitos (mesmas chaves que whatsapp)",
         "form_name": "Nome do formulário",
         "respostas": "Bloco de respostas filtradas",
         "respostas_filtradas": "Alias de respostas filtradas",
@@ -112,7 +114,7 @@ DEFAULT_FILTER_RULES: Dict[str, Dict[str, Any]] = {
 
 
 def _templates_path() -> str:
-    return os.path.join(os.path.dirname(__file__), "..", "message_templates.json")
+    return message_templates_json_path()
 
 
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
@@ -173,6 +175,7 @@ def save_templates(data: Dict[str, Dict[str, Dict[str, str]]]) -> None:
         return
 
     path = _templates_path()
+    ensure_data_dir()
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
         f.write("\n")
@@ -331,6 +334,7 @@ def upsert_filter_rules(
         filters = {}
     filters[channel] = filters_entry
     data["filters"] = filters
+    ensure_data_dir()
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
         f.write("\n")

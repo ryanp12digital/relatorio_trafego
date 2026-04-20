@@ -3,7 +3,7 @@ Dashboard viva de clientes da automação P12.
 
 Recursos:
 - Visualização de clientes e validações de configuração.
-- Cadastro rápido de novo cliente em clients.json.
+- Cadastro rápido de novo cliente em data/clients.json (sem Postgres).
 - Stream em tempo real (SSE) de eventos do webhook/automação.
 - Harness para simular fluxo de webhook por cliente.
 """
@@ -24,6 +24,11 @@ from urllib.parse import quote
 from flask import Flask, Response, jsonify, redirect, render_template, request, session, url_for
 
 from execution import persistence
+from execution.project_paths import (
+    clients_json_path,
+    ensure_data_dir,
+    google_clients_json_path,
+)
 
 from execution.live_events import (
     get_events_file_path,
@@ -54,11 +59,11 @@ _GOOGLE_CLIENTS_LOCK = threading.Lock()
 
 
 def _clients_path() -> str:
-    return os.path.join(os.path.dirname(__file__), "..", "clients.json")
+    return clients_json_path()
 
 
 def _google_clients_path() -> str:
-    return os.path.join(os.path.dirname(__file__), "..", "google_clients.json")
+    return google_clients_json_path()
 
 
 def _load_clients() -> List[Dict[str, Any]]:
@@ -92,6 +97,7 @@ def _save_clients(clients: List[Dict[str, Any]]) -> None:
         if not isinstance(c, dict):
             continue
         serializable.append({k: v for k, v in c.items() if k != "id"})
+    ensure_data_dir()
     with _CLIENTS_LOCK:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(serializable, f, ensure_ascii=False, indent=2)
@@ -125,6 +131,7 @@ def _save_google_clients(clients: List[Dict[str, Any]]) -> None:
     if persistence.db_enabled():
         raise RuntimeError("use_persistence_insert_update")
     path = _google_clients_path()
+    ensure_data_dir()
     serializable: List[Dict[str, Any]] = []
     for c in clients:
         if not isinstance(c, dict):
@@ -352,9 +359,80 @@ def _dashboard_auth_password() -> str:
     return (os.environ.get("DASHBOARD_AUTH_PASSWORD") or "").strip()
 
 
+def _dashboard_auth_users() -> List[Dict[str, str]]:
+    """
+    Contas e-mail+senha em JSON, variável DASHBOARD_AUTH_USERS.
+    Formato: [{"email":"a@b.com","password":"..."}, ...]
+    """
+    raw = (os.environ.get("DASHBOARD_AUTH_USERS") or "").strip()
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(data, list):
+        return []
+    out: List[Dict[str, str]] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        em = (item.get("email") or "").strip()
+        pw = item.get("password")
+        if not em or pw is None:
+            continue
+        out.append({"email": em, "password": str(pw)})
+    return out
+
+
+def dashboard_auth_configured() -> bool:
+    return bool(_dashboard_auth_password()) or bool(_dashboard_auth_users())
+
+
 def verify_dashboard_password(sent: str) -> bool:
     pwd = _dashboard_auth_password()
     return bool(pwd) and hmac.compare_digest(sent or "", pwd)
+
+
+def _norm_email(s: str) -> str:
+    return (s or "").strip().casefold()
+
+
+def verify_dashboard_credentials(email: str, password: str) -> bool:
+    users = _dashboard_auth_users()
+    if users:
+        want = _norm_email(email)
+        for u in users:
+            if _norm_email(u.get("email", "")) == want and hmac.compare_digest(
+                password or "", (u.get("password") or "")
+            ):
+                return True
+        return False
+    return verify_dashboard_password(password)
+
+
+def dashboard_require_email_login() -> bool:
+    return bool(_dashboard_auth_users())
+
+
+def dashboard_login_page_context(
+    *,
+    next_url: str,
+    error: Optional[str],
+    form_action: str,
+) -> Dict[str, Any]:
+    use_users = bool(_dashboard_auth_users())
+    return {
+        "next_url": next_url,
+        "error": error,
+        "form_action": form_action,
+        "require_email": use_users,
+        "login_subtext": (
+            "Informe e-mail e senha (contas em DASHBOARD_AUTH_USERS)."
+            if use_users
+            else "Informe a senha definida em DASHBOARD_AUTH_PASSWORD."
+        ),
+    }
 
 
 def dashboard_auth_gate_response() -> Optional[Any]:
@@ -362,8 +440,7 @@ def dashboard_auth_gate_response() -> Optional[Any]:
     Retorno None = seguir request. Usado pelo Flask da dashboard (porta 8091)
     e pelo webhook em rotas /dash/* (mesmo DASHBOARD_SESSION_SECRET para o cookie).
     """
-    pwd = _dashboard_auth_password()
-    if not pwd:
+    if not dashboard_auth_configured():
         return None
     raw = request.path or ""
     if raw.startswith("/static/"):
@@ -390,23 +467,29 @@ def _dashboard_auth_gate() -> Optional[Any]:
 @app.get("/login")
 def login() -> str:
     next_url = request.args.get("next") or "/"
-    return render_template("login.html", next_url=next_url, error=None, form_action=url_for("login_post"))
+    return render_template(
+        "login.html", **dashboard_login_page_context(next_url=next_url, error=None, form_action=url_for("login_post"))
+    )
 
 
 @app.post("/login")
 def login_post() -> Any:
     next_url = (request.form.get("next") or "/").strip() or "/"
-    if not _dashboard_auth_password():
+    if not dashboard_auth_configured():
         return redirect(next_url)
-    sent = request.form.get("password") or ""
-    if verify_dashboard_password(sent):
+    email = (request.form.get("email") or "").strip()
+    pwd = request.form.get("password") or ""
+    if verify_dashboard_credentials(email, pwd):
         session["dashboard_ok"] = True
         return redirect(next_url)
+    err = "E-mail ou senha incorretos." if dashboard_require_email_login() else "Senha incorreta."
     return render_template(
         "login.html",
-        next_url=next_url,
-        error="Senha incorreta.",
-        form_action=url_for("login_post"),
+        **dashboard_login_page_context(
+            next_url=next_url,
+            error=err,
+            form_action=url_for("login_post"),
+        ),
     )
 
 

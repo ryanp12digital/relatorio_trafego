@@ -28,6 +28,7 @@ from execution.evolution_client import get_evolution_client
 from execution import dashboard_app as dashboard_module
 from execution.live_events import publish_event
 from execution.message_templates import get_filter_rules, get_template_content, render_template_text
+from execution.project_paths import clients_json_path
 
 log_dir = os.path.join(os.path.dirname(__file__), "..", ".tmp")
 os.makedirs(log_dir, exist_ok=True)
@@ -51,7 +52,29 @@ app.secret_key = (
 )
 
 LOG_PREFIX = "[P12_META_LEAD_WEBHOOK]"
-_EXCLUDE_RESPOSTAS = frozenset({"nome_completo", "email", "telefone", "page_id", "pageId"})
+# Campos promovidos ao cabeçalho ({{nome}}, {{whatsapp}}, etc.) — não repetir no bloco "Respostas".
+_EXCLUDE_RESPOSTAS = frozenset(
+    {
+        "nome_completo",
+        "nome",
+        "full_name",
+        "name",
+        "email",
+        "telefone",
+        "phone_number",
+        "phone",
+        "mobile",
+        "celular",
+        "page_id",
+        "pageId",
+    }
+)
+# Ordem: legado Meta PT primeiro; depois chaves comuns em formulários instantâneos / Make.
+_LEAD_NAME_FIELD_KEYS = ("nome_completo", "nome", "full_name", "name")
+_LEAD_PHONE_FIELD_KEYS = ("telefone", "phone_number", "phone", "mobile", "celular")
+_LEAD_BODY_SIGNAL_KEYS = frozenset(
+    {"email", "nome_completo", "telefone", "nome", "full_name", "name", "phone_number", "phone", "mobile", "celular"}
+)
 _WHATSAPP_MSG_MAX = 4000
 _META_GRAPH_BASE_URL = "https://graph.facebook.com/v18.0"
 _FORM_NAME_CACHE: Dict[str, str] = {}
@@ -166,12 +189,33 @@ def _format_whatsapp_line(raw_phone: Optional[str]) -> str:
 
 
 def _mappable_lookup(mappable: List[Dict[str, Any]], name: str) -> str:
+    target = (name or "").strip()
+    if not target:
+        return ""
+    target_cf = target.casefold()
     for row in mappable:
         if not isinstance(row, dict):
             continue
-        if str(row.get("name", "")).strip() == name:
+        rn = str(row.get("name", "")).strip()
+        if rn == target or rn.casefold() == target_cf:
             v = row.get("value")
             return _format_field_value(v)
+    return ""
+
+
+def _first_field_from_data_and_mappable(
+    keys: Tuple[str, ...],
+    data: Dict[str, Any],
+    mappable: List[Dict[str, Any]],
+) -> str:
+    """Primeiro valor não vazio: chave em `data` ou em `mappable_field_data` (ordem de `keys`)."""
+    for key in keys:
+        v = _format_field_value(data.get(key))
+        if v:
+            return v
+        m = _mappable_lookup(mappable, key)
+        if m:
+            return m
     return ""
 
 
@@ -295,7 +339,7 @@ def _is_meta_lead_body(d: Dict[str, Any]) -> bool:
         return True
     if isinstance(d.get("mappable_field_data"), list):
         return True
-    if "email" in data or "nome_completo" in data or "telefone" in data:
+    if any(k in data for k in _LEAD_BODY_SIGNAL_KEYS):
         return True
     return False
 
@@ -465,7 +509,7 @@ def _load_clients() -> List[Dict[str, Any]]:
             return [{k: v for k, v in r.items() if k != "id"} for r in rows]
     except Exception as e:
         logger.warning("Falha ao carregar clientes Meta do Postgres: %s", e)
-    clients_path = os.path.join(os.path.dirname(__file__), "..", "clients.json")
+    clients_path = clients_json_path()
     try:
         with open(clients_path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -559,11 +603,9 @@ def _base_message_fields(body: Dict[str, Any], route: Optional[Dict[str, Any]] =
         "exclude_regex": [str(v).strip() for v in ((route or {}).get("exclude_regex") or []) if str(v).strip()],
     }
 
-    nome = _format_field_value(data.get("nome_completo")) or _mappable_lookup(mappable, "nome_completo")
+    nome = _first_field_from_data_and_mappable(_LEAD_NAME_FIELD_KEYS, data, mappable)
     email = _format_field_value(data.get("email")) or _mappable_lookup(mappable, "email")
-    telefone_raw = data.get("telefone")
-    if telefone_raw is None or telefone_raw == "":
-        telefone_raw = _mappable_lookup(mappable, "telefone")
+    telefone_raw = _first_field_from_data_and_mappable(_LEAD_PHONE_FIELD_KEYS, data, mappable)
     wa_link = _format_whatsapp_line(telefone_raw)
     telefone_digitos = _digits_only(telefone_raw)
 
@@ -1054,24 +1096,33 @@ def dash_login_page() -> str:
     next_url = request.args.get("next") or "/dash/"
     return render_template(
         "login.html",
-        next_url=next_url,
-        error=None,
-        form_action="/dash/login",
+        **dashboard_module.dashboard_login_page_context(
+            next_url=next_url,
+            error=None,
+            form_action="/dash/login",
+        ),
     )
 
 
 @app.post("/dash/login")
 def dash_login_post() -> Any:
     next_url = (request.form.get("next") or "/dash/").strip() or "/dash/"
-    if not dashboard_module.verify_dashboard_password(request.form.get("password") or ""):
-        return render_template(
-            "login.html",
+    if not dashboard_module.dashboard_auth_configured():
+        return redirect(next_url)
+    email = (request.form.get("email") or "").strip()
+    pwd = request.form.get("password") or ""
+    if dashboard_module.verify_dashboard_credentials(email, pwd):
+        session["dashboard_ok"] = True
+        return redirect(next_url)
+    err = "E-mail ou senha incorretos." if dashboard_module.dashboard_require_email_login() else "Senha incorreta."
+    return render_template(
+        "login.html",
+        **dashboard_module.dashboard_login_page_context(
             next_url=next_url,
-            error="Senha incorreta.",
+            error=err,
             form_action="/dash/login",
-        )
-    session["dashboard_ok"] = True
-    return redirect(next_url)
+        ),
+    )
 
 
 @app.get("/dash/logout")

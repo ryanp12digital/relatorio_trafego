@@ -18,7 +18,7 @@ No Easypanel, variável de ambiente:
 
 ## 3. Primeiro deploy
 
-Com tabelas vazias, no primeiro arranque o contentor **importa** da raiz do projeto: `clients.json`, `google_clients.json`, `message_templates.json` (se existirem).
+Com tabelas vazias, no primeiro arranque o contentor **importa** de `data/`: `clients.json`, `google_clients.json`, `message_templates.json` (se existirem).
 
 ## 4. Auth (e-mail só interno, só login)
 

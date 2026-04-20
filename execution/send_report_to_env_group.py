@@ -2,7 +2,7 @@
 Gera o relatorio completo (absoluto + comparativo em uma unica mensagem) e envia para EVOLUTION_GROUP_ID.
 
 Prioridade (sem argumentos):
-1) Entrada em clients.json com o mesmo group_id do .env (conta + nome do cliente).
+1) Entrada em data/clients.json com o mesmo group_id do .env (conta + nome do cliente).
 2) Se nao houver match: usa META_AD_ACCOUNT_ID e nome REPORT_CLIENT_NAME ou "Cliente".
 
 Com argumentos:
@@ -24,6 +24,7 @@ from dotenv import load_dotenv
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from execution.main_scheduler import P12RelatoriosReporter
+from execution.project_paths import clients_json_path
 
 
 def _normalize_act(raw: str) -> str:
@@ -38,9 +39,7 @@ def _resolve_target() -> tuple[str, str]:
     if not group_id:
         raise SystemExit("Defina EVOLUTION_GROUP_ID no .env.")
 
-    clients_path = os.path.join(
-        os.path.dirname(__file__), "..", "clients.json"
-    )
+    clients_path = clients_json_path()
     if os.path.isfile(clients_path):
         with open(clients_path, encoding="utf-8") as f:
             clients = json.load(f)
@@ -58,7 +57,7 @@ def _resolve_target() -> tuple[str, str]:
     ad_raw = os.getenv("META_AD_ACCOUNT_ID") or ""
     if not ad_raw.strip():
         raise SystemExit(
-            "Nenhum cliente no clients.json com este EVOLUTION_GROUP_ID "
+            "Nenhum cliente em data/clients.json com este EVOLUTION_GROUP_ID "
             "e META_AD_ACCOUNT_ID vazio no .env."
         )
     name = (os.getenv("REPORT_CLIENT_NAME") or "Cliente").strip()

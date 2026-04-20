@@ -61,7 +61,7 @@ def main():
         
         print("-" * 60)
         print(f"\nTotal: {len(accounts)} conta(s)")
-        print("\nUse estes IDs no clients.json para configurar os relatórios.")
+        print("\nUse estes IDs em data/clients.json para configurar os relatórios.")
         
         sys.exit(0)
         

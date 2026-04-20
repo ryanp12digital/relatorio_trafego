@@ -2,7 +2,7 @@
 Persistência Postgres (Supabase) para clientes e documento de templates.
 
 Ative com DATABASE_URL ou SUPABASE_DATABASE_URL (connection string do pooler).
-Se não estiver definido, o projeto continua usando clients.json / google_clients.json / message_templates.json.
+Se não estiver definido, o projeto continua usando os JSON em data/ (clients, google_clients, message_templates).
 """
 
 from __future__ import annotations
@@ -13,6 +13,12 @@ import os
 from contextlib import contextmanager
 from copy import deepcopy
 from typing import Any, Dict, List, Optional
+
+from execution.project_paths import (
+    clients_json_path,
+    google_clients_json_path,
+    message_templates_json_path,
+)
 
 logger = logging.getLogger(__name__)
 _DB_BOOTSTRAPPED = False
@@ -322,10 +328,9 @@ def seed_from_json_files_if_empty() -> None:
     """Importa JSON locais na primeira vez (tabelas vazias)."""
     if not db_enabled():
         return
-    base = os.path.join(os.path.dirname(__file__), "..")
-    clients_path = os.path.join(base, "clients.json")
-    google_path = os.path.join(base, "google_clients.json")
-    tpl_path = os.path.join(base, "message_templates.json")
+    clients_path = clients_json_path()
+    google_path = google_clients_json_path()
+    tpl_path = message_templates_json_path()
 
     with _connect() as conn:
         with conn.cursor() as cur:

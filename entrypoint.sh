@@ -21,8 +21,8 @@ else
     fi
 fi
 
-# 3. Garante que o diretório de logs existe
-mkdir -p /app/.tmp
+# 3. Garante que o diretório de logs e data/ existem
+mkdir -p /app/.tmp /app/data
 touch /app/.tmp/cron.log
 
 # 4. Webhook Make -> WhatsApp (leads Meta multi-cliente). Porta: WEBHOOK_PORT (default 8080).

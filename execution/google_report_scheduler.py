@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from execution.data_processor import format_currency, format_number
 from execution.evolution_client import get_evolution_client
 from execution.message_templates import get_template_content, render_template_text
+from execution.project_paths import google_clients_json_path
 
 log_dir = os.path.join(os.path.dirname(__file__), "..", ".tmp")
 os.makedirs(log_dir, exist_ok=True)
@@ -72,7 +73,7 @@ def _load_google_clients() -> List[Dict[str, Any]]:
             return [{k: v for k, v in r.items() if k != "id"} for r in rows]
     except Exception:
         pass
-    clients_path = os.path.join(os.path.dirname(__file__), "..", "google_clients.json")
+    clients_path = google_clients_json_path()
     with open(clients_path, "r", encoding="utf-8") as f:
         data = json.load(f)
     if not isinstance(data, list):

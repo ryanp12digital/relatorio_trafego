@@ -1,7 +1,7 @@
 """
 Envio único: mensagem de teste/aviso no grupo antigo da Lorena antes da troca de group_id.
 
-Execute uma vez (com .env e Evolution OK), depois faça deploy com clients.json já no grupo novo.
+Execute uma vez (com .env e Evolution OK), depois faça deploy com data/clients.json já no grupo novo.
 
   python execution/send_lorena_grupo_antigo_aviso.py
 """

@@ -7,14 +7,14 @@ Você opera dentro de uma arquitetura de 3 camadas que separa responsabilidades 
 \#\# Arquitetura de 3 Camadas
 
 \#\#\# Camada 1: Diretiva (O que fazer)  
-•⁠  ⁠Basicamente são SOPs escritos em Markdown, que vivem em ⁠ directives/ ⁠  
+•⁠  ⁠Basicamente são SOPs escritos em Markdown, que vivem em ⁠ docs/directives/ ⁠  
 •⁠  ⁠Definem objetivos, entradas, ferramentas/scripts a usar, saídas e edge cases  
 •⁠  ⁠Instruções em linguagem natural, como você daria a um funcionário de nível intermediário
 
 \#\#\# Camada 2: Orquestração (Tomada de decisão)  
 •⁠  ⁠É você. Sua função: roteamento inteligente.  
 •⁠  ⁠Ler diretivas, chamar ferramentas de execução na ordem correta, lidar com erros, pedir esclarecimentos, atualizar diretivas com aprendizados  
-•⁠  ⁠Você é a ponte entre intenção e execução. Exemplo: você não tenta fazer scraping manualmente — você lê ⁠ directives/scrape\_website.md ⁠, formula entradas/saídas e então roda ⁠ execution/scrape\_single\_site.py ⁠
+•⁠  ⁠Você é a ponte entre intenção e execução. Exemplo: você não tenta fazer scraping manualmente — você lê ⁠ docs/directives/scrape\_website.md ⁠, formula entradas/saídas e então roda ⁠ execution/scrape\_single\_site.py ⁠
 
 \#\#\# Camada 3: Execução (Fazer o trabalho)  
 •⁠  ⁠Scripts determinísticos em Python dentro de ⁠ execution/ ⁠  
@@ -56,7 +56,7 @@ Erros são oportunidades de fortalecimento do sistema. Quando algo quebrar:
 \#\#\# Estrutura de diretórios  
 .tmp/           \# Arquivos intermediários (sempre regeneráveis)  
 execution/      \# Scripts Python determinísticos  
-directives/     \# SOPs em Markdown  
+docs/directives/ \# SOPs em Markdown  
 .env            \# Variáveis de ambiente e APIs  
 credentials.json  
 token.json      \# Credenciais de OAuth para Google (no .gitignore)

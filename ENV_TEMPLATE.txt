@@ -44,6 +44,12 @@ DASHBOARD_PORT=8091
 # Mesmo DASHBOARD_SESSION_SECRET no processo que serve /dash se usares webhook na mesma app.
 DASHBOARD_SESSION_SECRET=
 FLASK_SECRET_KEY=
+# Uma destas: (A) contas e-mail+senha em JSON, ou (B) senha única.
+# (A) Exemplo (uma linha, aspas simples no exterior): lista de { "email", "password" }.
+# DASHBOARD_AUTH_USERS='[{"email":"pessoa@exemplo.com","password":"SENHA_FORTE"}]'
+# (B) Legado: só o campo senha, sem e-mail no formulário.
+# DASHBOARD_AUTH_PASSWORD=
+DASHBOARD_AUTH_USERS=
 DASHBOARD_AUTH_PASSWORD=
 
 # -----------------------------------------------------------------------------
@@ -51,7 +57,7 @@ DASHBOARD_AUTH_PASSWORD=
 # -----------------------------------------------------------------------------
 # URI do pooler em modo Transaction (Supabase: geralmente porta 6543).
 # Depois de criar as tabelas (SQL em supabase/migrations/001_initial_pulseboard.sql), no
-# primeiro arranque com BD vazio o contentor importa clients.json / google_clients.json / message_templates.json.
+# primeiro arranque com BD vazio o contentor importa data/clients.json, data/google_clients.json, data/message_templates.json.
 DATABASE_URL=
 # Alternativa aceite pelo código:
 # SUPABASE_DATABASE_URL=

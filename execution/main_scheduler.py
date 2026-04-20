@@ -25,6 +25,7 @@ from execution.webhook_notify import (
     notify_exception_as_automation_error,
     notify_meta_token_expirado,
 )
+from execution.project_paths import clients_json_path
 
 # Configuração de logging
 log_dir = os.path.join(os.path.dirname(__file__), '..', '.tmp')
@@ -410,7 +411,7 @@ class P12RelatoriosReporter:
     
     def load_clients_config(self) -> List[Dict[str, Any]]:
         """
-        Carrega configuração de clientes do Postgres (DATABASE_URL) ou clients.json.
+        Carrega configuração de clientes do Postgres (DATABASE_URL) ou data/clients.json.
         """
         try:
             from execution.persistence import db_enabled, ensure_db_ready, list_meta_clients
@@ -422,7 +423,7 @@ class P12RelatoriosReporter:
         except Exception:
             pass
 
-        clients_path = os.path.join(os.path.dirname(__file__), "..", "clients.json")
+        clients_path = clients_json_path()
 
         if not os.path.exists(clients_path):
             raise FileNotFoundError(f"Arquivo clients.json não encontrado em {clients_path}")
@@ -440,7 +441,7 @@ class P12RelatoriosReporter:
     
     def generate_and_send_report(self) -> bool:
         """
-        Gera e envia relatórios para todos os clientes habilitados em clients.json.
+        Gera e envia relatórios para todos os clientes habilitados (Postgres ou data/clients.json).
         
         Returns:
             True se pelo menos um relatório foi enviado com sucesso, False caso contrário
@@ -468,7 +469,7 @@ class P12RelatoriosReporter:
             
             # Carrega configuração de clientes
             clients_config = self.load_clients_config()
-            logger.info(f"Carregados {len(clients_config)} cliente(s) do clients.json")
+            logger.info(f"Carregados {len(clients_config)} cliente(s) da configuracao")
             
             # Busca todas as contas de anúncios do Business
             logger.info("Buscando contas de anúncios do Business...")
@@ -588,7 +589,7 @@ class P12RelatoriosReporter:
             logger.error(f"Erro ao carregar configuração: {str(e)}")
             notify_exception_as_automation_error(
                 e,
-                "Arquivo de configuração necessário não encontrado (clients.json ou path inválido).",
+                "Arquivo de configuração necessário não encontrado (data/clients.json ou path inválido).",
             )
             return False
         except Exception as e:
