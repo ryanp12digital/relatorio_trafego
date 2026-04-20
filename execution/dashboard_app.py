@@ -30,7 +30,10 @@ from urllib.parse import quote
 from flask import Flask, Response, jsonify, redirect, render_template, request, session, url_for
 
 from execution import persistence
-from execution.evolution_catalog_webhook import process_evolution_catalog_payload
+from execution.evolution_catalog_webhook import (
+    log_evolution_catalog_warning,
+    process_evolution_catalog_payload,
+)
 from execution.flask_server import serve_flask_app
 from execution.project_paths import (
     clients_json_path,
@@ -535,6 +538,7 @@ def evolution_catalog_webhook_view() -> Any:
             except json.JSONDecodeError:
                 raw = None
     if raw is None:
+        log_evolution_catalog_warning("JSON_INVALIDO", "corpo vazio ou nao e JSON valido")
         return jsonify({"ok": False, "error": "invalid_json"}), 400
     hdr = (request.headers.get("X-Webhook-Secret") or "").strip()
     auth = request.headers.get("Authorization") or ""

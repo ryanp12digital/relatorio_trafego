@@ -14,6 +14,36 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
+LOG_PREFIX_EVOLUTION = "[P12_EVOLUTION_CATALOG]"
+
+
+def _evolution_instance_tag() -> str:
+    inst = (os.getenv("EVOLUTION_INSTANCE") or "").strip()
+    return f"evolution_instance={inst}" if inst else "evolution_instance=(defina EVOLUTION_INSTANCE)"
+
+
+def _evo_log(message: str, level: int = logging.INFO) -> None:
+    logger.log(level, "%s %s | %s", LOG_PREFIX_EVOLUTION, _evolution_instance_tag(), message)
+
+
+def _payload_shape_evolution(raw: Any, max_keys: int = 16) -> str:
+    if raw is None:
+        return "shape=tipo_null"
+    raw = _unwrap_json_strings(raw)
+    if isinstance(raw, list):
+        return f"shape=lista[n={len(raw)}]"
+    if isinstance(raw, dict):
+        keys = ",".join(sorted(str(k) for k in list(raw.keys())[:max_keys]))
+        more = "+" if len(raw) > max_keys else ""
+        return f"shape=dict keys=[{keys}{more}]"
+    return f"shape=tipo_{type(raw).__name__}"
+
+
+def log_evolution_catalog_warning(cod: str, detail: str = "") -> None:
+    """Chamado pela dashboard em falhas de parse antes de process_evolution_catalog_payload."""
+    tail = f" | {detail}" if detail else ""
+    _evo_log(f"cod={cod}{tail}", level=logging.WARNING)
+
 
 def _unwrap_json_strings(raw: Any, max_depth: int = 8) -> Any:
     cur = raw
@@ -139,11 +169,16 @@ def verify_evolution_catalog_webhook_secret(
             "yes",
         )
         if allow:
-            logger.warning(
-                "Webhook catálogo Evolution sem EVOLUTION_CATALOG_WEBHOOK_SECRET (EVOLUTION_CATALOG_ALLOW_INSECURE)"
+            _evo_log(
+                "cod=CATALOGO_SEM_SECRET_DEV | "
+                "EVOLUTION_CATALOG_ALLOW_INSECURE ativo - nao use em producao",
+                level=logging.WARNING,
             )
             return True
-        logger.warning("Webhook catálogo Evolution rejeitado: defina EVOLUTION_CATALOG_WEBHOOK_SECRET")
+        _evo_log(
+            "cod=SECRET_CATALOGO_NAO_CONFIGURADO | defina EVOLUTION_CATALOG_WEBHOOK_SECRET na Evolution e no .env",
+            level=logging.WARNING,
+        )
         return False
     hs = (header_secret or "").strip()
     ab = (auth_bearer or "").strip()
@@ -151,6 +186,7 @@ def verify_evolution_catalog_webhook_secret(
         return True
     if ab and ab == expected:
         return True
+    _evo_log("cod=WEBHOOK_SECRET_CATALOGO_INVALIDO | cabecalho X-Webhook-Secret ou Bearer incorreto", level=logging.WARNING)
     return False
 
 
@@ -174,7 +210,7 @@ def _enrich_group_subject_async(group_jid: str) -> None:
             if sub:
                 persistence.update_catalog_group_subject(group_jid, sub)
         except Exception as e:
-            logger.warning("Enriquecimento subject grupo %s: %s", group_jid, e)
+            _evo_log(f"cod=ENRIQUECIMENTO_SUBJECT_ERRO | group_jid={group_jid} | err={e!s}", level=logging.WARNING)
 
     threading.Thread(target=run, name=f"evo-catalog-{group_jid[:20]}", daemon=True).start()
 
@@ -193,14 +229,24 @@ def process_evolution_catalog_payload(
 
     events = normalize_evolution_events(raw)
     if not events:
+        _evo_log(
+            f"cod=EVENTOS_EVOLUTION_VAZIOS | canal=catalogo_grupos | {_payload_shape_evolution(raw)} | "
+            f"dica=JSON com event+data ou lista n8n com body.event",
+            level=logging.INFO,
+        )
         return {"ok": True, "processed": 0, "skipped": "no_events"}, 200
 
     from execution import persistence
 
     processed = 0
+    skipped_no_jid = 0
+    first_event_name = ""
     for ev in events:
         gj = extract_group_jid_from_event(ev)
         if not gj:
+            skipped_no_jid += 1
+            if not first_event_name:
+                first_event_name = str(ev.get("event") or "")[:80]
             continue
         et, push, preview = extract_activity_meta(ev)
         if persistence.upsert_catalog_group_activity(
@@ -212,4 +258,14 @@ def process_evolution_catalog_payload(
             processed += 1
             _enrich_group_subject_async(gj)
 
+    if skipped_no_jid:
+        _evo_log(
+            f"cod=EVENTOS_SEM_JID_GRUPO | canal=catalogo_grupos | quantidade={skipped_no_jid} | "
+            f"exemplo_event={first_event_name!r} | dica=remoteJid terminado em @g.us",
+            level=logging.INFO,
+        )
+    _evo_log(
+        f"cod=OK_CATALOGO_GRUPOS | canal=catalogo_grupos | eventos={len(events)} | grupos_actualizados={processed}",
+        level=logging.INFO,
+    )
     return {"ok": True, "processed": processed, "events": len(events)}, 200

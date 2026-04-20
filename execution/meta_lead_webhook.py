@@ -571,6 +571,59 @@ def _load_clients() -> List[Dict[str, Any]]:
     return []
 
 
+def _payload_shape_hint_lead(raw: Any, max_keys: int = 18) -> str:
+    """Resumo não sensível do JSON recebido (debug de formato Make/Meta)."""
+    if raw is None:
+        return "shape=tipo_null"
+    if isinstance(raw, list):
+        if not raw:
+            return "shape=lista_vazia"
+        first = raw[0]
+        if isinstance(first, dict):
+            keys = ",".join(sorted(str(k) for k in list(first.keys())[:max_keys]))
+            more = "+" if len(first) > max_keys else ""
+            return f"shape=lista[n={len(raw)}] primeiro_obj_keys=[{keys}{more}]"
+        return f"shape=lista[n={len(raw)}] primeiro_tipo={type(first).__name__}"
+    if isinstance(raw, dict):
+        keys = ",".join(sorted(str(k) for k in list(raw.keys())[:max_keys]))
+        more = "+" if len(raw) > max_keys else ""
+        return f"shape=dict keys=[{keys}{more}]"
+    return f"shape=tipo_{type(raw).__name__}"
+
+
+def _configured_meta_pages_hint(max_pairs: int = 10) -> str:
+    """Lista cliente:page_id configurados para roteamento (ajuda a corrigir IGNORADO_ROUTE)."""
+    try:
+        clients = _load_clients()
+        parts: List[str] = []
+        for c in clients:
+            if c.get("enabled", True) is False:
+                continue
+            pid = str(c.get("meta_page_id", "")).strip()
+            nm = str(c.get("client_name", "")).strip() or "Cliente"
+            if pid:
+                parts.append(f"{nm}:{pid}")
+        if not parts:
+            return "meta_pages_configuradas=(nenhuma com meta_page_id)"
+        head = parts[:max_pairs]
+        tail = f" ...(+{len(parts) - max_pairs})" if len(parts) > max_pairs else ""
+        return "meta_pages_configuradas=" + "; ".join(head) + tail
+    except Exception as exc:
+        return f"meta_pages_configuradas=(erro_leitura:{exc!s})"
+
+
+def _evolution_instance_label() -> str:
+    inst = (os.getenv("EVOLUTION_INSTANCE") or "").strip()
+    return inst if inst else "(sem EVOLUTION_INSTANCE)"
+
+
+def _skipped_leads_summary(skipped: List[str], max_len: int = 260) -> str:
+    if not skipped:
+        return "(nenhum)"
+    s = " | ".join(skipped)
+    return s if len(s) <= max_len else s[: max_len - 3] + "..."
+
+
 def _resolve_lead_route(page_id: str) -> Optional[Dict[str, Any]]:
     if not page_id:
         return None
@@ -842,7 +895,7 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
     denied = _check_webhook_secret()
     if denied:
         _wh_log(
-            f"POST {endpoint_label} | NEGADO_AUTH | "
+            f"POST {endpoint_label} | ERRO_AUTH | canal=leads_meta | cod=WEBHOOK_SECRET_META_NEGADO | "
             f"ip={_client_ip()} | content_length={request.content_length}",
             level=logging.WARNING,
         )
@@ -855,7 +908,7 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
         return denied
 
     _wh_log(
-        f"POST {endpoint_label} | RECEBIDO | "
+        f"POST {endpoint_label} | RECEBIDO | canal=leads_meta | "
         f"ip={_client_ip()} | content_type={request.content_type!r} | content_length={request.content_length}"
     )
     _emit_runtime_event(
@@ -873,7 +926,7 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
     raw, parse_err = parse_incoming_payload()
     if raw is None:
         _wh_log(
-            f"POST {endpoint_label} | ERRO_JSON | "
+            f"POST {endpoint_label} | ERRO_JSON | canal=leads_meta | cod=PAYLOAD_NAO_E_JSON | "
             f"ip={_client_ip()} | motivo={parse_err}",
             level=logging.WARNING,
         )
@@ -898,12 +951,21 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
     if not events:
         if raw in ({}, []):
             return jsonify({"ok": True, "ignored": True, "reason": "empty_payload"}), 200
-        _wh_log(f"POST {endpoint_label} | ERRO_PAYLOAD | nenhum lead extraido", level=logging.WARNING)
+        _wh_log(
+            f"POST {endpoint_label} | ERRO_LEAD | canal=leads_meta | cod=PAYLOAD_SEM_LEAD_RECONHECIDO | "
+            f"{_payload_shape_hint_lead(raw)} | "
+            f"dica=body.data/mappable_field_data ou field_data (Graph) ou envelope Make com json",
+            level=logging.WARNING,
+        )
         _emit_runtime_event(
             stage="ERRO_PAYLOAD",
             status="error",
             detail=f"nenhum lead extraído em {endpoint_label}",
-            payload={"endpoint": endpoint_label},
+            payload={
+                "endpoint": endpoint_label,
+                "cod": "PAYLOAD_SEM_LEAD_RECONHECIDO",
+                "shape": _payload_shape_hint_lead(raw),
+            },
         )
         return (
             jsonify(
@@ -916,7 +978,7 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
             400,
         )
 
-    _wh_log(f"POST {endpoint_label} | PAYLOAD_OK | leads={len(events)}")
+    _wh_log(f"POST {endpoint_label} | PAYLOAD_OK | canal=leads_meta | cod=LEAD_NORMALIZADO | leads={len(events)}")
     _emit_runtime_event(
         stage="PAYLOAD_OK",
         status="ok",
@@ -947,7 +1009,8 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
             route = _resolve_legacy_lorena_route()
             if route:
                 _wh_log(
-                    f"LEAD_{idx} | FALLBACK_LEGADO_APLICADO | endpoint={endpoint_label} | cliente={route['client_name']}"
+                    f"LEAD_{idx} | AVISO_ROTA | canal=leads_meta | cod=FALLBACK_LEGADO_LORENA | "
+                    f"endpoint={endpoint_label} | cliente={route['client_name']}"
                 )
                 _emit_runtime_event(
                     stage="FALLBACK_LEGADO_APLICADO",
@@ -960,8 +1023,11 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
                 )
         if not route:
             skipped.append(f"lead_index_{idx}: page_id_nao_mapeado ({page_id or 'vazio'})")
+            _pages_hint = _configured_meta_pages_hint()
             _wh_log(
-                f"LEAD_{idx} | IGNORADO_ROUTE | page_id_nao_mapeado={page_id or 'vazio'}",
+                f"LEAD_{idx} | ERRO_ROTA_CLIENTE | canal=leads_meta | cod=PAGE_ID_SEM_CLIENTE_NA_PULSEBOARD | "
+                f"page_id_recebido={page_id or 'vazio'} | cliente_mapeado=(nenhum) | "
+                f"{_pages_hint}",
                 level=logging.WARNING,
             )
             _emit_runtime_event(
@@ -969,7 +1035,12 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
                 status="warning",
                 detail="Lead ignorado por page_id não mapeado",
                 page_id=page_id,
-                payload={"lead_index": idx, "endpoint": endpoint_label},
+                payload={
+                    "lead_index": idx,
+                    "endpoint": endpoint_label,
+                    "cod": "PAGE_ID_SEM_CLIENTE_NA_PULSEBOARD",
+                    "meta_pages_hint": _pages_hint,
+                },
             )
             continue
 
@@ -986,7 +1057,8 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
         if not group_id:
             skipped.append(f"lead_index_{idx}: group_id_ausente ({route['client_name']})")
             _wh_log(
-                f"LEAD_{idx} | IGNORADO_CONFIG | group_id_ausente | cliente={route['client_name']}",
+                f"LEAD_{idx} | ERRO_CONFIG_CLIENTE | canal=leads_meta | cod=LEAD_GROUP_ID_VAZIO | "
+                f"cliente={route['client_name']} | page_id={page_id}",
                 level=logging.WARNING,
             )
             _emit_runtime_event(
@@ -1018,7 +1090,8 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
             )
             if dry:
                 _wh_log(
-                    f"LEAD_{idx} | DRY_RUN | cliente={route['client_name']} | page_id={page_id} | preview_len={len(message)}"
+                    f"LEAD_{idx} | OK_SIMULADO | canal=leads_meta | cod=DRY_RUN_SEM_ENVIO | "
+                    f"cliente={route['client_name']} | page_id={page_id} | preview_len={len(message)}"
                 )
                 sent += 1
                 _emit_runtime_event(
@@ -1035,7 +1108,9 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
             client = get_evolution_client()
             if client.send_text_message(group_id, message):
                 _wh_log(
-                    f"LEAD_{idx} | WHATSAPP_ENVIADO_OK | cliente={route['client_name']} | page_id={page_id} | group_id={group_id}"
+                    f"LEAD_{idx} | OK_WHATSAPP | canal=leads_meta | cod=MENSAGEM_ENVIADA_EVOLUTION | "
+                    f"cliente={route['client_name']} | page_id={page_id} | group_id={group_id} | "
+                    f"evolution_instance={_evolution_instance_label()}"
                 )
                 sent += 1
                 _emit_runtime_event(
@@ -1050,7 +1125,9 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
             else:
                 errors.append(f"lead_index_{idx}: send returned false")
                 _wh_log(
-                    f"LEAD_{idx} | WHATSAPP_FALHA | cliente={route['client_name']}",
+                    f"LEAD_{idx} | ERRO_WHATSAPP | canal=leads_meta | cod=EVOLUTION_SEND_TEXT_FALHOU | "
+                    f"cliente={route['client_name']} | page_id={page_id} | group_id={group_id} | "
+                    f"evolution_instance={_evolution_instance_label()}",
                     level=logging.ERROR,
                 )
                 _emit_runtime_event(
@@ -1068,12 +1145,16 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
             if route.get("template") == "pratical_life" and extra_phone:
                 if client.send_text_message(extra_phone, message):
                     _wh_log(
-                        f"LEAD_{idx} | WHATSAPP_TELEFONE_ENVIADO_OK | cliente={route['client_name']} | numero={extra_phone}"
+                        f"LEAD_{idx} | OK_WHATSAPP_EXTRA | canal=leads_meta | cod=MENSAGEM_ENVIADA_TELEFONE | "
+                        f"cliente={route['client_name']} | numero={extra_phone} | "
+                        f"evolution_instance={_evolution_instance_label()}"
                     )
                 else:
                     errors.append(f"lead_index_{idx}: phone send returned false")
                     _wh_log(
-                        f"LEAD_{idx} | WHATSAPP_TELEFONE_FALHA | cliente={route['client_name']} | numero={extra_phone}",
+                        f"LEAD_{idx} | ERRO_WHATSAPP_EXTRA | canal=leads_meta | cod=EVOLUTION_SEND_TELEFONE_FALHOU | "
+                        f"cliente={route['client_name']} | numero={extra_phone} | "
+                        f"evolution_instance={_evolution_instance_label()}",
                         level=logging.ERROR,
                     )
                     _emit_runtime_event(
@@ -1086,7 +1167,12 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
                     )
         except Exception as e:
             errors.append(f"lead_index_{idx}: {e!s}")
-            _wh_log(f"LEAD_{idx} | WHATSAPP_EXCECAO | {e!s}", level=logging.ERROR)
+            _wh_log(
+                f"LEAD_{idx} | ERRO_EXCECAO | canal=leads_meta | cod=EXCECAO_ENVIO_WHATSAPP | "
+                f"cliente={route.get('client_name', '')} | page_id={page_id} | group_id={group_id} | "
+                f"evolution_instance={_evolution_instance_label()} | err={e!s}",
+                level=logging.ERROR,
+            )
             logger.exception("Falha ao enviar lead %s", idx)
             _emit_runtime_event(
                 stage="WHATSAPP_EXCECAO",
@@ -1100,7 +1186,8 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
 
     if errors:
         _wh_log(
-            f"POST {endpoint_label} | RESPOSTA_500 | sent={sent} | erros={len(errors)}",
+            f"POST {endpoint_label} | ERRO_RESPOSTA | canal=leads_meta | cod=WEBHOOK_HTTP_500 | "
+            f"sent={sent} | erros={len(errors)} | resumo_erros={_skipped_leads_summary(errors)}",
             level=logging.ERROR,
         )
         _emit_runtime_event(
@@ -1111,7 +1198,10 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
         )
         return jsonify({"ok": False, "sent": sent, "skipped": skipped, "errors": errors}), 500
 
-    _wh_log(f"POST {endpoint_label} | CONCLUIDO_OK | sent={sent} | skipped={len(skipped)}")
+    _wh_log(
+        f"POST {endpoint_label} | CONCLUIDO_OK | canal=leads_meta | cod=WEBHOOK_LEADS_FINALIZADO | "
+        f"sent={sent} | skipped={len(skipped)} | resumo_skipped={_skipped_leads_summary(skipped)}"
+    )
     _emit_runtime_event(
         stage="CONCLUIDO_OK",
         status="ok",
