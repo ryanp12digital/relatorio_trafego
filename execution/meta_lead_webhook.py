@@ -390,6 +390,18 @@ def _resolve_legacy_lorena_route() -> Optional[Dict[str, str]]:
     return None
 
 
+def _allow_default_no_page_legacy_fallback() -> bool:
+    """
+    Compatibilidade: no endpoint padrão, payloads antigos sem page_id
+    podem cair no roteamento legado da Lorena.
+
+    Para desativar explicitamente:
+      META_LEAD_ALLOW_DEFAULT_NO_PAGE_FALLBACK=0|false|no
+    """
+    raw = (os.getenv("META_LEAD_ALLOW_DEFAULT_NO_PAGE_FALLBACK") or "true").strip().lower()
+    return raw not in {"0", "false", "no"}
+
+
 def _check_webhook_secret() -> Optional[Tuple[Any, int]]:
     secret = (os.getenv("META_LEAD_WEBHOOK_SECRET") or os.getenv("LORENA_LEAD_WEBHOOK_SECRET") or "").strip()
     if not secret:
@@ -606,8 +618,22 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
         body = event["body"]
         page_id = str(event.get("page_id", "")).strip()
         route = _resolve_lead_route(page_id)
-        if not route and allow_legacy_lorena_fallback and not page_id:
+        should_try_legacy_no_page = (
+            not page_id
+            and (
+                allow_legacy_lorena_fallback
+                or (
+                    endpoint_label == "/meta-new-lead"
+                    and _allow_default_no_page_legacy_fallback()
+                )
+            )
+        )
+        if not route and should_try_legacy_no_page:
             route = _resolve_legacy_lorena_route()
+            if route:
+                _wh_log(
+                    f"LEAD_{idx} | FALLBACK_LEGADO_APLICADO | endpoint={endpoint_label} | cliente={route['client_name']}"
+                )
         if not route:
             skipped.append(f"lead_index_{idx}: page_id_nao_mapeado ({page_id or 'vazio'})")
             _wh_log(
