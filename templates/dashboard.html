@@ -205,7 +205,18 @@
         <div class="client-main">
           <div class="client-head">
             <h3 class="client-name"></h3>
-            <span class="status-pill"></span>
+            <div class="head-actions">
+              <span class="status-pill"></span>
+              <button
+                type="button"
+                class="gear-btn"
+                data-action="toggle-edit"
+                title="Editar cliente"
+                aria-label="Editar cliente"
+              >
+                ⚙
+              </button>
+            </div>
           </div>
           <dl class="meta-grid">
             <div><dt>Conta</dt><dd class="f-ad_account_id"></dd></div>
@@ -217,7 +228,6 @@
           </dl>
           <div class="checks"></div>
           <div class="actions">
-            <button class="small action-edit" data-action="toggle-edit">Editar cliente</button>
             <button data-scenario="success" class="small action-ok">Harness sucesso</button>
             <button data-scenario="send_fail" class="small action-warn">Harness falha envio</button>
             <button data-scenario="route_fail" class="small action-err">Harness falha rota</button>
@@ -274,7 +284,18 @@
         <div class="client-main">
           <div class="client-head">
             <h3 class="client-name"></h3>
-            <span class="status-pill"></span>
+            <div class="head-actions">
+              <span class="status-pill"></span>
+              <button
+                type="button"
+                class="gear-btn"
+                data-action="toggle-edit-google"
+                title="Editar cliente Google"
+                aria-label="Editar cliente Google"
+              >
+                ⚙
+              </button>
+            </div>
           </div>
           <dl class="meta-grid">
             <div><dt>Customer ID</dt><dd class="g-google_customer_id"></dd></div>
@@ -285,7 +306,6 @@
             <div><dt>Notas</dt><dd class="g-notes"></dd></div>
           </dl>
           <div class="checks"></div>
-          <button class="small action-edit" data-action="toggle-edit-google">Editar cliente Google</button>
           <form class="edit-form hidden">
             <label>
               Nome
