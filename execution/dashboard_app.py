@@ -203,7 +203,7 @@ def _run_flow_async(client: Dict[str, Any], scenario: str) -> None:
 
 @app.get("/")
 def dashboard_home() -> str:
-    return render_template("dashboard.html")
+    return render_template("dashboard.html", dashboard_base="")
 
 
 @app.get("/api/clients")

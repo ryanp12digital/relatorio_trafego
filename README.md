@@ -199,6 +199,9 @@ No Easypanel, recomenda-se:
 - Domínio A (webhook Make): porta `8080`
 - Domínio B (dashboard): porta `8091`
 
+Alternativa (sem novo domínio): a dashboard também fica disponível no mesmo serviço do webhook em:
+- `https://<domínio-do-webhook>/dash`
+
 **O que a dashboard entrega:**
 - Lista de clientes e status (`Ativo completo`, `Ativo parcial`, `Pausado`, `Inconsistente`)
 - Validação visual de `ad_account_id`, `group_id`, `meta_page_id`, `lead_group_id`

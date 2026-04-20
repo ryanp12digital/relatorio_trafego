@@ -17,12 +17,13 @@ import requests
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request
+from flask import Flask, Response, jsonify, render_template, request
 
 # Raiz do projeto no path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from execution.evolution_client import get_evolution_client
+from execution import dashboard_app as dashboard_module
 from execution.live_events import publish_event
 
 log_dir = os.path.join(os.path.dirname(__file__), "..", ".tmp")
@@ -35,7 +36,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    template_folder=os.path.join(os.path.dirname(__file__), "..", "templates"),
+    static_folder=os.path.join(os.path.dirname(__file__), "..", "static"),
+)
 
 LOG_PREFIX = "[P12_META_LEAD_WEBHOOK]"
 _EXCLUDE_RESPOSTAS = frozenset({"nome_completo", "email", "telefone", "page_id", "pageId"})
@@ -873,12 +878,48 @@ def lorena_new_lead_legacy():
     return response, status
 
 
+@app.get("/dash")
+@app.get("/dash/")
+def dash_home():
+    return render_template("dashboard.html", dashboard_base="/dash")
+
+
+@app.get("/dash/api/clients")
+def dash_api_clients():
+    return jsonify(dashboard_module._build_clients_response())
+
+
+@app.post("/dash/api/clients")
+def dash_api_add_client():
+    return dashboard_module.api_add_client()
+
+
+@app.put("/dash/api/clients/<int:client_id>")
+def dash_api_update_client(client_id: int):
+    return dashboard_module.api_update_client(client_id)
+
+
+@app.post("/dash/api/harness/simulate-webhook")
+def dash_api_harness_simulate_webhook():
+    return dashboard_module.api_harness_simulate_webhook()
+
+
+@app.get("/dash/api/events/recent")
+def dash_api_events_recent():
+    return dashboard_module.api_events_recent()
+
+
+@app.get("/dash/api/events/stream")
+def dash_api_events_stream() -> Response:
+    return dashboard_module.api_events_stream()
+
+
 def main() -> None:
     _load_env()
     port = int(os.getenv("WEBHOOK_PORT", "8080"))
     _wh_log(
         "SERVICO_INICIADO | "
-        f"escutando 0.0.0.0:{port} | rotas POST /meta-new-lead e /lorena-new-lead (legado)"
+        f"escutando 0.0.0.0:{port} | rotas POST /meta-new-lead e /lorena-new-lead (legado) | dashboard em /dash"
     )
     logging.getLogger("werkzeug").setLevel(logging.WARNING)
     app.run(host="0.0.0.0", port=port, threaded=True)

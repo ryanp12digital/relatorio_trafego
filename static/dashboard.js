@@ -4,6 +4,10 @@ const state = {
   eventStream: null,
 };
 
+const DASHBOARD_BASE =
+  (document.querySelector('meta[name="dashboard-base"]')?.getAttribute("content") || "").replace(/\/+$/, "");
+const apiUrl = (path) => `${DASHBOARD_BASE}${path}`;
+
 const flowSteps = [
   "RECEBIDO",
   "PAYLOAD_OK",
@@ -144,7 +148,7 @@ function renderClients() {
 }
 
 async function fetchClients() {
-  const r = await fetch("/api/clients");
+  const r = await fetch(apiUrl("/api/clients"));
   if (!r.ok) throw new Error("Falha ao carregar clientes.");
   const data = await r.json();
   state.clients = data.clients || [];
@@ -166,7 +170,7 @@ async function submitNewClient(ev) {
   const payload = Object.fromEntries(fd.entries());
   payload.enabled = !!fd.get("enabled");
 
-  const r = await fetch("/api/clients", {
+  const r = await fetch(apiUrl("/api/clients"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -184,7 +188,7 @@ async function submitNewClient(ev) {
 }
 
 async function simulateHarness(clientId, scenario) {
-  const r = await fetch("/api/harness/simulate-webhook", {
+  const r = await fetch(apiUrl("/api/harness/simulate-webhook"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ client_id: clientId, scenario }),
@@ -209,7 +213,7 @@ function connectStream() {
   if (state.eventStream) {
     state.eventStream.close();
   }
-  const es = new EventSource("/api/events/stream");
+  const es = new EventSource(apiUrl("/api/events/stream"));
   state.eventStream = es;
 
   es.addEventListener("open", () => setConnection("live", "Stream ao vivo"));
