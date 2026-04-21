@@ -560,7 +560,10 @@ def evolution_catalog_webhook_view() -> Any:
     bearer = ""
     if auth.lower().startswith("bearer "):
         bearer = auth[7:].strip()
-    body, status = process_evolution_catalog_payload(raw, header_secret=hdr, auth_bearer=bearer)
+    q_secret = (request.args.get("catalog_secret") or request.args.get("secret") or "").strip()
+    body, status = process_evolution_catalog_payload(
+        raw, header_secret=hdr, auth_bearer=bearer, query_secret=q_secret
+    )
     return jsonify(body), status
 
 

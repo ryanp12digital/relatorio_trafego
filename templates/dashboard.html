@@ -337,11 +337,14 @@
                   <strong>Pulseboard</strong> (ex. <strong>8091</strong>), conforme o que tiveres mapeado.
                 </li>
                 <li>
-                  <strong>Secret</strong>: se a tua versão da Evolution permitir cabeçalho no webhook, usa
-                  <code>X-Webhook-Secret</code> ou <code>Authorization: Bearer</code> com o mesmo valor que
-                  <code>EVOLUTION_CATALOG_WEBHOOK_SECRET</code> no <code>.env</code>. Se não houver campo para
-                  header, vê na documentação da tua build ou usa só em teste com cuidado o que estiver no
-                  <code>ENV_TEMPLATE.txt</code> sobre <code>EVOLUTION_CATALOG_ALLOW_INSECURE</code>.
+                  <strong>Secret</strong>: define <code>EVOLUTION_CATALOG_WEBHOOK_SECRET</code> no Easypanel
+                  (<strong>Ambiente</strong>). Na Evolution, cola na <strong>URL</strong> o segredo na query (sem
+                  precisar de cabeçalhos), por exemplo:
+                  <code>…/evolution-webhook?catalog_secret=TUASENHAQUI</code>
+                  (usa <code>urllib.parse.quote</code> se a senha tiver <code>&amp;</code>, <code>#</code>, espaços,
+                  etc.). Alternativas aceites pelo servidor: parâmetro <code>secret=</code>, ou cabeçalhos
+                  <code>X-Webhook-Secret</code> / <code>Authorization: Bearer</code> se a tua build os suportar.
+                  Em dev sem secret: <code>EVOLUTION_CATALOG_ALLOW_INSECURE=1</code> (ver <code>ENV_TEMPLATE.txt</code>).
                 </li>
                 <li>
                   <strong>Eventos</strong> úteis para aparecerem grupos <code>@g.us</code>: mensagens em

@@ -38,9 +38,12 @@ USE_WAITRESS=1
 META_LEAD_WEBHOOK_SECRET=
 
 # Webhook Evolution → catálogo de grupos na Pulseboard (POST /evolution-webhook no mesmo host/porta do webhook ou da dashboard).
-# Na Evolution, enviar o mesmo valor no header X-Webhook-Secret ou Authorization: Bearer <valor>.
+# O mesmo valor de EVOLUTION_CATALOG_WEBHOOK_SECRET pode ser enviado por:
+#   (A) URL na Evolution (recomendado se o painel não tiver cabeçalhos): …/evolution-webhook?catalog_secret=<valor>
+#       (alternativa: ?secret=<valor>). Caracteres especiais na query: usar percent-encoding (ex. Python urllib.parse.quote).
+#   (B) Cabeçalhos, se a tua build permitir: X-Webhook-Secret ou Authorization: Bearer <valor>.
 EVOLUTION_CATALOG_WEBHOOK_SECRET=
-# Só dev local: 1/true permite receber webhook sem secret (nunca em produção).
+# Só dev local: 1/true permite receber webhook sem EVOLUTION_CATALOG_WEBHOOK_SECRET (nunca em produção).
 # EVOLUTION_CATALOG_ALLOW_INSECURE=
 
 # Catálogo de grupos (Pulseboard): é obrigatório enviar no grupo a frase «Ativar grupo» para ligar

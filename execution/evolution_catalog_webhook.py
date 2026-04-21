@@ -1,7 +1,8 @@
 """
 Webhook Evolution: catalogar grupos (@g.us) para a Pulseboard.
 
-POST /evolution-webhook — sem sessão Flask; valida EVOLUTION_CATALOG_WEBHOOK_SECRET.
+POST /evolution-webhook — sem sessão Flask; valida EVOLUTION_CATALOG_WEBHOOK_SECRET
+(cabeçalhos X-Webhook-Secret / Bearer ou query ?catalog_secret= / ?secret=).
 """
 
 from __future__ import annotations
@@ -270,6 +271,7 @@ def extract_activity_meta(event_body: Dict[str, Any]) -> Tuple[str, str, str]:
 def verify_evolution_catalog_webhook_secret(
     header_secret: str,
     auth_bearer: str,
+    query_secret: str = "",
 ) -> bool:
     expected = (os.getenv("EVOLUTION_CATALOG_WEBHOOK_SECRET") or "").strip()
     if not expected:
@@ -286,17 +288,24 @@ def verify_evolution_catalog_webhook_secret(
             )
             return True
         _evo_log(
-            "cod=SECRET_CATALOGO_NAO_CONFIGURADO | defina EVOLUTION_CATALOG_WEBHOOK_SECRET na Evolution e no .env",
+            "cod=SECRET_CATALOGO_NAO_CONFIGURADO | defina EVOLUTION_CATALOG_WEBHOOK_SECRET no .env "
+            "ou EVOLUTION_CATALOG_ALLOW_INSECURE=1 so em dev",
             level=logging.WARNING,
         )
         return False
     hs = (header_secret or "").strip()
     ab = (auth_bearer or "").strip()
+    qs = (query_secret or "").strip()
     if hs and hs == expected:
         return True
     if ab and ab == expected:
         return True
-    _evo_log("cod=WEBHOOK_SECRET_CATALOGO_INVALIDO | cabecalho X-Webhook-Secret ou Bearer incorreto", level=logging.WARNING)
+    if qs and qs == expected:
+        return True
+    _evo_log(
+        "cod=WEBHOOK_SECRET_CATALOGO_INVALIDO | X-Webhook-Secret, Bearer ou query catalog_secret/secret incorreto",
+        level=logging.WARNING,
+    )
     return False
 
 
@@ -376,20 +385,23 @@ def process_evolution_catalog_payload(
     *,
     header_secret: str = "",
     auth_bearer: str = "",
+    query_secret: str = "",
 ) -> Tuple[Dict[str, Any], int]:
     """
     Processa JSON bruto do webhook. Retorna (dict resposta, status_http).
     """
-    if not verify_evolution_catalog_webhook_secret(header_secret, auth_bearer):
+    if not verify_evolution_catalog_webhook_secret(header_secret, auth_bearer, query_secret):
         _emit_catalog_flow(
             "auth",
             "SECRET_NEGADO",
             "error",
-            "401 — secret ou Bearer do catálogo inválido ou EVOLUTION_CATALOG_WEBHOOK_SECRET não definido",
+            "401 — secret do catálogo inválido ou EVOLUTION_CATALOG_WEBHOOK_SECRET não definido",
             payload={
                 "hint": (
-                    "Defina o secret no .env e na Evolution (X-Webhook-Secret ou Bearer). "
-                    "Teste local: EVOLUTION_CATALOG_ALLOW_INSECURE=1."
+                    "Defina EVOLUTION_CATALOG_WEBHOOK_SECRET no .env e na Evolution: URL com "
+                    "?catalog_secret=<valor> (ou ?secret=), ou cabeçalhos X-Webhook-Secret / Bearer. "
+                    "Codifique caracteres especiais na query (percent-encoding). "
+                    "Dev sem secret: EVOLUTION_CATALOG_ALLOW_INSECURE=1."
                 ),
             },
         )
@@ -397,9 +409,10 @@ def process_evolution_catalog_payload(
             "ok": False,
             "error": "unauthorized",
             "hint": (
-                "No servidor defina EVOLUTION_CATALOG_WEBHOOK_SECRET e na Evolution envie o mesmo valor em "
-                "X-Webhook-Secret ou Authorization: Bearer. Sem isso o catalogo rejeita o POST (401). "
-                "Só em teste local: EVOLUTION_CATALOG_ALLOW_INSECURE=1."
+                "Defina EVOLUTION_CATALOG_WEBHOOK_SECRET no servidor e envie o mesmo valor na Evolution: "
+                "na URL do webhook use …/evolution-webhook?catalog_secret=<valor> (recomendado quando não há "
+                "campos de cabeçalho), ou X-Webhook-Secret / Authorization: Bearer. "
+                "Sem secret e sem EVOLUTION_CATALOG_ALLOW_INSECURE=1 o POST responde 401."
             ),
         }, 401
 
