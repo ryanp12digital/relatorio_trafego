@@ -743,6 +743,25 @@ def patch_catalog_group_manual(
     return get_catalog_group(gj)
 
 
+def delete_catalog_group(group_jid: str) -> bool:
+    """Remove o grupo do catálogo. Retorna True se existia e foi apagado."""
+    gj = (group_jid or "").strip()
+    if not gj:
+        return False
+    if db_enabled():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM whatsapp_catalog_groups WHERE group_jid = %s", (gj,))
+                return cur.rowcount > 0
+    with _CATALOG_JSON_LOCK:
+        rows = _load_catalog_json()
+        new_rows = [r for r in rows if str(r.get("group_jid", "")).strip() != gj]
+        if len(new_rows) == len(rows):
+            return False
+        _save_catalog_json(new_rows)
+        return True
+
+
 def get_catalog_webhook_listening() -> bool:
     """
     Se False, POST /evolution-webhook responde 200 sem normalizar nem gravar (menos carga).

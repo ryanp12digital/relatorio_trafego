@@ -905,39 +905,56 @@ function renderCatalogGroups() {
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
-  const head = `<table class="catalog-table"><thead><tr>
-    <th>Nome</th><th>JID</th><th>Última actividade</th><th>Evento</th><th>Monitorar</th><th>Ações</th>
-  </tr></thead><tbody>`;
-  const body = rows
-    .map((g) => {
+  const cards = rows
+    .map((g, idx) => {
       const jid = esc(g.group_jid);
       const rawSub = String(g.subject || "").trim();
       const subVal = esc(rawSub);
-      const la = esc(g.last_activity_at || "");
-      const ev = esc(g.last_event_type || "");
+      const laRaw = g.last_activity_at || "";
+      const laDisp = laRaw
+        ? esc(new Date(laRaw).toLocaleString("pt-BR"))
+        : `<span class="catalog-meta-dash">—</span>`;
+      const evRaw = String(g.last_event_type || "").trim();
+      const ev = evRaw ? esc(evRaw) : `<span class="catalog-meta-dash">—</span>`;
       const mon = !!g.monitoring_enabled;
-      const monLabel = mon ? "Ativo" : "Pausado";
-      return `<tr data-group-jid="${jid}">
-        <td><input type="text" class="catalog-subject-input" value="${subVal}" data-jid="${jid}" placeholder="Nome do grupo" /></td>
-        <td><code class="catalog-jid">${jid}</code></td>
-        <td class="catalog-muted">${la ? new Date(la).toLocaleString("pt-BR") : "—"}</td>
-        <td class="catalog-muted">${ev || "—"}</td>
-        <td>
-          <label class="catalog-switch">
-            <input type="checkbox" class="catalog-mon" data-jid="${jid}" ${mon ? "checked" : ""} />
-            <span class="catalog-switch-track" aria-hidden="true"><span class="catalog-switch-thumb"></span></span>
-            <span class="catalog-switch-label">${monLabel}</span>
-          </label>
-        </td>
-        <td class="catalog-actions">
-          <button type="button" class="small ghost catalog-copy" data-jid="${jid}">Copiar JID</button>
-          <button type="button" class="small ghost catalog-refresh" data-jid="${jid}">Nome API</button>
-          <button type="button" class="small primary catalog-save-sub" data-jid="${jid}">Guardar nome</button>
-        </td>
-      </tr>`;
+      const monLabel = mon ? "Ao vivo" : "Pausado";
+      const titleId = `catalog-card-h-${idx}`;
+      return `<article class="catalog-group-card ${mon ? "is-live" : "is-paused"}" data-group-jid="${jid}" style="--i:${idx}" aria-labelledby="${titleId}">
+        <div class="catalog-card-gutter" aria-hidden="true"></div>
+        <div class="catalog-card-inner">
+          <header class="catalog-card-head">
+            <div class="catalog-card-head-top">
+              <span id="${titleId}" class="catalog-card-kicker">Grupo WhatsApp</span>
+              <div class="catalog-card-status" data-live="${mon ? "1" : "0"}">
+                <span class="catalog-status-dot" aria-hidden="true"></span>
+                <span class="catalog-status-text">${monLabel}</span>
+              </div>
+            </div>
+            <input type="text" class="catalog-subject-input catalog-card-subject" value="${subVal}" data-jid="${jid}" placeholder="Nome ou etiqueta interna…" autocomplete="off" />
+            <p class="catalog-card-jid-line"><code class="catalog-jid catalog-jid-pill" translate="no">${jid}</code></p>
+          </header>
+          <dl class="catalog-card-meta">
+            <div class="catalog-meta-cell"><dt>Última actividade</dt><dd>${laDisp}</dd></div>
+            <div class="catalog-meta-cell"><dt>Último evento</dt><dd class="catalog-meta-event">${ev}</dd></div>
+          </dl>
+          <footer class="catalog-card-foot">
+            <label class="catalog-switch catalog-card-switch">
+              <input type="checkbox" class="catalog-mon" data-jid="${jid}" ${mon ? "checked" : ""} aria-label="Monitorar eventos deste grupo no catálogo" />
+              <span class="catalog-switch-track" aria-hidden="true"><span class="catalog-switch-thumb"></span></span>
+              <span class="catalog-switch-label">Monitorar</span>
+            </label>
+            <div class="catalog-card-actions">
+              <button type="button" class="catalog-chip catalog-copy" data-jid="${jid}">Copiar JID</button>
+              <button type="button" class="catalog-chip catalog-refresh" data-jid="${jid}">Nome API</button>
+              <button type="button" class="catalog-chip catalog-chip-primary catalog-save-sub" data-jid="${jid}">Guardar nome</button>
+              <button type="button" class="catalog-chip catalog-chip-danger catalog-delete" data-jid="${jid}">Remover</button>
+            </div>
+          </footer>
+        </div>
+      </article>`;
     })
     .join("");
-  wrap.innerHTML = head + body + `</tbody></table>`;
+  wrap.innerHTML = `<div class="catalog-card-list" role="list">${cards}</div>`;
 
   wrap.querySelectorAll(".catalog-copy").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -982,7 +999,16 @@ function renderCatalogGroups() {
     cb.addEventListener("change", async () => {
       const j = cb.getAttribute("data-jid");
       if (!j) return;
-      const label = cb.closest(".catalog-switch")?.querySelector(".catalog-switch-label");
+      const card = cb.closest(".catalog-group-card");
+      const applyMonitorVisual = (on) => {
+        if (!card) return;
+        card.classList.toggle("is-live", on);
+        card.classList.toggle("is-paused", !on);
+        const pill = card.querySelector(".catalog-card-status");
+        const txt = card.querySelector(".catalog-status-text");
+        if (pill) pill.setAttribute("data-live", on ? "1" : "0");
+        if (txt) txt.textContent = on ? "Ao vivo" : "Pausado";
+      };
       const res = await dashFetch(apiUrl("/api/catalog-groups"), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -990,10 +1016,10 @@ function renderCatalogGroups() {
       });
       if (!res.ok) {
         cb.checked = !cb.checked;
-        if (label) label.textContent = cb.checked ? "Ativo" : "Pausado";
+        applyMonitorVisual(cb.checked);
         setCatalogFeedback("Falha ao guardar monitoramento.", "error");
-      } else if (label) {
-        label.textContent = cb.checked ? "Ativo" : "Pausado";
+      } else {
+        applyMonitorVisual(cb.checked);
         setCatalogFeedback("Monitoramento actualizado.", "success");
         setTimeout(() => setCatalogFeedback("", ""), 2200);
       }
@@ -1003,8 +1029,8 @@ function renderCatalogGroups() {
     btn.addEventListener("click", async () => {
       const j = btn.getAttribute("data-jid");
       if (!j) return;
-      const row = btn.closest("tr");
-      const inp = row?.querySelector(".catalog-subject-input");
+      const card = btn.closest(".catalog-group-card");
+      const inp = card?.querySelector(".catalog-subject-input");
       const subject = (inp?.value || "").trim();
       const res = await dashFetch(apiUrl("/api/catalog-groups"), {
         method: "PATCH",
@@ -1016,6 +1042,35 @@ function renderCatalogGroups() {
         await fetchCatalogGroups();
       } else {
         setCatalogFeedback("Falha ao guardar nome.", "error");
+      }
+    });
+  });
+  wrap.querySelectorAll(".catalog-delete").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const j = btn.getAttribute("data-jid");
+      if (!j) return;
+      const card = btn.closest(".catalog-group-card");
+      const nameHint = (card?.querySelector(".catalog-card-subject")?.value || "").trim() || j;
+      const ok = window.confirm(
+        `Remover este grupo do catálogo na Pulseboard?\n\n${nameHint}\n\nO registo deixa de aparecer aqui; novos eventos da Evolution podem voltar a criá-lo.`,
+      );
+      if (!ok) return;
+      btn.disabled = true;
+      try {
+        const res = await dashFetch(apiUrl("/api/catalog-groups"), {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ group_jid: j }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setCatalogFeedback(data.error || "Falha ao remover grupo.", "error");
+          return;
+        }
+        setCatalogFeedback("Grupo removido do catálogo.", "success");
+        await fetchCatalogGroups();
+      } finally {
+        btn.disabled = false;
       }
     });
   });

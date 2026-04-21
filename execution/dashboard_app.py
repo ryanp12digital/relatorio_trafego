@@ -602,6 +602,18 @@ def api_catalog_groups_patch() -> Any:
     return jsonify({"ok": True, "group": updated})
 
 
+@app.delete("/api/catalog-groups")
+def api_catalog_groups_delete() -> Any:
+    persistence.ensure_db_ready()
+    payload = request.get_json(silent=True) or {}
+    gj = str(payload.get("group_jid") or "").strip()
+    if not gj:
+        return jsonify({"ok": False, "error": "group_jid_obrigatorio"}), 400
+    if not persistence.delete_catalog_group(gj):
+        return jsonify({"ok": False, "error": "grupo_nao_encontrado"}), 404
+    return jsonify({"ok": True})
+
+
 @app.route("/api/catalog-groups/webhook-listener", methods=["GET", "POST"])
 def api_catalog_webhook_listener() -> Any:
     """Liga/desliga processamento do POST /evolution-webhook (ficheiro partilhado entre processos)."""

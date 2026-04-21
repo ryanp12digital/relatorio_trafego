@@ -1371,6 +1371,11 @@ def dash_api_catalog_groups_patch():
     return dashboard_module.api_catalog_groups_patch()
 
 
+@app.delete("/dash/api/catalog-groups")
+def dash_api_catalog_groups_delete():
+    return dashboard_module.api_catalog_groups_delete()
+
+
 @app.post("/dash/api/catalog-groups/refresh")
 def dash_api_catalog_groups_refresh():
     return dashboard_module.api_catalog_groups_refresh()
