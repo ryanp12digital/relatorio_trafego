@@ -639,6 +639,12 @@ dd {
   gap: 10px;
 }
 
+select.catalog-group-select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .field-select {
   cursor: pointer;
   appearance: none;

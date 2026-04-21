@@ -498,6 +498,7 @@ async function fetchMetaClients() {
   for (const c of state.metaClients) state.eventsByClient.set(c.client_name, c.events || []);
   buildStats("statsRow", state.metaClients);
   renderMetaClients();
+  syncCatalogGroupSelects();
 }
 
 async function fetchGoogleClients() {
@@ -507,6 +508,7 @@ async function fetchGoogleClients() {
   state.googleClients = data.clients || [];
   buildStats("googleStatsRow", state.googleClients);
   renderGoogleClients();
+  syncCatalogGroupSelects();
 }
 
 async function fetchTemplates() {
@@ -540,9 +542,11 @@ async function submitNewMetaClient(ev) {
   }
   feedback.textContent = "Cliente Meta adicionado com sucesso.";
   form.reset();
-  form.querySelector('input[name="enabled"]').checked = true;
+  const en = form.querySelector('[name="enabled"]');
+  if (en && "checked" in en) en.checked = true;
   populateLeadTemplateSelect(document.getElementById("newClientLeadTemplate"), "default");
   setupChipFields(form, ["lead_exclude_fields", "lead_exclude_contains"]);
+  syncCatalogGroupSelects();
   await fetchMetaClients();
 }
 
@@ -566,7 +570,9 @@ async function submitNewGoogleClient(ev) {
   }
   feedback.textContent = "Cliente Google adicionado com sucesso.";
   form.reset();
-  form.querySelector('input[name="enabled"]').checked = true;
+  const enG = form.querySelector('[name="enabled"]');
+  if (enG && "checked" in enG) enG.checked = true;
+  syncCatalogGroupSelects();
   await fetchGoogleClients();
 }
 
@@ -849,7 +855,51 @@ function bindTabs() {
         fetchCatalogGroups().catch((e) => console.error(e));
         fetchCatalogListenerState().catch((e) => console.error(e));
       }
+      if (btn.dataset.tab === "meta" || btn.dataset.tab === "google") {
+        fetchCatalogGroups().catch((e) => console.error(e));
+      }
     });
+  });
+}
+
+function formatCatalogGroupLabel(g) {
+  const sub = (g.subject || "").trim() || "Sem nome";
+  const jid = (g.group_jid || "").trim();
+  if (!jid) return sub;
+  const short = jid.length > 42 ? `${jid.slice(0, 20)}…${jid.slice(-18)}` : jid;
+  return `${sub} — ${short}`;
+}
+
+function syncCatalogGroupSelects() {
+  const groups = Array.isArray(state.catalogGroups) ? state.catalogGroups : [];
+  document.querySelectorAll("select.catalog-group-select").forEach((sel) => {
+    const optional = sel.dataset.catalogOptional === "1";
+    const prev = (sel.value || "").trim();
+    const known = new Set([""]);
+    sel.replaceChildren();
+    const ph = document.createElement("option");
+    ph.value = "";
+    ph.textContent = optional ? "(Opcional) sem grupo lead" : "— Escolher do catálogo —";
+    sel.appendChild(ph);
+    groups.forEach((g) => {
+      const jid = (g.group_jid || "").trim();
+      if (!jid || known.has(jid)) return;
+      known.add(jid);
+      const o = document.createElement("option");
+      o.value = jid;
+      o.textContent = formatCatalogGroupLabel(g);
+      o.title = jid;
+      sel.appendChild(o);
+    });
+    if (prev && !known.has(prev)) {
+      const o = document.createElement("option");
+      o.value = prev;
+      o.textContent = `${prev.length > 48 ? `${prev.slice(0, 24)}…` : prev} (fora do catálogo)`;
+      o.title = prev;
+      sel.appendChild(o);
+    }
+    const hasPrev = prev && [...sel.options].some((o) => o.value === prev);
+    if (hasPrev) sel.value = prev;
   });
 }
 
@@ -875,6 +925,7 @@ async function fetchCatalogGroups() {
     }
     state.catalogGroups = Array.isArray(data.groups) ? data.groups : [];
     renderCatalogGroups();
+    syncCatalogGroupSelects();
     const n = state.catalogGroups.length;
     setGroupsStatus(n ? `Lista actualizada · ${n} ${n === 1 ? "grupo" : "grupos"}` : "Lista vazia — aguardando eventos do webhook.");
     setCatalogFeedback("", "");
@@ -1101,7 +1152,7 @@ function bindUI() {
 
 async function boot() {
   bindUI();
-  await Promise.all([fetchMetaClients(), fetchGoogleClients(), fetchTemplates()]);
+  await Promise.all([fetchMetaClients(), fetchGoogleClients(), fetchTemplates(), fetchCatalogGroups()]);
   connectStream();
 }
 

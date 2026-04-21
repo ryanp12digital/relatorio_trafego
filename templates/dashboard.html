@@ -56,7 +56,10 @@
               </label>
               <label>
                 Grupo relatório
-                <input name="group_id" required placeholder="1203...@g.us" />
+                <select name="group_id" class="field-select catalog-group-select" required data-catalog-optional="0">
+                  <option value="">— Escolher do catálogo —</option>
+                </select>
+                <span class="field-hint">Lista da aba Grupos WhatsApp (webhook Evolution).</span>
               </label>
               <label>
                 Meta page id
@@ -64,7 +67,10 @@
               </label>
               <label>
                 Grupo leads
-                <input name="lead_group_id" placeholder="1203...@g.us" />
+                <select name="lead_group_id" class="field-select catalog-group-select" data-catalog-optional="1">
+                  <option value="">(Opcional) sem grupo lead</option>
+                </select>
+                <span class="field-hint">Mesmo catálogo; vazio usa o grupo relatório como fallback no fluxo.</span>
               </label>
               <label class="new-client-field-template">
                 Template lead
@@ -151,7 +157,10 @@
               </label>
               <label>
                 Grupo WhatsApp
-                <input name="group_id" required placeholder="1203...@g.us" />
+                <select name="group_id" class="field-select catalog-group-select" required data-catalog-optional="0">
+                  <option value="">— Escolher do catálogo —</option>
+                </select>
+                <span class="field-hint">Lista da aba Grupos WhatsApp.</span>
               </label>
               <label>
                 Template Google
@@ -453,7 +462,9 @@
               </label>
               <label class="edit-field">
                 Grupo relatório
-                <input name="group_id" required placeholder="…@g.us" spellcheck="false" />
+                <select name="group_id" class="field-select catalog-group-select" required data-catalog-optional="0">
+                  <option value="">— Escolher do catálogo —</option>
+                </select>
               </label>
               <label class="edit-field">
                 Meta page id
@@ -461,7 +472,9 @@
               </label>
               <label class="edit-field">
                 Grupo lead
-                <input name="lead_group_id" placeholder="…@g.us" spellcheck="false" />
+                <select name="lead_group_id" class="field-select catalog-group-select" data-catalog-optional="1">
+                  <option value="">(Opcional) sem grupo lead</option>
+                </select>
               </label>
               <label class="edit-field">
                 Telefone lead
@@ -573,7 +586,9 @@
             </label>
             <label>
               Grupo
-              <input name="group_id" required />
+              <select name="group_id" class="field-select catalog-group-select" required data-catalog-optional="0">
+                <option value="">— Escolher do catálogo —</option>
+              </select>
             </label>
             <label>
               Template Google
