@@ -324,16 +324,31 @@
               Como ligar o webhook na Evolution
             </summary>
             <div class="groups-guide-body">
+              <p>
+                No painel da Evolution costuma dar só para colar a <strong>URL</strong> e marcar
+                <strong>quais eventos</strong> enviar — não precisas de mais opções lá. O resto (secret,
+                <code>findGroupInfos</code>) fica do lado deste servidor / Pulseboard.
+              </p>
               <ol>
                 <li>
-                  URL <code>POST …/evolution-webhook</code> na mesma origem que o serviço (ex.: porta
-                  <strong>8080</strong> do webhook ou <strong>8091</strong> da Pulseboard).
+                  <strong>URL</strong> (HTTPS), caminho fixo:
+                  <code>…/evolution-webhook</code> no mesmo host que o teu contentor (Easypanel), na porta
+                  exposta do <strong>webhook Meta</strong> (ex. <strong>8080</strong>) ou da
+                  <strong>Pulseboard</strong> (ex. <strong>8091</strong>), conforme o que tiveres mapeado.
                 </li>
                 <li>
-                  Header <code>X-Webhook-Secret</code> ou <code>Authorization: Bearer</code> igual a
-                  <code>EVOLUTION_CATALOG_WEBHOOK_SECRET</code>.
+                  <strong>Secret</strong>: se a tua versão da Evolution permitir cabeçalho no webhook, usa
+                  <code>X-Webhook-Secret</code> ou <code>Authorization: Bearer</code> com o mesmo valor que
+                  <code>EVOLUTION_CATALOG_WEBHOOK_SECRET</code> no <code>.env</code>. Se não houver campo para
+                  header, vê na documentação da tua build ou usa só em teste com cuidado o que estiver no
+                  <code>ENV_TEMPLATE.txt</code> sobre <code>EVOLUTION_CATALOG_ALLOW_INSECURE</code>.
                 </li>
-                <li>Após cada evento útil, a Pulseboard pede o nome do grupo à Evolution.</li>
+                <li>
+                  <strong>Eventos</strong> úteis para aparecerem grupos <code>@g.us</code>: mensagens em
+                  grupo (ex. <code>MESSAGES_UPSERT</code> / <code>messages.upsert</code>) e, se existirem na
+                  lista, eventos de chats/grupos (ex. <code>CHATS_UPSERT</code>, <code>CHATS_UPDATE</code>).
+                  Eventos só de aplicação ou chamadas não catalogam grupos, mas não atrapalham.
+                </li>
               </ol>
             </div>
           </details>
