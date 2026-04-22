@@ -564,6 +564,7 @@ function renderGoogleClients() {
   state.googleClients.forEach((client) => {
     const node = tpl.content.cloneNode(true);
     const card = node.querySelector(".client-card");
+    card.dataset.clientId = String(client.id);
     card.querySelector(".client-name").textContent = client.client_name || "(sem nome)";
     const statusLabel = client.checks?.status_label || "Inconsistente";
     const pill = card.querySelector(".status-pill");
@@ -1079,16 +1080,28 @@ function formatCatalogGroupLabel(g) {
 
 function syncCatalogGroupSelects() {
   const groups = Array.isArray(state.catalogGroups) ? state.catalogGroups : [];
+  const activeGroups = groups.filter((g) => !!g?.monitoring_enabled);
+  const optionsSource = activeGroups.length ? activeGroups : groups;
   document.querySelectorAll("select.catalog-group-select").forEach((sel) => {
     const optional = sel.dataset.catalogOptional === "1";
-    const prev = (sel.value || "").trim();
+    let prev = (sel.value || "").trim();
+    const card = sel.closest(".client-card");
+    const fieldName = String(sel.name || "").trim();
+    if (card?.dataset?.clientId) {
+      const cid = String(card.dataset.clientId);
+      const metaClient = state.metaClients.find((x) => String(x.id) === cid);
+      const googleClient = state.googleClients.find((x) => String(x.id) === cid);
+      if (metaClient && fieldName === "group_id") prev = String(metaClient.group_id || "").trim();
+      if (metaClient && fieldName === "lead_group_id") prev = String(metaClient.lead_group_id || "").trim();
+      if (googleClient && fieldName === "group_id") prev = String(googleClient.group_id || "").trim();
+    }
     const known = new Set([""]);
     sel.replaceChildren();
     const ph = document.createElement("option");
     ph.value = "";
     ph.textContent = optional ? "(Opcional) sem grupo lead" : "— Escolher do catálogo —";
     sel.appendChild(ph);
-    groups.forEach((g) => {
+    optionsSource.forEach((g) => {
       const jid = (g.group_jid || "").trim();
       if (!jid || known.has(jid)) return;
       known.add(jid);
@@ -1277,7 +1290,10 @@ function renderCatalogGroups() {
         applyMonitorVisual(cb.checked);
         setCatalogFeedback("Falha ao guardar monitoramento.", "error");
       } else {
+        const row = (state.catalogGroups || []).find((x) => String(x.group_jid || "").trim() === String(j || "").trim());
+        if (row) row.monitoring_enabled = !!cb.checked;
         applyMonitorVisual(cb.checked);
+        syncCatalogGroupSelects();
         setCatalogFeedback("Monitoramento actualizado.", "success");
         setTimeout(() => setCatalogFeedback("", ""), 2200);
       }
