@@ -1956,3 +1956,213 @@ textarea {
     min-width: 0;
   }
 }
+
+/* --- Filtros: cabeçalho + ajuda + modal --- */
+.filters-block-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 4px;
+}
+
+.filters-block-head-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.filters-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 4px;
+}
+
+.filters-panel-titles {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.filters-help-btn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid rgba(129, 168, 255, 0.55);
+  background: rgba(129, 168, 255, 0.1);
+  color: #c8dcff;
+  font-weight: 800;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.filters-help-btn:hover {
+  background: rgba(129, 168, 255, 0.22);
+  border-color: rgba(129, 168, 255, 0.95);
+  color: #fff;
+}
+
+.filters-help-btn:focus-visible {
+  outline: 2px solid var(--hot);
+  outline-offset: 2px;
+}
+
+.field-micro {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: none;
+  color: rgba(170, 178, 198, 0.92);
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+}
+
+.field-micro code {
+  font-size: 10px;
+}
+
+.meta-catalog-hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--muted);
+  min-height: 1.2em;
+}
+
+.edit-section-filters-head {
+  margin-bottom: 10px;
+}
+
+.edit-section-filters-head .edit-section-title {
+  margin: 0;
+}
+
+.filters-help-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.filters-help-overlay[hidden] {
+  display: none;
+}
+
+.filters-help-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 6, 12, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.filters-help-card {
+  position: relative;
+  z-index: 1;
+  width: min(560px, 100%);
+  max-height: min(86vh, 720px);
+  overflow: auto;
+  border-radius: 18px;
+  border: 1px solid rgba(58, 247, 214, 0.22);
+  background: linear-gradient(165deg, rgba(12, 16, 26, 0.98), rgba(8, 10, 18, 0.96));
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.filters-help-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 18px 12px;
+  border-bottom: 1px solid rgba(42, 48, 66, 0.9);
+}
+
+.filters-help-title {
+  margin: 0;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: clamp(26px, 4vw, 32px);
+  letter-spacing: 0.05em;
+  color: #f4f7ff;
+  line-height: 1;
+}
+
+.filters-help-close-x {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+}
+
+.filters-help-close-x:hover {
+  border-color: rgba(255, 93, 115, 0.55);
+  color: var(--error);
+}
+
+.filters-help-body {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.55;
+}
+
+.filters-help-lede {
+  margin: 0;
+  color: var(--muted);
+}
+
+.filters-help-lede code,
+.filters-help-list code {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+  color: #b8e8ff;
+}
+
+.filters-help-list {
+  margin: 0;
+  padding-left: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--muted);
+}
+
+.filters-help-list strong {
+  color: var(--text);
+}
+
+.filters-help-note {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 209, 102, 0.28);
+  background: rgba(255, 209, 102, 0.06);
+  font-size: 13px;
+  color: #dfe6f5;
+}
+
+.filters-help-footer {
+  padding: 14px 18px 18px;
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid rgba(42, 48, 66, 0.75);
+}
+
+.filters-help-close-btn {
+  min-width: 120px;
+}

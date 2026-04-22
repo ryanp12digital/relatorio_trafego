@@ -6,6 +6,14 @@ const state = {
   templates: { channels: {}, variables: {}, filters: {} },
   eventsByClient: new Map(),
   eventStream: null,
+  metaCatalog: {
+    accounts: [],
+    pages: [],
+    sourceAccounts: "",
+    sourcePages: "",
+    warningsAccounts: [],
+    warningsPages: [],
+  },
 };
 
 const DASHBOARD_BASE = (() => {
@@ -58,6 +66,182 @@ function uniqueKeepOrder(values) {
 
 function stringifyCsv(values) {
   return uniqueKeepOrder(values).join(", ");
+}
+
+/** Regex inválidas nos chips (mesmo critério case-insensitive do backend). */
+function invalidRegexPatterns(hiddenInput) {
+  const vals = parseCsvValue(hiddenInput?.value || "");
+  const bad = [];
+  for (const pat of vals) {
+    try {
+      new RegExp(pat, "i");
+    } catch {
+      bad.push(pat);
+    }
+  }
+  return bad;
+}
+
+function fillMetaSelect(selectEl, items, preferredValue, emptyLabel) {
+  if (!selectEl) return;
+  const prev =
+    preferredValue !== undefined && preferredValue !== null && String(preferredValue).trim() !== ""
+      ? String(preferredValue).trim()
+      : String(selectEl.value || "").trim();
+  const known = new Set([""]);
+  selectEl.replaceChildren();
+  const ph = document.createElement("option");
+  ph.value = "";
+  ph.textContent = emptyLabel;
+  selectEl.appendChild(ph);
+  (Array.isArray(items) ? items : []).forEach((it) => {
+    const id = String(it.id || "").trim();
+    if (!id || known.has(id)) return;
+    known.add(id);
+    const o = document.createElement("option");
+    o.value = id;
+    o.textContent = it.label || id;
+    o.title = id;
+    selectEl.appendChild(o);
+  });
+  if (prev && !known.has(prev)) {
+    const o = document.createElement("option");
+    o.value = prev;
+    const short = prev.length > 44 ? `${prev.slice(0, 22)}…${prev.slice(-18)}` : prev;
+    o.textContent = `${short} (fora do catálogo)`;
+    o.title = prev;
+    selectEl.appendChild(o);
+  }
+  if (prev && [...selectEl.options].some((o) => o.value === prev)) selectEl.value = prev;
+}
+
+function updateMetaCatalogHint() {
+  const el = document.getElementById("metaCatalogHint");
+  if (!el) return;
+  const mc = state.metaCatalog || {};
+  const sa = mc.sourceAccounts || "—";
+  const sp = mc.sourcePages || "—";
+  const bits = [`Catálogo: contas (${sa}) · páginas (${sp})`];
+  const wa = (mc.warningsAccounts || []).filter(Boolean);
+  const wp = (mc.warningsPages || []).filter(Boolean);
+  if (wa.length) bits.push(wa.join(" "));
+  if (wp.length) bits.push(wp.join(" "));
+  el.textContent = bits.join(" · ");
+}
+
+function syncMetaCatalogSelects() {
+  const accItems = state.metaCatalog?.accounts || [];
+  const pageItems = state.metaCatalog?.pages || [];
+
+  document.querySelectorAll("select.meta-catalog-account-select").forEach((sel) => {
+    let preferred = String(sel.value || "").trim();
+    const card = sel.closest(".client-card");
+    if (card?.dataset?.clientId) {
+      const cl = state.metaClients.find((x) => String(x.id) === String(card.dataset.clientId));
+      if (cl?.ad_account_id) preferred = String(cl.ad_account_id).trim();
+    }
+    fillMetaSelect(sel, accItems, preferred, "— Escolher conta —");
+  });
+
+  document.querySelectorAll("select.meta-catalog-page-select").forEach((sel) => {
+    let preferred = String(sel.value || "").trim();
+    const card = sel.closest(".client-card");
+    if (card?.dataset?.clientId) {
+      const cl = state.metaClients.find((x) => String(x.id) === String(card.dataset.clientId));
+      if (cl?.meta_page_id) preferred = String(cl.meta_page_id).trim();
+    }
+    fillMetaSelect(sel, pageItems, preferred, "(Opcional) — escolher página —");
+  });
+}
+
+async function fetchMetaCatalogs() {
+  try {
+    const [ra, rp] = await Promise.all([
+      dashFetch(apiUrl("/api/meta-catalog/ad-accounts")),
+      dashFetch(apiUrl("/api/meta-catalog/pages")),
+    ]);
+    const a = await ra.json().catch(() => ({}));
+    const p = await rp.json().catch(() => ({}));
+    state.metaCatalog = {
+      accounts: Array.isArray(a.items) ? a.items : [],
+      pages: Array.isArray(p.items) ? p.items : [],
+      sourceAccounts: a.source || "fallback",
+      sourcePages: p.source || "fallback",
+      warningsAccounts: Array.isArray(a.warnings) ? a.warnings : [],
+      warningsPages: Array.isArray(p.warnings) ? p.warnings : [],
+    };
+    updateMetaCatalogHint();
+  } catch (e) {
+    console.error(e);
+    state.metaCatalog = {
+      accounts: [],
+      pages: [],
+      sourceAccounts: "fallback",
+      sourcePages: "fallback",
+      warningsAccounts: [String(e)],
+      warningsPages: [],
+    };
+    updateMetaCatalogHint();
+  }
+  syncMetaCatalogSelects();
+}
+
+function bindFiltersHelpModal() {
+  const dlg = document.getElementById("filtersHelpDialog");
+  if (!dlg) return;
+  let lastFocus = null;
+
+  const trapFocus = (ev) => {
+    if (ev.key !== "Tab" || dlg.hidden) return;
+    const focusables = dlg.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    const list = [...focusables].filter((n) => !n.hasAttribute("disabled") && n.offsetParent !== null);
+    if (!list.length) return;
+    const first = list[0];
+    const last = list[list.length - 1];
+    if (ev.shiftKey && document.activeElement === first) {
+      ev.preventDefault();
+      last.focus();
+    } else if (!ev.shiftKey && document.activeElement === last) {
+      ev.preventDefault();
+      first.focus();
+    }
+  };
+
+  const onKey = (ev) => {
+    if (dlg.hidden) return;
+    if (ev.key === "Escape") {
+      close();
+      return;
+    }
+    if (ev.key === "Tab" && dlg.contains(document.activeElement)) trapFocus(ev);
+  };
+
+  function open() {
+    lastFocus = document.activeElement;
+    dlg.hidden = false;
+    dlg.setAttribute("aria-hidden", "false");
+    const btn = dlg.querySelector(".filters-help-close-btn");
+    (btn || dlg).focus();
+    document.addEventListener("keydown", onKey);
+  }
+
+  function close() {
+    dlg.hidden = true;
+    dlg.setAttribute("aria-hidden", "true");
+    document.removeEventListener("keydown", onKey);
+    if (lastFocus && typeof lastFocus.focus === "function") lastFocus.focus();
+  }
+
+  document.querySelectorAll('[data-open="filters-help"]').forEach((btn) => {
+    btn.addEventListener("click", () => open());
+  });
+  dlg.querySelectorAll("[data-filters-help-dismiss]").forEach((el) => {
+    el.addEventListener("click", (ev) => {
+      if (ev.target === el) close();
+    });
+  });
 }
 
 /** IDs de template Meta Lead conhecidos no backend (integrados). */
@@ -312,9 +496,7 @@ function renderMetaClients() {
     const editForm = card.querySelector(".edit-form");
     const editFeedback = card.querySelector(".edit-feedback");
     editForm.elements.client_name.value = client.client_name || "";
-    editForm.elements.ad_account_id.value = client.ad_account_id || "";
     editForm.elements.group_id.value = client.group_id || "";
-    editForm.elements.meta_page_id.value = client.meta_page_id || "";
     editForm.elements.lead_group_id.value = client.lead_group_id || "";
     editForm.elements.lead_phone_number.value = client.lead_phone_number || "";
     populateLeadTemplateSelect(editForm.querySelector('select[name="lead_template"]'), client.lead_template);
@@ -334,6 +516,11 @@ function renderMetaClients() {
     });
     editForm.addEventListener("submit", async (ev) => {
       ev.preventDefault();
+      const badRx = invalidRegexPatterns(editForm.querySelector('input[name="lead_exclude_regex"]'));
+      if (badRx.length) {
+        editFeedback.textContent = `Corrija a(s) regex inválida(s) antes de salvar: ${badRx.join(", ")}`;
+        return;
+      }
       editFeedback.textContent = "Salvando alterações...";
       const fd = new FormData(editForm);
       const payload = Object.fromEntries(fd.entries());
@@ -359,6 +546,7 @@ function renderMetaClients() {
 
     grid.appendChild(node);
   });
+  syncMetaCatalogSelects();
 }
 
 function renderGoogleClients() {
@@ -526,6 +714,11 @@ async function submitNewMetaClient(ev) {
   ev.preventDefault();
   const form = ev.currentTarget;
   const feedback = document.getElementById("formFeedback");
+  const badRx = invalidRegexPatterns(form.querySelector('input[name="lead_exclude_regex"]'));
+  if (badRx.length) {
+    feedback.textContent = `Corrija a(s) regex inválida(s): ${badRx.join(", ")}`;
+    return;
+  }
   feedback.textContent = "Enviando...";
   const fd = new FormData(form);
   const payload = Object.fromEntries(fd.entries());
@@ -545,8 +738,9 @@ async function submitNewMetaClient(ev) {
   const en = form.querySelector('[name="enabled"]');
   if (en && "checked" in en) en.checked = true;
   populateLeadTemplateSelect(document.getElementById("newClientLeadTemplate"), "default");
-  setupChipFields(form, ["lead_exclude_fields", "lead_exclude_contains"]);
+  setupChipFields(form, ["lead_exclude_fields", "lead_exclude_contains", "lead_exclude_regex"]);
   syncCatalogGroupSelects();
+  syncMetaCatalogSelects();
   await fetchMetaClients();
 }
 
@@ -603,6 +797,11 @@ async function saveFilters(ev) {
   ev.preventDefault();
   const form = ev.currentTarget;
   const feedback = document.getElementById("filtersFeedback");
+  const badRx = invalidRegexPatterns(form.querySelector('input[name="exclude_regex"]'));
+  if (badRx.length) {
+    feedback.textContent = `Corrija a(s) regex inválida(s): ${badRx.join(", ")}`;
+    return;
+  }
   feedback.textContent = "Salvando filtros...";
   const payload = Object.fromEntries(new FormData(form).entries());
   const r = await dashFetch(apiUrl("/api/message-filters/meta_lead"), {
@@ -1129,6 +1328,7 @@ function renderCatalogGroups() {
 
 function bindUI() {
   bindTabs();
+  bindFiltersHelpModal();
   document.getElementById("newClientForm").addEventListener("submit", submitNewMetaClient);
   document.getElementById("newGoogleClientForm").addEventListener("submit", submitNewGoogleClient);
   document.getElementById("templateForm").addEventListener("submit", saveTemplate);
@@ -1146,13 +1346,23 @@ function bindUI() {
   );
   document.getElementById("previewBtn").addEventListener("click", generateTemplatePreview);
   document.getElementById("tplChannel").addEventListener("change", (ev) => renderTemplateVariables(ev.target.value));
-  setupChipFields(document.getElementById("newClientForm"), ["lead_exclude_fields", "lead_exclude_contains"]);
+  setupChipFields(document.getElementById("newClientForm"), [
+    "lead_exclude_fields",
+    "lead_exclude_contains",
+    "lead_exclude_regex",
+  ]);
   setupChipFields(document.getElementById("filtersForm"), ["exclude_exact", "exclude_contains", "exclude_regex"]);
 }
 
 async function boot() {
   bindUI();
-  await Promise.all([fetchMetaClients(), fetchGoogleClients(), fetchTemplates(), fetchCatalogGroups()]);
+  await Promise.all([
+    fetchMetaClients(),
+    fetchGoogleClients(),
+    fetchTemplates(),
+    fetchCatalogGroups(),
+    fetchMetaCatalogs(),
+  ]);
   connectStream();
 }
 

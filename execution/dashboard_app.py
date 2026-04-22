@@ -53,6 +53,7 @@ from execution.message_templates import (
     upsert_filter_rules,
     upsert_template,
 )
+from execution.meta_client import MetaAPIAuthError, list_business_ad_accounts, list_business_pages
 
 app = Flask(
     __name__,
@@ -660,6 +661,139 @@ def _dashboard_public_url_prefix() -> str:
     Define DASHBOARD_URL_PREFIX=/dash para o meta tag dashboard-base e fetch() correctos.
     """
     return (os.getenv("DASHBOARD_URL_PREFIX") or "").strip().rstrip("/")
+
+
+def _catalog_ad_accounts_from_clients() -> List[Dict[str, str]]:
+    """Contas distintas já salvas em clientes (fallback para o select)."""
+    seen: set[str] = set()
+    out: List[Dict[str, str]] = []
+    for c in _load_clients():
+        aid = _normalize_act_id(str(c.get("ad_account_id", "") or "").strip())
+        if not aid or not re.fullmatch(r"act_\d{6,}", aid) or aid in seen:
+            continue
+        seen.add(aid)
+        nm = str(c.get("client_name", "") or "").strip() or aid
+        out.append({"id": aid, "label": f"{nm} — {aid}"})
+    return sorted(out, key=lambda x: x["id"])
+
+
+def _catalog_pages_from_clients() -> List[Dict[str, str]]:
+    """Page IDs distintos já salvos em clientes (fallback para o select)."""
+    seen: set[str] = set()
+    out: List[Dict[str, str]] = []
+    for c in _load_clients():
+        pid = str(c.get("meta_page_id", "") or "").strip()
+        if not pid or not pid.isdigit() or pid in seen:
+            continue
+        seen.add(pid)
+        nm = str(c.get("client_name", "") or "").strip() or pid
+        out.append({"id": pid, "label": f"{nm} — {pid}"})
+    return sorted(out, key=lambda x: x["id"])
+
+
+def meta_catalog_ad_accounts_payload() -> Dict[str, Any]:
+    """Catálogo híbrido: Graph API (Business) + contas já cadastradas nos clientes."""
+    warnings: List[str] = []
+    token = (os.getenv("META_ACCESS_TOKEN") or "").strip()
+    bid = (os.getenv("META_BUSINESS_ID") or "").strip()
+    api_attempted = bool(token and bid)
+    from_api: List[Dict[str, str]] = []
+
+    if api_attempted:
+        try:
+            raw = list_business_ad_accounts(token, bid, max_retries=2)
+            for acc in raw:
+                aid_raw = acc.get("id") or acc.get("account_id")
+                if not aid_raw:
+                    continue
+                aid = _normalize_act_id(str(aid_raw).strip())
+                if not re.fullmatch(r"act_\d{6,}", aid):
+                    continue
+                name = str(acc.get("name") or "").strip() or aid
+                from_api.append({"id": aid, "label": f"{name} — {aid}"})
+        except MetaAPIAuthError as e:
+            warnings.append(f"Meta API (autenticação): {e!s}")
+        except Exception as e:
+            warnings.append(f"Meta API (contas): {e!s}")
+    else:
+        if not token:
+            warnings.append("META_ACCESS_TOKEN ausente: usando só contas já cadastradas nos clientes.")
+        if not bid:
+            warnings.append("META_BUSINESS_ID ausente: usando só contas já cadastradas nos clientes.")
+
+    from_clients = _catalog_ad_accounts_from_clients()
+    api_ids = {x["id"] for x in from_api}
+    merged: Dict[str, Dict[str, str]] = {x["id"]: x for x in from_api}
+    for row in from_clients:
+        if row["id"] not in merged:
+            merged[row["id"]] = row
+
+    items = sorted(merged.values(), key=lambda x: x["id"])
+    extras = [c for c in from_clients if c["id"] not in api_ids]
+    if from_api:
+        source = "hybrid" if extras else "api"
+    elif api_attempted:
+        source = "hybrid" if from_clients else "api"
+    else:
+        source = "fallback"
+
+    return {"ok": True, "source": source, "items": items, "warnings": warnings}
+
+
+def meta_catalog_pages_payload() -> Dict[str, Any]:
+    """Catálogo híbrido: Graph API (páginas do Business) + page_id já cadastrados nos clientes."""
+    warnings: List[str] = []
+    token = (os.getenv("META_ACCESS_TOKEN") or "").strip()
+    bid = (os.getenv("META_BUSINESS_ID") or "").strip()
+    api_attempted = bool(token and bid)
+    from_api: List[Dict[str, str]] = []
+
+    if api_attempted:
+        try:
+            raw = list_business_pages(token, bid, max_retries=2)
+            for p in raw:
+                pid = str(p.get("id") or "").strip()
+                if not pid.isdigit():
+                    continue
+                name = str(p.get("name") or "").strip() or pid
+                from_api.append({"id": pid, "label": f"{name} — {pid}"})
+        except MetaAPIAuthError as e:
+            warnings.append(f"Meta API (autenticação): {e!s}")
+        except Exception as e:
+            warnings.append(f"Meta API (páginas): {e!s}")
+    else:
+        if not token:
+            warnings.append("META_ACCESS_TOKEN ausente: usando só páginas já cadastradas nos clientes.")
+        if not bid:
+            warnings.append("META_BUSINESS_ID ausente: usando só páginas já cadastradas nos clientes.")
+
+    from_clients = _catalog_pages_from_clients()
+    api_ids = {x["id"] for x in from_api}
+    merged: Dict[str, Dict[str, str]] = {x["id"]: x for x in from_api}
+    for row in from_clients:
+        if row["id"] not in merged:
+            merged[row["id"]] = row
+
+    items = sorted(merged.values(), key=lambda x: x["id"])
+    extras = [c for c in from_clients if c["id"] not in api_ids]
+    if from_api:
+        source = "hybrid" if extras else "api"
+    elif api_attempted:
+        source = "hybrid" if from_clients else "api"
+    else:
+        source = "fallback"
+
+    return {"ok": True, "source": source, "items": items, "warnings": warnings}
+
+
+@app.get("/api/meta-catalog/ad-accounts")
+def api_meta_catalog_ad_accounts() -> Any:
+    return jsonify(meta_catalog_ad_accounts_payload())
+
+
+@app.get("/api/meta-catalog/pages")
+def api_meta_catalog_pages() -> Any:
+    return jsonify(meta_catalog_pages_payload())
 
 
 @app.get("/")

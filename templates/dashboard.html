@@ -52,7 +52,10 @@
               </label>
               <label>
                 Conta Meta
-                <input name="ad_account_id" required placeholder="act_123456789" />
+                <select name="ad_account_id" class="field-select meta-catalog-account-select" required>
+                  <option value="">Carregando catálogo…</option>
+                </select>
+                <span class="field-hint">Contas do Business (API) + contas já cadastradas.</span>
               </label>
               <label>
                 Grupo relatório
@@ -63,7 +66,10 @@
               </label>
               <label>
                 Meta page id
-                <input name="meta_page_id" placeholder="102086421781424" />
+                <select name="meta_page_id" class="field-select meta-catalog-page-select">
+                  <option value="">(Opcional) — escolher página —</option>
+                </select>
+                <span class="field-hint">Páginas do Business (API) + páginas já cadastradas.</span>
               </label>
               <label>
                 Grupo leads
@@ -85,14 +91,33 @@
                 <span class="field-hint">Integrados ou templates criados na aba Templates.</span>
               </label>
             </div>
+            <p id="metaCatalogHint" class="meta-catalog-hint" aria-live="polite"></p>
             <div class="new-client-filters">
-              <h3 class="new-client-filters-title">Filtros do formulário Meta</h3>
-              <p class="new-client-filters-desc">
-                Campos do lead a ignorar antes do envio ao WhatsApp. Use Enter para criar cada tag.
-              </p>
+              <div class="filters-block-head">
+                <div class="filters-block-head-text">
+                  <h3 class="new-client-filters-title">Filtros do bloco “Formulário”</h3>
+                  <p class="new-client-filters-desc">
+                    Remove <strong>linhas de perguntas</strong> do texto enviado ao WhatsApp (variável
+                    <code>{{respostas}}</code>). As regras aplicam-se ao <strong>nome interno do campo</strong>, não ao
+                    texto da resposta. Use Enter para cada tag.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="filters-help-btn"
+                  data-open="filters-help"
+                  aria-haspopup="dialog"
+                  aria-controls="filtersHelpDialog"
+                  aria-label="Ajuda: filtros de exclusão de perguntas"
+                  title="Como funcionam os filtros"
+                >
+                  ?
+                </button>
+              </div>
               <div class="new-client-filters-grid">
                 <label>
                   Excluir perguntas (nome exato)
+                  <span class="field-micro">Igual ao nome/chave da pergunta (ignora maiúsculas).</span>
                   <div class="chips-control" data-chip-for="lead_exclude_fields">
                     <div class="chips-list"></div>
                     <input
@@ -105,6 +130,7 @@
                 </label>
                 <label>
                   Excluir se o nome contiver
+                  <span class="field-micro">Se o nome da pergunta contiver este trecho.</span>
                   <div class="chips-control" data-chip-for="lead_exclude_contains">
                     <div class="chips-list"></div>
                     <input
@@ -114,6 +140,19 @@
                     />
                   </div>
                   <input type="hidden" name="lead_exclude_contains" />
+                </label>
+                <label>
+                  Excluir por regex
+                  <span class="field-micro">Regex testada sobre o nome da pergunta; inválida é ignorada no envio.</span>
+                  <div class="chips-control" data-chip-for="lead_exclude_regex">
+                    <div class="chips-list"></div>
+                    <input
+                      type="text"
+                      class="chips-entry"
+                      placeholder="Regex e Enter"
+                    />
+                  </div>
+                  <input type="hidden" name="lead_exclude_regex" />
                 </label>
               </div>
             </div>
@@ -249,14 +288,28 @@
         </section>
 
         <section class="panel">
-          <div class="panel-title-wrap">
-            <h2>Filtros globais de perguntas (Meta Lead)</h2>
-            <p>Define quais chaves não devem ir no texto final.</p>
+          <div class="filters-panel-head">
+            <div class="panel-title-wrap filters-panel-titles">
+              <h2>Filtros globais de perguntas (Meta Lead)</h2>
+              <p>Somam-se às regras por cliente; aplicam-se ao nome interno do campo.</p>
+            </div>
+            <button
+              type="button"
+              class="filters-help-btn"
+              data-open="filters-help"
+              aria-haspopup="dialog"
+              aria-controls="filtersHelpDialog"
+              aria-label="Ajuda: filtros de exclusão de perguntas"
+              title="Como funcionam os filtros"
+            >
+              ?
+            </button>
           </div>
           <form id="filtersForm" class="filters-form">
             <div class="new-client-filters-grid" aria-label="Regras de exclusão">
               <label>
                 Excluir perguntas exatas (CSV)
+                <span class="field-micro">Nome exato da pergunta (ignora maiúsculas).</span>
                 <div class="chips-control" data-chip-for="exclude_exact">
                   <div class="chips-list"></div>
                   <input
@@ -269,6 +322,7 @@
               </label>
               <label>
                 Excluir se contiver (CSV)
+                <span class="field-micro">Substring no nome do campo.</span>
                 <div class="chips-control" data-chip-for="exclude_contains">
                   <div class="chips-list"></div>
                   <input
@@ -281,6 +335,7 @@
               </label>
               <label>
                 Excluir por regex (CSV)
+                <span class="field-micro">Regex sobre o nome; inválida é ignorada no envio.</span>
                 <div class="chips-control" data-chip-for="exclude_regex">
                   <div class="chips-list"></div>
                   <input
@@ -414,6 +469,57 @@
       </section>
     </main>
 
+    <div
+      id="filtersHelpDialog"
+      class="filters-help-overlay"
+      hidden
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="filtersHelpTitle"
+      aria-hidden="true"
+    >
+      <div class="filters-help-backdrop" data-filters-help-dismiss tabindex="-1" aria-hidden="true"></div>
+      <div class="filters-help-card">
+        <header class="filters-help-header">
+          <h2 id="filtersHelpTitle" class="filters-help-title">Filtros de perguntas (Meta Lead)</h2>
+          <button type="button" class="filters-help-close-x" data-filters-help-dismiss aria-label="Fechar diálogo">
+            ×
+          </button>
+        </header>
+        <div class="filters-help-body">
+          <p class="filters-help-lede">
+            Estas regras removem <strong>linhas</strong> do bloco de respostas do lead (o que vai em
+            <code>{{respostas}}</code> / <code>{{respostas_filtradas}}</code> nos templates). Elas <strong>não</strong>
+            filtram pelo texto que o utilizador escreveu na resposta — apenas pelo <strong>nome interno do campo</strong>
+            (a “chave” que vem do Meta, por ex. <code>email</code>, <code>phone_number</code>, rótulo em português,
+            etc.).
+          </p>
+          <ul class="filters-help-list">
+            <li>
+              <strong>Nome exato</strong> — remove a pergunta se o nome normalizado (minúsculas, sem espaços extras)
+              for igual à tag. Útil quando sabes a chave exacta.
+            </li>
+            <li>
+              <strong>Contém</strong> — remove se o <em>nome</em> da pergunta contiver o trecho indicado (também em
+              minúsculas). Útil para agrupar variações (<code>utm_</code>, <code>referencia</code>, etc.).
+            </li>
+            <li>
+              <strong>Regex</strong> — aplica <code>re.search</code> ao nome da pergunta (case-insensitive). Se a
+              expressão for inválida, o backend ignora essa regra silenciosamente — valide antes de contar com ela.
+            </li>
+          </ul>
+          <p class="filters-help-note">
+            <strong>Globais vs cliente:</strong> na aba Templates, “Filtros globais” somam-se às regras deste cliente.
+            Se a mensagem ainda mostrar dados “cru”, confirme se o template usa <code>{{respostas_raw}}</code> em vez
+            de <code>{{respostas}}</code>.
+          </p>
+        </div>
+        <footer class="filters-help-footer">
+          <button type="button" class="primary filters-help-close-btn" data-filters-help-dismiss>Fechar</button>
+        </footer>
+      </div>
+    </div>
+
     <template id="clientCardTemplate">
       <article class="client-card">
         <div class="client-main">
@@ -458,7 +564,9 @@
               </label>
               <label class="edit-field">
                 Conta Meta
-                <input name="ad_account_id" required placeholder="act_…" spellcheck="false" />
+                <select name="ad_account_id" class="field-select meta-catalog-account-select" required>
+                  <option value="">Carregando catálogo…</option>
+                </select>
               </label>
               <label class="edit-field">
                 Grupo relatório
@@ -468,7 +576,9 @@
               </label>
               <label class="edit-field">
                 Meta page id
-                <input name="meta_page_id" inputmode="numeric" placeholder="ID numérico da página" />
+                <select name="meta_page_id" class="field-select meta-catalog-page-select">
+                  <option value="">(Opcional) — escolher página —</option>
+                </select>
               </label>
               <label class="edit-field">
                 Grupo lead
@@ -487,11 +597,30 @@
               </label>
             </div>
             <div class="edit-section">
-              <h5 class="edit-section-title">Filtros do bloco “Formulário”</h5>
-              <p class="edit-section-desc">Tags: digite e pressione Enter. Remove linhas antes do envio ao WhatsApp.</p>
+              <div class="filters-block-head edit-section-filters-head">
+                <div class="filters-block-head-text">
+                  <h5 class="edit-section-title">Filtros do bloco “Formulário”</h5>
+                  <p class="edit-section-desc">
+                    Remove linhas do texto <code>{{respostas}}</code>; regras aplicam ao <strong>nome do campo</strong>,
+                    não ao valor. Enter para cada tag.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="filters-help-btn"
+                  data-open="filters-help"
+                  aria-haspopup="dialog"
+                  aria-controls="filtersHelpDialog"
+                  aria-label="Ajuda: filtros de exclusão de perguntas"
+                  title="Como funcionam os filtros"
+                >
+                  ?
+                </button>
+              </div>
               <div class="edit-field-grid edit-field-grid--filters">
                 <label class="edit-field edit-field--full">
                   Excluir perguntas (nome exato)
+                  <span class="field-micro">Igual ao nome/chave (ignora maiúsculas).</span>
                   <div class="chips-control" data-chip-for="lead_exclude_fields">
                     <div class="chips-list"></div>
                     <input
@@ -504,6 +633,7 @@
                 </label>
                 <label class="edit-field edit-field--full">
                   Excluir se o nome contiver
+                  <span class="field-micro">Substring no nome do campo.</span>
                   <div class="chips-control" data-chip-for="lead_exclude_contains">
                     <div class="chips-list"></div>
                     <input
@@ -516,6 +646,7 @@
                 </label>
                 <label class="edit-field edit-field--full">
                   Excluir por regex
+                  <span class="field-micro">Regex sobre o nome; inválida é ignorada no envio.</span>
                   <div class="chips-control" data-chip-for="lead_exclude_regex">
                     <div class="chips-list"></div>
                     <input

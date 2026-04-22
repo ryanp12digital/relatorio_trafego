@@ -448,6 +448,91 @@ def list_business_ad_accounts(access_token: str, business_id: str, max_retries: 
     return all_accounts
 
 
+def list_business_pages(access_token: str, business_id: str, max_retries: int = 3) -> List[Dict[str, Any]]:
+    """
+    Lista páginas Facebook ligadas ao Business Manager (owned + client).
+
+    Retorno: [{"id": "123...", "name": "Nome da página"}, ...]
+    """
+    BASE_URL = "https://graph.facebook.com/v18.0"
+
+    def _fetch_pages_from_endpoint(endpoint_path: str) -> List[Dict[str, Any]]:
+        pages: List[Dict[str, Any]] = []
+        endpoint = f"{business_id}/{endpoint_path}"
+        params = {"access_token": access_token, "fields": "id,name", "limit": 1000}
+        url = f"{BASE_URL}/{endpoint}"
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                response = requests.get(url, params=params, timeout=30)
+                response.raise_for_status()
+                data = response.json()
+
+                if "error" in data:
+                    error = data["error"]
+                    error_code = error.get("code", "UNKNOWN")
+                    error_message = error.get("message", "Unknown error")
+                    if error_code in [190, 200]:
+                        logger.error(f"Erro de autenticação ao buscar páginas ({endpoint_path}): {error_message}")
+                        raise meta_api_auth_error_from_graph(error)
+                    logger.warning(f"Erro ao buscar páginas ({endpoint_path}): {error_message}")
+                    return pages
+
+                while True:
+                    if "data" in data:
+                        pages.extend(data["data"])
+                    paging = data.get("paging", {})
+                    next_url = paging.get("next")
+                    if not next_url:
+                        break
+                    params = {}
+                    if "?" in next_url:
+                        query_string = next_url.split("?")[1]
+                        params = {
+                            p.split("=", 1)[0]: p.split("=", 1)[1]
+                            for p in query_string.split("&")
+                            if "=" in p
+                        }
+                        params["access_token"] = access_token
+                    response = requests.get(next_url, timeout=30)
+                    response.raise_for_status()
+                    data = response.json()
+                    if "error" in data:
+                        err = data["error"]
+                        if err.get("code") in [190, 200]:
+                            raise meta_api_auth_error_from_graph(err)
+                    time.sleep(1)
+                break
+            except MetaAPIAuthError:
+                raise
+            except requests.RequestException as e:
+                if attempt < max_retries:
+                    logger.warning(
+                        f"Erro ao buscar páginas ({endpoint_path}) (tentativa {attempt}/{max_retries}): {e!s}"
+                    )
+                    time.sleep(5)
+                    continue
+                logger.warning(f"Falha ao buscar páginas ({endpoint_path}): {e!s}")
+                return pages
+        return pages
+
+    logger.info(f"Buscando páginas (owned_pages) do Business {business_id}...")
+    owned = _fetch_pages_from_endpoint("owned_pages")
+    logger.info(f"Buscando páginas (client_pages) do Business {business_id}...")
+    client_pages = _fetch_pages_from_endpoint("client_pages")
+
+    out: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+    for p in owned + client_pages:
+        pid = str(p.get("id") or "").strip()
+        if not pid or pid in seen:
+            continue
+        seen.add(pid)
+        out.append({"id": pid, "name": str(p.get("name") or "").strip() or pid})
+    logger.info(f"Total de {len(out)} página(s) únicas no Business {business_id}")
+    return out
+
+
 def get_ad_accounts_from_portfolio(access_token: str, portfolio_id: str, max_retries: int = 3) -> List[Dict[str, Any]]:
     """
     Busca todas as contas de anúncios vinculadas a um portfolio.

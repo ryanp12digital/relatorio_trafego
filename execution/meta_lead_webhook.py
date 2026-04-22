@@ -1386,6 +1386,16 @@ def dash_api_catalog_webhook_listener():
     return dashboard_module.api_catalog_webhook_listener()
 
 
+@app.get("/dash/api/meta-catalog/ad-accounts")
+def dash_api_meta_catalog_ad_accounts() -> Any:
+    return jsonify(dashboard_module.meta_catalog_ad_accounts_payload())
+
+
+@app.get("/dash/api/meta-catalog/pages")
+def dash_api_meta_catalog_pages() -> Any:
+    return jsonify(dashboard_module.meta_catalog_pages_payload())
+
+
 def main() -> None:
     _load_env()
     port = int(os.getenv("WEBHOOK_PORT", "8080"))
