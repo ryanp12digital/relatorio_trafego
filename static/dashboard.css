@@ -156,6 +156,9 @@ h1 {
 
 .tab-btn {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--font-ui);
   border-radius: 12px;
   padding: 10px 16px;
@@ -167,6 +170,11 @@ h1 {
   letter-spacing: 0.02em;
   transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, box-shadow 0.2s ease,
     transform 0.15s ease;
+}
+
+.tab-ico {
+  font-size: 14px;
+  line-height: 1;
 }
 
 .tab-btn:hover {
@@ -192,6 +200,41 @@ h1 {
 
 .tab-panel.is-active {
   display: block;
+}
+
+.site-routes-wrap {
+  display: grid;
+  gap: 10px;
+}
+
+.site-route-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.site-route-main h3 {
+  margin: 0 0 6px;
+}
+
+.site-route-main p {
+  margin: 3px 0;
+  color: var(--muted);
+}
+
+.site-route-notes {
+  color: var(--text) !important;
+}
+
+.site-route-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
 }
 
 .panel-title-wrap {

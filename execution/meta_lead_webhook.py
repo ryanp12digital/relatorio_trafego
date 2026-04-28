@@ -29,7 +29,7 @@ from execution import dashboard_app as dashboard_module
 from execution.flask_server import serve_flask_app
 from execution.live_events import publish_event
 from execution.message_templates import get_filter_rules, get_template_content, render_internal_lead_notify, render_template_text
-from execution.project_paths import clients_json_path
+from execution.project_paths import clients_json_path, google_clients_json_path
 
 log_dir = os.path.join(os.path.dirname(__file__), "..", ".tmp")
 os.makedirs(log_dir, exist_ok=True)
@@ -104,6 +104,17 @@ _FORM_NAME_PAYLOAD_KEYS: Tuple[str, ...] = (
     "nome_formulario_meta",
     "instant_form_name",
 )
+_CODI_ID_PAYLOAD_KEYS: Tuple[str, ...] = (
+    "codi_id",
+    "codiid",
+    "codiId",
+    "form_id",
+    "formid",
+    "formId",
+    "lead_form_id",
+    "leadFormId",
+)
+_NATIVE_FORM_ID_KEYS: Tuple[str, ...] = ("form_id", "formid", "formId", "lead_form_id", "leadFormId")
 
 
 def _emoji_for_log(message: str) -> str:
@@ -639,6 +650,27 @@ def _load_clients() -> List[Dict[str, Any]]:
     return []
 
 
+def _load_google_clients() -> List[Dict[str, Any]]:
+    try:
+        from execution.persistence import db_enabled, ensure_db_ready, list_google_clients
+
+        if db_enabled():
+            ensure_db_ready()
+            rows = list_google_clients()
+            return [{k: v for k, v in r.items() if k != "id"} for r in rows]
+    except Exception as e:
+        logger.warning("Falha ao carregar clientes Google do Postgres: %s", e)
+    path = google_clients_json_path()
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            return [c for c in data if isinstance(c, dict)]
+    except (OSError, json.JSONDecodeError) as e:
+        logger.warning("Falha ao carregar google_clients.json para roteamento de leads: %s", e)
+    return []
+
+
 def _payload_shape_hint_lead(raw: Any, max_keys: int = 18) -> str:
     """Resumo não sensível do JSON recebido (debug de formato Make/Meta)."""
     if raw is None:
@@ -719,6 +751,167 @@ def _resolve_lead_route(page_id: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+def _route_from_meta_client(c: Dict[str, Any]) -> Dict[str, Any]:
+    group_id = str(c.get("lead_group_id") or c.get("group_id") or "").strip()
+    return {
+        "client_name": str(c.get("client_name", "")).strip() or "Cliente",
+        "group_id": group_id,
+        "phone_number": str(c.get("lead_phone_number", "")).strip(),
+        "template": str(c.get("lead_template", "")).strip() or "default",
+        "exclude_exact": _csv_to_list(c.get("lead_exclude_fields")),
+        "exclude_contains": _csv_to_list(c.get("lead_exclude_contains")),
+        "exclude_regex": _csv_to_list(c.get("lead_exclude_regex")),
+        "internal_notify_group_id": str(c.get("internal_notify_group_id", "")).strip(),
+        "internal_lead_template": str(c.get("internal_lead_template", "")).strip(),
+        "internal_weekly_template": str(c.get("internal_weekly_template", "")).strip(),
+        "internal_notify_message": str(c.get("internal_notify_message", "")).strip(),
+    }
+
+
+def _route_from_google_client(c: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "client_name": str(c.get("client_name", "")).strip() or "Cliente",
+        "group_id": str(c.get("group_id") or "").strip(),
+        "phone_number": str(c.get("lead_phone_number", "")).strip(),
+        "template": "default",
+        "exclude_exact": [],
+        "exclude_contains": [],
+        "exclude_regex": [],
+        "internal_notify_group_id": str(c.get("internal_notify_group_id", "")).strip(),
+        "internal_lead_template": "",
+        "internal_weekly_template": str(c.get("internal_weekly_template", "")).strip(),
+        "internal_notify_message": str(c.get("internal_notify_message", "")).strip(),
+    }
+
+
+def _extract_codi_id_from_body(body: Dict[str, Any]) -> str:
+    if not isinstance(body, dict):
+        return ""
+    data = body.get("data") if isinstance(body.get("data"), dict) else {}
+    mappable = _ensure_mappable(body, data)
+    for key in _CODI_ID_PAYLOAD_KEYS:
+        raw = _pick_ci(data, key)
+        if raw not in (None, ""):
+            txt = _format_field_value(raw).strip()
+            if txt:
+                return txt
+    for key in _CODI_ID_PAYLOAD_KEYS:
+        raw = _pick_ci(body, key)
+        if raw not in (None, ""):
+            txt = _format_field_value(raw).strip()
+            if txt:
+                return txt
+    for key in _CODI_ID_PAYLOAD_KEYS:
+        txt = _mappable_lookup(mappable, key).strip()
+        if txt:
+            return txt
+    return ""
+
+
+def _extract_native_form_id_from_body(body: Dict[str, Any]) -> str:
+    """
+    Chave de formulário nativa (Meta/Google). Não é usada para roteamento de site.
+    Mantida para compatibilidade e futuras implementações.
+    """
+    if not isinstance(body, dict):
+        return ""
+    data = body.get("data") if isinstance(body.get("data"), dict) else {}
+    mappable = _ensure_mappable(body, data)
+    for key in _NATIVE_FORM_ID_KEYS:
+        raw = _pick_ci(data, key)
+        if raw not in (None, ""):
+            txt = _format_field_value(raw).strip()
+            if txt:
+                return txt
+    for key in _NATIVE_FORM_ID_KEYS:
+        raw = _pick_ci(body, key)
+        if raw not in (None, ""):
+            txt = _format_field_value(raw).strip()
+            if txt:
+                return txt
+    for key in _NATIVE_FORM_ID_KEYS:
+        txt = _mappable_lookup(mappable, key).strip()
+        if txt:
+            return txt
+    return ""
+
+
+def _is_valid_site_codi_id(value: str) -> bool:
+    return bool(re.fullmatch(r"\d{32}", (value or "").strip()))
+
+
+def _resolve_site_lead_route(codi_id: str) -> Optional[Dict[str, Any]]:
+    cid = (codi_id or "").strip()
+    if not cid:
+        return None
+    try:
+        from execution.persistence import db_enabled, ensure_db_ready, list_site_lead_routes
+
+        if db_enabled():
+            ensure_db_ready()
+        routes = list_site_lead_routes()
+    except Exception as e:
+        logger.warning("Falha ao carregar site_lead_routes: %s", e)
+        routes = []
+    target = next(
+        (
+            r
+            for r in routes
+            if bool(r.get("enabled", True))
+            and str(r.get("codi_id", r.get("form_id", ""))).strip().lower() == cid.lower()
+        ),
+        None,
+    )
+    if not target:
+        return None
+    target_type = str(target.get("target_type", "meta")).strip().lower()
+    target_name = str(target.get("target_client_name", "")).strip()
+    if target_type == "google":
+        for c in _load_google_clients():
+            if c.get("enabled", True) is False:
+                continue
+            if str(c.get("client_name", "")).strip() == target_name:
+                route = _route_from_google_client(c)
+                route["route_origin"] = "site_codi_id"
+                route["site_codi_id"] = cid
+                route["route_target_type"] = "google"
+                return route
+        return None
+    for c in _load_clients():
+        if c.get("enabled", True) is False:
+            continue
+        if str(c.get("client_name", "")).strip() == target_name:
+            route = _route_from_meta_client(c)
+            route["route_origin"] = "site_codi_id"
+            route["site_codi_id"] = cid
+            route["route_target_type"] = "meta"
+            return route
+    return None
+
+
+def _resolve_route_with_context(page_id: str, codi_id: str) -> Tuple[Optional[Dict[str, Any]], str, str, str]:
+    """
+    Organização explícita de contexto de roteamento:
+    - native_ads: usa page_id (Meta/Google nativo)
+    - site: usa codi_id (leads de site)
+    """
+    if page_id:
+        return _resolve_lead_route(page_id), "native_ads", "PAGE_ID_SEM_CLIENTE_NA_PULSEBOARD", _configured_meta_pages_hint()
+    if codi_id:
+        if not _is_valid_site_codi_id(codi_id):
+            return (
+                None,
+                "site",
+                "CODI_ID_INVALID_FORMAT",
+                f"codi_id_recebido={codi_id} (esperado: 32 dígitos numéricos)",
+            )
+        route = _resolve_site_lead_route(codi_id)
+        if route:
+            return route, "site", "", ""
+        return None, "site", "CODI_ID_ROUTE_NOT_FOUND", f"codi_id_recebido={codi_id}"
+    return None, "unknown", "ROUTING_KEY_MISSING", "Envie page_id (Meta/Ads) ou codi_id (Lead Site)"
+
+
 def _resolve_legacy_lorena_route() -> Optional[Dict[str, Any]]:
     """
     Compatibilidade do endpoint legado:
@@ -755,7 +948,7 @@ def _allow_default_no_page_legacy_fallback() -> bool:
     Para desativar explicitamente:
       META_LEAD_ALLOW_DEFAULT_NO_PAGE_FALLBACK=0|false|no
     """
-    raw = (os.getenv("META_LEAD_ALLOW_DEFAULT_NO_PAGE_FALLBACK") or "true").strip().lower()
+    raw = (os.getenv("META_LEAD_ALLOW_DEFAULT_NO_PAGE_FALLBACK") or "false").strip().lower()
     return raw not in {"0", "false", "no"}
 
 
@@ -1172,9 +1365,30 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
     for idx, event in enumerate(events):
         body = event["body"]
         page_id = str(event.get("page_id", "")).strip()
-        route = _resolve_lead_route(page_id)
+        codi_id = _extract_codi_id_from_body(body)
+        native_form_id = _extract_native_form_id_from_body(body)
+        route, route_context, route_error_code, route_error_hint = _resolve_route_with_context(page_id, codi_id)
+        route_error_detail = (
+            "Lead ignorado por page_id não mapeado"
+            if route_error_code == "PAGE_ID_SEM_CLIENTE_NA_PULSEBOARD"
+            else (
+                "Lead de site ignorado por codi_id fora do padrão"
+                if route_error_code == "CODI_ID_INVALID_FORMAT"
+                else (
+                    "Lead de site ignorado por codi_id sem rota cadastrada"
+                    if route_error_code == "CODI_ID_ROUTE_NOT_FOUND"
+                    else "Lead ignorado sem page_id e sem codi_id"
+                )
+            )
+        )
+        if route and route_context == "site":
+            _wh_log(
+                f"LEAD_{idx} | ROTA_CODI_ID_OK | canal=leads_site | cod=CODI_ID_ROUTE_MATCH | "
+                f"codi_id={codi_id} | cliente={route.get('client_name','')}"
+            )
         should_try_legacy_no_page = (
             not page_id
+            and not codi_id
             and (
                 allow_legacy_lorena_fallback
                 or (
@@ -1200,24 +1414,29 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
                     payload={"lead_index": idx, "endpoint": endpoint_label},
                 )
         if not route:
-            skipped.append(f"lead_index_{idx}: page_id_nao_mapeado ({page_id or 'vazio'})")
-            _pages_hint = _configured_meta_pages_hint()
+            skipped.append(
+                f"lead_index_{idx}: rota_nao_mapeada (page_id={page_id or 'vazio'}; codi_id={codi_id or 'vazio'})"
+            )
             _wh_log(
-                f"LEAD_{idx} | ERRO_ROTA_CLIENTE | canal=leads_meta | cod=PAGE_ID_SEM_CLIENTE_NA_PULSEBOARD | "
-                f"page_id_recebido={page_id or 'vazio'} | cliente_mapeado=(nenhum) | "
-                f"{_pages_hint}",
+                f"LEAD_{idx} | ERRO_ROTA_CLIENTE | canal=leads_meta | cod={route_error_code} | "
+                f"page_id_recebido={page_id or 'vazio'} | codi_id_recebido={codi_id or 'vazio'} | "
+                f"native_form_id={native_form_id or 'vazio'} | contexto={route_context} | "
+                f"cliente_mapeado=(nenhum) | {route_error_hint}",
                 level=logging.WARNING,
             )
             _emit_runtime_event(
                 stage="IGNORADO_ROUTE",
                 status="warning",
-                detail="Lead ignorado por page_id não mapeado",
+                detail=route_error_detail,
                 page_id=page_id,
                 payload={
                     "lead_index": idx,
                     "endpoint": endpoint_label,
-                    "cod": "PAGE_ID_SEM_CLIENTE_NA_PULSEBOARD",
-                    "meta_pages_hint": _pages_hint,
+                    "cod": route_error_code,
+                    "meta_pages_hint": route_error_hint,
+                    "codi_id": codi_id,
+                    "native_form_id": native_form_id,
+                    "route_context": route_context,
                 },
             )
             continue
@@ -1230,7 +1449,15 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
             client_name=route["client_name"],
             page_id=page_id,
             group_id=group_id,
-            payload={"lead_index": idx, "template": route.get("template", "")},
+            payload={
+                "lead_index": idx,
+                "template": route.get("template", ""),
+                "codi_id": codi_id,
+                "native_form_id": native_form_id,
+                "route_origin": route.get("route_origin", "meta_page_id"),
+                "route_target_type": route.get("route_target_type", "meta"),
+                "route_context": route_context,
+            },
         )
         if not group_id:
             skipped.append(f"lead_index_{idx}: group_id_ausente ({route['client_name']})")

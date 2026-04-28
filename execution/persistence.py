@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import threading
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -23,12 +24,14 @@ from execution.project_paths import (
     ensure_data_dir,
     google_clients_json_path,
     message_templates_json_path,
+    site_lead_routes_json_path,
 )
 
 logger = logging.getLogger(__name__)
 _DB_BOOTSTRAPPED = False
 _CATALOG_JSON_LOCK = threading.RLock()
 _LISTENER_JSON_LOCK = threading.RLock()
+_SITE_ROUTES_JSON_LOCK = threading.RLock()
 _CATALOG_WEBHOOK_LISTENING_DEFAULT = True
 
 try:
@@ -433,9 +436,24 @@ def _migrate_db_schema() -> None:
         "ALTER TABLE google_clients ADD COLUMN IF NOT EXISTS internal_lead_template text NOT NULL DEFAULT ''",
         "ALTER TABLE google_clients ADD COLUMN IF NOT EXISTS internal_weekly_template text NOT NULL DEFAULT ''",
     ]
+    site_routes_sql = [
+        """
+        CREATE TABLE IF NOT EXISTS site_lead_routes (
+          id bigserial PRIMARY KEY,
+          form_id text NOT NULL UNIQUE,
+          target_type text NOT NULL DEFAULT 'meta',
+          target_client_name text NOT NULL DEFAULT '',
+          source_type text NOT NULL DEFAULT '',
+          enabled boolean NOT NULL DEFAULT true,
+          notes text NOT NULL DEFAULT '',
+          created_at timestamptz NOT NULL DEFAULT now(),
+          updated_at timestamptz NOT NULL DEFAULT now()
+        )
+        """
+    ]
     with _connect() as conn:
         with conn.cursor() as cur:
-            for stmt in meta_sql + google_sql:
+            for stmt in meta_sql + google_sql + site_routes_sql:
                 cur.execute(stmt)
 
 
@@ -897,3 +915,202 @@ def set_catalog_webhook_listening(listening: bool) -> None:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
             f.write("\n")
+
+
+def _load_site_routes_json() -> List[Dict[str, Any]]:
+    path = site_lead_routes_json_path()
+    if not os.path.isfile(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        return raw if isinstance(raw, list) else []
+    except (OSError, json.JSONDecodeError):
+        return []
+
+
+def _save_site_routes_json(rows: List[Dict[str, Any]]) -> None:
+    ensure_data_dir()
+    path = site_lead_routes_json_path()
+    with _SITE_ROUTES_JSON_LOCK:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(rows, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+
+
+def _site_route_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    codi_id = str(row.get("codi_id") or row.get("form_id") or "").strip()
+    return {
+        "id": int(row.get("id") or 0),
+        "codi_id": codi_id,
+        "target_type": str(row.get("target_type") or "meta").strip() or "meta",
+        "target_client_name": str(row.get("target_client_name") or "").strip(),
+        "source_type": str(row.get("source_type") or "").strip(),
+        "enabled": bool(row.get("enabled", True)),
+        "notes": str(row.get("notes") or "").strip(),
+    }
+
+
+def _is_valid_site_codi_id(value: str) -> bool:
+    return bool(re.fullmatch(r"\d{32}", (value or "").strip()))
+
+
+def list_site_lead_routes() -> List[Dict[str, Any]]:
+    if db_enabled():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, form_id, target_type, target_client_name, source_type, enabled, notes
+                    FROM site_lead_routes
+                    ORDER BY lower(form_id) ASC, id ASC
+                    """
+                )
+                return [_site_route_row(dict(r)) for r in cur.fetchall()]
+    rows = [_site_route_row(r) for r in _load_site_routes_json() if isinstance(r, dict)]
+    rows.sort(key=lambda x: (x.get("codi_id", "").lower(), int(x.get("id") or 0)))
+    return rows
+
+
+def get_site_lead_route(route_id: int) -> Optional[Dict[str, Any]]:
+    rid = int(route_id)
+    if db_enabled():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, form_id, target_type, target_client_name, source_type, enabled, notes
+                    FROM site_lead_routes
+                    WHERE id = %s
+                    """,
+                    (rid,),
+                )
+                row = cur.fetchone()
+                return _site_route_row(dict(row)) if row else None
+    for row in list_site_lead_routes():
+        if int(row.get("id") or 0) == rid:
+            return row
+    return None
+
+
+def insert_site_lead_route(data: Dict[str, Any]) -> int:
+    codi_id = str(data.get("codi_id") or data.get("form_id") or "").strip()
+    if not codi_id:
+        raise ValueError("codi_id_obrigatorio")
+    if not _is_valid_site_codi_id(codi_id):
+        raise ValueError("codi_id_invalido_32_digitos_numericos")
+    if db_enabled():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO site_lead_routes (
+                      form_id, target_type, target_client_name, source_type, enabled, notes
+                    ) VALUES (%(form_id)s, %(target_type)s, %(target_client_name)s, %(source_type)s, %(enabled)s, %(notes)s)
+                    RETURNING id
+                    """,
+                    {
+                        "form_id": codi_id,
+                        "target_type": str(data.get("target_type") or "meta").strip() or "meta",
+                        "target_client_name": str(data.get("target_client_name") or "").strip(),
+                        "source_type": str(data.get("source_type") or "").strip(),
+                        "enabled": bool(data.get("enabled", True)),
+                        "notes": str(data.get("notes") or "").strip(),
+                    },
+                )
+                row = cur.fetchone()
+                return int(row["id"])
+    with _SITE_ROUTES_JSON_LOCK:
+        rows = _load_site_routes_json()
+        if any(
+            str(r.get("codi_id") or r.get("form_id") or "").strip().lower() == codi_id.lower()
+            for r in rows
+            if isinstance(r, dict)
+        ):
+            raise ValueError("codi_id_duplicado")
+        next_id = max([int(r.get("id") or 0) for r in rows if isinstance(r, dict)] or [0]) + 1
+        rows.append(
+            {
+                "id": next_id,
+                "codi_id": codi_id,
+                "target_type": str(data.get("target_type") or "meta").strip() or "meta",
+                "target_client_name": str(data.get("target_client_name") or "").strip(),
+                "source_type": str(data.get("source_type") or "").strip(),
+                "enabled": bool(data.get("enabled", True)),
+                "notes": str(data.get("notes") or "").strip(),
+            }
+        )
+        _save_site_routes_json(rows)
+    return next_id
+
+
+def update_site_lead_route(route_id: int, data: Dict[str, Any]) -> None:
+    rid = int(route_id)
+    codi_id = str(data.get("codi_id") or data.get("form_id") or "").strip()
+    if not codi_id:
+        raise ValueError("codi_id_obrigatorio")
+    if not _is_valid_site_codi_id(codi_id):
+        raise ValueError("codi_id_invalido_32_digitos_numericos")
+    if db_enabled():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE site_lead_routes
+                    SET
+                      form_id = %(form_id)s,
+                      target_type = %(target_type)s,
+                      target_client_name = %(target_client_name)s,
+                      source_type = %(source_type)s,
+                      enabled = %(enabled)s,
+                      notes = %(notes)s,
+                      updated_at = now()
+                    WHERE id = %(id)s
+                    """,
+                    {
+                        "id": rid,
+                        "form_id": codi_id,
+                        "target_type": str(data.get("target_type") or "meta").strip() or "meta",
+                        "target_client_name": str(data.get("target_client_name") or "").strip(),
+                        "source_type": str(data.get("source_type") or "").strip(),
+                        "enabled": bool(data.get("enabled", True)),
+                        "notes": str(data.get("notes") or "").strip(),
+                    },
+                )
+        return
+    with _SITE_ROUTES_JSON_LOCK:
+        rows = _load_site_routes_json()
+        idx = next((i for i, r in enumerate(rows) if isinstance(r, dict) and int(r.get("id") or 0) == rid), None)
+        if idx is None:
+            return
+        for i, r in enumerate(rows):
+            if i == idx or not isinstance(r, dict):
+                continue
+            if str(r.get("codi_id") or r.get("form_id") or "").strip().lower() == codi_id.lower():
+                raise ValueError("codi_id_duplicado")
+        rows[idx] = {
+            "id": rid,
+            "codi_id": codi_id,
+            "target_type": str(data.get("target_type") or "meta").strip() or "meta",
+            "target_client_name": str(data.get("target_client_name") or "").strip(),
+            "source_type": str(data.get("source_type") or "").strip(),
+            "enabled": bool(data.get("enabled", True)),
+            "notes": str(data.get("notes") or "").strip(),
+        }
+        _save_site_routes_json(rows)
+
+
+def delete_site_lead_route(route_id: int) -> bool:
+    rid = int(route_id)
+    if db_enabled():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM site_lead_routes WHERE id = %s", (rid,))
+                return cur.rowcount > 0
+    with _SITE_ROUTES_JSON_LOCK:
+        rows = _load_site_routes_json()
+        new_rows = [r for r in rows if not (isinstance(r, dict) and int(r.get("id") or 0) == rid)]
+        if len(new_rows) == len(rows):
+            return False
+        _save_site_routes_json(new_rows)
+        return True

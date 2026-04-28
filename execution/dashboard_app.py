@@ -39,6 +39,7 @@ from execution.project_paths import (
     clients_json_path,
     ensure_data_dir,
     google_clients_json_path,
+    site_lead_routes_json_path,
 )
 
 from execution.live_events import (
@@ -68,6 +69,7 @@ app.secret_key = (
 
 _CLIENTS_LOCK = threading.Lock()
 _GOOGLE_CLIENTS_LOCK = threading.Lock()
+_SITE_ROUTES_LOCK = threading.Lock()
 
 
 def _clients_path() -> str:
@@ -76,6 +78,10 @@ def _clients_path() -> str:
 
 def _google_clients_path() -> str:
     return google_clients_json_path()
+
+
+def _site_routes_path() -> str:
+    return site_lead_routes_json_path()
 
 
 def _load_clients() -> List[Dict[str, Any]]:
@@ -158,6 +164,44 @@ def _save_google_clients(clients: List[Dict[str, Any]]) -> None:
             f.write("\n")
 
 
+def _load_site_lead_routes() -> List[Dict[str, Any]]:
+    if persistence.db_enabled():
+        persistence.ensure_db_ready()
+        return persistence.list_site_lead_routes()
+    path = _site_routes_path()
+    if not os.path.exists(path):
+        return []
+    with _SITE_ROUTES_LOCK:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    if not isinstance(data, list):
+        return []
+    out: List[Dict[str, Any]] = []
+    for idx, row in enumerate(data):
+        if not isinstance(row, dict):
+            continue
+        item = dict(row)
+        item["id"] = int(item.get("id") or idx)
+        out.append(item)
+    return out
+
+
+def _save_site_lead_routes(rows: List[Dict[str, Any]]) -> None:
+    if persistence.db_enabled():
+        raise RuntimeError("use_persistence_insert_update_site_routes")
+    ensure_data_dir()
+    path = _site_routes_path()
+    serializable: List[Dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        serializable.append({k: v for k, v in row.items() if k != "id"})
+    with _SITE_ROUTES_LOCK:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(serializable, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+
+
 def _normalize_act_id(raw: str) -> str:
     value = (raw or "").strip()
     if not value:
@@ -188,6 +232,10 @@ def _csv_list(value: Any) -> List[str]:
     if isinstance(value, str):
         return [part.strip() for part in value.split(",") if part.strip()]
     return []
+
+
+def _is_valid_site_codi_id(value: str) -> bool:
+    return bool(re.fullmatch(r"\d{32}", (value or "").strip()))
 
 
 def _validate_client(client: Dict[str, Any]) -> Dict[str, Any]:
@@ -349,6 +397,29 @@ def _build_google_clients_response() -> Dict[str, Any]:
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "clients": payload,
+    }
+
+
+def _public_site_lead_route_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
+    target_type = str(raw.get("target_type", "meta")).strip().lower()
+    if target_type not in {"meta", "google"}:
+        target_type = "meta"
+    return {
+        "id": int(raw.get("id", 0)),
+        "codi_id": str(raw.get("codi_id", raw.get("form_id", ""))).strip(),
+        "target_type": target_type,
+        "target_client_name": str(raw.get("target_client_name", "")).strip(),
+        "source_type": str(raw.get("source_type", "")).strip().lower(),
+        "enabled": bool(raw.get("enabled", True)),
+        "notes": str(raw.get("notes", "")).strip(),
+    }
+
+
+def _build_site_lead_routes_response() -> Dict[str, Any]:
+    routes = [_public_site_lead_route_payload(r) for r in _load_site_lead_routes()]
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "routes": routes,
     }
 
 
@@ -1110,6 +1181,145 @@ def api_update_google_client(client_id: int) -> Any:
         group_id=str(fresh.get("group_id", "")).strip(),
     )
     return jsonify({"ok": True, "client": _public_google_client_payload(fresh)})
+
+
+@app.get("/api/site-lead-routes")
+def api_site_lead_routes() -> Any:
+    return jsonify({"ok": True, **_build_site_lead_routes_response()})
+
+
+@app.post("/api/site-lead-routes")
+def api_add_site_lead_route() -> Any:
+    payload = request.get_json(silent=True) or {}
+    route_data = {
+        "codi_id": str(payload.get("codi_id", payload.get("form_id", ""))).strip(),
+        "target_type": str(payload.get("target_type", "meta")).strip().lower() or "meta",
+        "target_client_name": str(payload.get("target_client_name", "")).strip(),
+        "source_type": str(payload.get("source_type", "")).strip().lower(),
+        "enabled": _as_bool(payload.get("enabled"), default=True),
+        "notes": str(payload.get("notes", "")).strip(),
+    }
+    if not route_data["codi_id"]:
+        return jsonify({"ok": False, "error": "codi_id_obrigatorio"}), 400
+    if not _is_valid_site_codi_id(route_data["codi_id"]):
+        return jsonify({"ok": False, "error": "codi_id_invalido_32_digitos_numericos"}), 400
+    if route_data["target_type"] not in {"meta", "google"}:
+        return jsonify({"ok": False, "error": "target_type_invalido"}), 400
+    if not route_data["target_client_name"]:
+        return jsonify({"ok": False, "error": "target_client_name_obrigatorio"}), 400
+    try:
+        if persistence.db_enabled():
+            persistence.ensure_db_ready()
+            new_id = persistence.insert_site_lead_route(route_data)
+            fresh = persistence.get_site_lead_route(new_id)
+        else:
+            rows = _load_site_lead_routes()
+            if any(
+                str(r.get("codi_id", r.get("form_id", ""))).strip().lower() == route_data["codi_id"].lower()
+                for r in rows
+                if isinstance(r, dict)
+            ):
+                return jsonify({"ok": False, "error": "codi_id_duplicado"}), 409
+            new_id = max([int(r.get("id", 0)) for r in rows if isinstance(r, dict)] or [0]) + 1
+            fresh = {**route_data, "id": new_id}
+            rows.append(fresh)
+            _save_site_lead_routes(rows)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    publish_event(
+        source="dashboard_app",
+        stage="SITE_ROUTE_ADICIONADA",
+        status="ok",
+        detail=f"Rota de lead site adicionada ({route_data['codi_id']})",
+        payload={"codi_id": route_data["codi_id"], "target_type": route_data["target_type"]},
+    )
+    return jsonify({"ok": True, "route": _public_site_lead_route_payload(fresh or {**route_data, "id": new_id})})
+
+
+@app.put("/api/site-lead-routes/<int:route_id>")
+def api_update_site_lead_route(route_id: int) -> Any:
+    payload = request.get_json(silent=True) or {}
+    if persistence.db_enabled():
+        persistence.ensure_db_ready()
+        current = persistence.get_site_lead_route(route_id)
+    else:
+        current = next((r for r in _load_site_lead_routes() if int(r.get("id", -1)) == route_id), None)
+    if not current:
+        return jsonify({"ok": False, "error": "route_nao_encontrada"}), 404
+    current = dict(current)
+    updatable = {"codi_id", "form_id", "target_type", "target_client_name", "source_type", "enabled", "notes"}
+    for key in updatable:
+        if key not in payload:
+            continue
+        if key == "form_id":
+            current["codi_id"] = str(payload[key]).strip()
+        elif key == "enabled":
+            current[key] = _as_bool(payload[key], default=True)
+        elif key in {"target_type", "source_type"}:
+            current[key] = str(payload[key]).strip().lower()
+        else:
+            current[key] = str(payload[key]).strip()
+    if "form_id" in current and "codi_id" not in current:
+        current["codi_id"] = str(current.get("form_id", "")).strip()
+    if not str(current.get("codi_id", "")).strip():
+        return jsonify({"ok": False, "error": "codi_id_obrigatorio"}), 400
+    if not _is_valid_site_codi_id(str(current.get("codi_id", ""))):
+        return jsonify({"ok": False, "error": "codi_id_invalido_32_digitos_numericos"}), 400
+    if str(current.get("target_type", "")).strip() not in {"meta", "google"}:
+        return jsonify({"ok": False, "error": "target_type_invalido"}), 400
+    if not str(current.get("target_client_name", "")).strip():
+        return jsonify({"ok": False, "error": "target_client_name_obrigatorio"}), 400
+    try:
+        if persistence.db_enabled():
+            persistence.update_site_lead_route(route_id, current)
+            fresh = persistence.get_site_lead_route(route_id) or current
+        else:
+            rows = _load_site_lead_routes()
+            for row in rows:
+                if int(row.get("id", -1)) == route_id:
+                    continue
+                if str(row.get("codi_id", row.get("form_id", ""))).strip().lower() == str(current.get("codi_id", "")).strip().lower():
+                    return jsonify({"ok": False, "error": "codi_id_duplicado"}), 409
+            for i, row in enumerate(rows):
+                if int(row.get("id", -1)) == route_id:
+                    rows[i] = {**current, "id": route_id}
+                    break
+            _save_site_lead_routes(rows)
+            fresh = {**current, "id": route_id}
+    except ValueError as exc:
+        code = 409 if str(exc) == "codi_id_duplicado" else 400
+        return jsonify({"ok": False, "error": str(exc)}), code
+    publish_event(
+        source="dashboard_app",
+        stage="SITE_ROUTE_ATUALIZADA",
+        status="info",
+        detail=f"Rota de lead site atualizada ({fresh.get('codi_id', '')})",
+        payload={"route_id": route_id},
+    )
+    return jsonify({"ok": True, "route": _public_site_lead_route_payload(fresh)})
+
+
+@app.delete("/api/site-lead-routes/<int:route_id>")
+def api_delete_site_lead_route(route_id: int) -> Any:
+    if persistence.db_enabled():
+        persistence.ensure_db_ready()
+        ok = persistence.delete_site_lead_route(route_id)
+    else:
+        rows = _load_site_lead_routes()
+        new_rows = [r for r in rows if int(r.get("id", -1)) != route_id]
+        ok = len(new_rows) != len(rows)
+        if ok:
+            _save_site_lead_routes(new_rows)
+    if not ok:
+        return jsonify({"ok": False, "error": "route_nao_encontrada"}), 404
+    publish_event(
+        source="dashboard_app",
+        stage="SITE_ROUTE_REMOVIDA",
+        status="warning",
+        detail=f"Rota de lead site removida (id={route_id})",
+        payload={"route_id": route_id},
+    )
+    return jsonify({"ok": True})
 
 
 @app.get("/api/message-templates")

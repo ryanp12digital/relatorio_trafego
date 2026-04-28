@@ -42,3 +42,8 @@ def catalog_groups_json_path() -> str:
 def catalog_webhook_listener_json_path() -> str:
     """Liga/desliga processamento global do POST /evolution-webhook (partilhado entre processos)."""
     return os.path.join(DATA_DIR, "catalog_webhook_listener.json")
+
+
+def site_lead_routes_json_path() -> str:
+    """Regras de roteamento para leads de site (form_id -> cliente destino)."""
+    return os.path.join(DATA_DIR, "site_lead_routes.json")

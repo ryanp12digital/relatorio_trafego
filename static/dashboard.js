@@ -1,6 +1,7 @@
 const state = {
   metaClients: [],
   googleClients: [],
+  siteLeadRoutes: [],
   catalogGroups: [],
   catalogFlowEvents: [],
   templates: { channels: {}, variables: {}, filters: {} },
@@ -15,6 +16,14 @@ const state = {
     warningsPages: [],
   },
 };
+
+function escHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
 const DASHBOARD_BASE = (() => {
   const raw = (document.querySelector('meta[name="dashboard-base"]')?.getAttribute("content") || "").trim();
@@ -1040,6 +1049,175 @@ async function fetchGoogleClients() {
   buildStats("googleStatsRow", state.googleClients);
   renderGoogleClients();
   syncCatalogGroupSelects();
+  renderSiteTargetClientOptions();
+}
+
+function renderSiteTargetClientOptions(selectedName = "") {
+  const select = document.getElementById("siteRouteTargetClient");
+  const typeSel = document.querySelector('#siteLeadRouteForm [name="target_type"]');
+  if (!select || !typeSel) return;
+  const type = String(typeSel.value || "meta").trim().toLowerCase();
+  const source = type === "google" ? state.googleClients : state.metaClients;
+  const names = [...new Set((source || []).map((c) => String(c.client_name || "").trim()).filter(Boolean))].sort(
+    (a, b) => a.localeCompare(b, "pt-BR"),
+  );
+  const prev = String(selectedName || select.value || "").trim();
+  select.replaceChildren();
+  const ph = document.createElement("option");
+  ph.value = "";
+  ph.textContent = names.length ? "— Escolher cliente —" : "Sem clientes nesse tipo";
+  select.appendChild(ph);
+  names.forEach((name) => {
+    const o = document.createElement("option");
+    o.value = name;
+    o.textContent = name;
+    select.appendChild(o);
+  });
+  if (prev && [...select.options].some((o) => o.value === prev)) select.value = prev;
+}
+
+function renderSiteLeadRoutes() {
+  const wrap = document.getElementById("siteLeadRoutesWrap");
+  if (!wrap) return;
+  const rows = Array.isArray(state.siteLeadRoutes) ? state.siteLeadRoutes : [];
+  if (!rows.length) {
+    wrap.innerHTML = `<div class="catalog-empty-state" role="status">
+      <div class="catalog-empty-orb" aria-hidden="true">◎</div>
+      <h3 class="catalog-empty-title">Sem rotas por codi_id</h3>
+      <p class="catalog-empty-text">Cadastre uma regra para evitar envio para cliente incorreto quando o lead vier do site.</p>
+    </div>`;
+    return;
+  }
+  wrap.innerHTML = rows
+    .map((r) => {
+      const id = Number(r.id || 0);
+      const formId = escHtml(r.codi_id || r.form_id || "");
+      const targetType = escHtml(r.target_type || "meta");
+      const targetClient = escHtml(r.target_client_name || "");
+      const sourceType = escHtml(r.source_type || "");
+      const notes = escHtml(r.notes || "");
+      const enabled = !!r.enabled;
+      return `<article class="site-route-card" data-route-id="${id}">
+        <div class="site-route-main">
+          <h3><code>${formId}</code></h3>
+          <p>Destino: <strong>${targetType}</strong> · ${targetClient}</p>
+          <p>Origem esperada: ${sourceType || "qualquer"}</p>
+          ${notes ? `<p class="site-route-notes">${notes}</p>` : ""}
+        </div>
+        <div class="site-route-actions">
+          <label class="check">
+            <input type="checkbox" data-action="toggle-enabled" ${enabled ? "checked" : ""} />
+            <span>${enabled ? "Ativa" : "Inativa"}</span>
+          </label>
+          <button type="button" class="small ghost" data-action="edit">Editar</button>
+          <button type="button" class="small action-err" data-action="delete">Remover</button>
+        </div>
+      </article>`;
+    })
+    .join("");
+
+  wrap.querySelectorAll('[data-action="toggle-enabled"]').forEach((el) => {
+    el.addEventListener("change", async (ev) => {
+      const card = ev.currentTarget.closest(".site-route-card");
+      if (!card) return;
+      const routeId = Number(card.dataset.routeId || 0);
+      const route = state.siteLeadRoutes.find((x) => Number(x.id) === routeId);
+      if (!route) return;
+      await saveSiteLeadRoute({ ...route, enabled: !!ev.currentTarget.checked }, routeId);
+    });
+  });
+  wrap.querySelectorAll('[data-action="edit"]').forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const card = btn.closest(".site-route-card");
+      const routeId = Number(card?.dataset.routeId || 0);
+      const route = state.siteLeadRoutes.find((x) => Number(x.id) === routeId);
+      if (!route) return;
+      fillSiteLeadRouteForm(route);
+    });
+  });
+  wrap.querySelectorAll('[data-action="delete"]').forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const card = btn.closest(".site-route-card");
+      const routeId = Number(card?.dataset.routeId || 0);
+      if (!routeId) return;
+      const ok = window.confirm("Remover esta rota por codi_id?");
+      if (!ok) return;
+      const res = await dashFetch(apiUrl(`/api/site-lead-routes/${routeId}`), { method: "DELETE" });
+      const body = await res.json().catch(() => ({}));
+      const fb = document.getElementById("siteLeadRouteFeedback");
+      if (!res.ok || !body.ok) {
+        if (fb) fb.textContent = `Erro: ${body.error || "nao foi possível remover"}`;
+        return;
+      }
+      if (fb) fb.textContent = "Rota removida com sucesso.";
+      await fetchSiteLeadRoutes();
+    });
+  });
+}
+
+function fillSiteLeadRouteForm(route) {
+  const form = document.getElementById("siteLeadRouteForm");
+  if (!form || !route) return;
+  form.dataset.editId = String(route.id || "");
+  form.elements.codi_id.value = route.codi_id || route.form_id || "";
+  form.elements.target_type.value = route.target_type || "meta";
+  renderSiteTargetClientOptions(route.target_client_name || "");
+  form.elements.target_client_name.value = route.target_client_name || "";
+  form.elements.source_type.value = route.source_type || "";
+  form.elements.notes.value = route.notes || "";
+  form.elements.enabled.checked = !!route.enabled;
+  const submitBtn = form.querySelector('button[type="submit"]');
+  if (submitBtn) submitBtn.textContent = "Atualizar rota";
+}
+
+function resetSiteLeadRouteForm() {
+  const form = document.getElementById("siteLeadRouteForm");
+  if (!form) return;
+  form.reset();
+  form.dataset.editId = "";
+  form.elements.enabled.checked = true;
+  renderSiteTargetClientOptions("");
+  const submitBtn = form.querySelector('button[type="submit"]');
+  if (submitBtn) submitBtn.textContent = "Salvar rota";
+}
+
+async function fetchSiteLeadRoutes() {
+  const res = await dashFetch(apiUrl("/api/site-lead-routes"));
+  if (!res.ok) throw new Error("Falha ao carregar rotas de leads site");
+  const body = await res.json().catch(() => ({}));
+  state.siteLeadRoutes = Array.isArray(body.routes) ? body.routes : [];
+  renderSiteLeadRoutes();
+}
+
+async function saveSiteLeadRoute(payload, routeId = null) {
+  const fb = document.getElementById("siteLeadRouteFeedback");
+  if (fb) fb.textContent = routeId ? "Atualizando rota..." : "Salvando rota...";
+  const url = routeId ? apiUrl(`/api/site-lead-routes/${routeId}`) : apiUrl("/api/site-lead-routes");
+  const method = routeId ? "PUT" : "POST";
+  const res = await dashFetch(url, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body.ok) {
+    if (fb) fb.textContent = `Erro: ${body.error || "nao foi possível salvar rota"}`;
+    return false;
+  }
+  if (fb) fb.textContent = routeId ? "Rota atualizada com sucesso." : "Rota cadastrada com sucesso.";
+  await fetchSiteLeadRoutes();
+  resetSiteLeadRouteForm();
+  return true;
+}
+
+async function submitSiteLeadRoute(ev) {
+  ev.preventDefault();
+  const form = ev.currentTarget;
+  const fd = new FormData(form);
+  const payload = Object.fromEntries(fd.entries());
+  payload.enabled = !!fd.get("enabled");
+  const routeId = Number(form.dataset.editId || 0) || null;
+  await saveSiteLeadRoute(payload, routeId);
 }
 
 async function fetchTemplates() {
@@ -1389,6 +1567,7 @@ function bindTabs() {
     google: document.getElementById("tab-google"),
     templates: document.getElementById("tab-templates"),
     groups: document.getElementById("tab-groups"),
+    "site-leads": document.getElementById("tab-site-leads"),
   };
   buttons.forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -1403,6 +1582,10 @@ function bindTabs() {
       }
       if (btn.dataset.tab === "meta" || btn.dataset.tab === "google") {
         fetchCatalogGroups().catch((e) => console.error(e));
+      }
+      if (btn.dataset.tab === "site-leads") {
+        fetchSiteLeadRoutes().catch((e) => console.error(e));
+        renderSiteTargetClientOptions();
       }
     });
   });
@@ -1709,6 +1892,13 @@ function bindUI() {
   );
   document.getElementById("previewBtn").addEventListener("click", generateTemplatePreview);
   document.getElementById("tplChannel").addEventListener("change", (ev) => renderTemplateVariables(ev.target.value));
+  document.getElementById("siteLeadRouteForm")?.addEventListener("submit", submitSiteLeadRoute);
+  document.getElementById("refreshSiteRoutesBtn")?.addEventListener("click", () =>
+    fetchSiteLeadRoutes().catch((e) => console.error(e)),
+  );
+  document.querySelector('#siteLeadRouteForm [name="target_type"]')?.addEventListener("change", () =>
+    renderSiteTargetClientOptions(""),
+  );
   setupChipFields(document.getElementById("newClientForm"), [
     "lead_exclude_fields",
     "lead_exclude_contains",
@@ -1725,7 +1915,10 @@ async function boot() {
     fetchTemplates(),
     fetchCatalogGroups(),
     fetchMetaCatalogs(),
+    fetchSiteLeadRoutes(),
   ]);
+  renderSiteTargetClientOptions();
+  resetSiteLeadRouteForm();
   connectStream();
 }
 

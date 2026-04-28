@@ -32,10 +32,11 @@
       </header>
 
       <nav class="tabs-nav panel">
-        <button class="tab-btn is-active" data-tab="meta">Clientes Meta</button>
-        <button class="tab-btn" data-tab="google">Clientes Google Ads</button>
-        <button class="tab-btn" data-tab="templates">Templates de Mensagem</button>
-        <button class="tab-btn" data-tab="groups">Grupos WhatsApp</button>
+        <button class="tab-btn is-active" data-tab="meta"><span class="tab-ico">📣</span><span>Meta Ads</span></button>
+        <button class="tab-btn" data-tab="google"><span class="tab-ico">🔎</span><span>Google Ads</span></button>
+        <button class="tab-btn" data-tab="templates"><span class="tab-ico">💬</span><span>Mensagens</span></button>
+        <button class="tab-btn" data-tab="groups"><span class="tab-ico">👥</span><span>Grupos de WhatsApp</span></button>
+        <button class="tab-btn" data-tab="site-leads"><span class="tab-ico">🧭</span><span>Leads Site</span></button>
       </nav>
 
       <section id="tab-meta" class="tab-panel is-active">
@@ -562,6 +563,72 @@
 
           <div id="catalogGroupsFeedback" class="catalog-feedback" role="status" hidden></div>
         </article>
+      </section>
+
+      <section id="tab-site-leads" class="tab-panel">
+        <section class="panel panel-form">
+          <div class="panel-title-wrap">
+            <h2>Leads Site</h2>
+            <p>Mapeie <code>codi_id</code> para cliente de destino, evitando roteamento errado.</p>
+          </div>
+          <form id="siteLeadRouteForm" class="new-client-form">
+            <div class="new-client-fields" aria-label="Regra de roteamento por codi_id">
+              <label>
+                CODI ID
+                <input
+                  name="codi_id"
+                  required
+                  inputmode="numeric"
+                  pattern="\d{32}"
+                  minlength="32"
+                  maxlength="32"
+                  placeholder="Ex.: 12345678901234567890123456789012"
+                />
+                <span class="field-hint">Obrigatório: exatamente 32 dígitos numéricos (codi_id).</span>
+              </label>
+              <label>
+                Tipo destino
+                <select name="target_type" class="field-select" required>
+                  <option value="meta">meta</option>
+                  <option value="google">google</option>
+                </select>
+              </label>
+              <label>
+                Cliente destino
+                <select name="target_client_name" id="siteRouteTargetClient" class="field-select" required>
+                  <option value="">Selecione o tipo primeiro</option>
+                </select>
+              </label>
+              <label>
+                Origem esperada
+                <select name="source_type" class="field-select">
+                  <option value="">Nenhum</option>
+                  <option value="meta">meta</option>
+                  <option value="google">google</option>
+                </select>
+              </label>
+              <label>
+                Observações
+                <input name="notes" placeholder="Opcional" />
+              </label>
+            </div>
+            <div class="new-client-actions">
+              <label class="check">
+                <input type="checkbox" name="enabled" checked />
+                <span>Regra ativa</span>
+              </label>
+              <button type="submit" class="primary">Salvar rota</button>
+            </div>
+          </form>
+          <p id="siteLeadRouteFeedback" class="feedback"></p>
+        </section>
+        <section class="panel">
+          <div class="panel-title-wrap list-header">
+            <h2>Rotas por codi_id</h2>
+            <button id="refreshSiteRoutesBtn" class="ghost">Atualizar</button>
+          </div>
+          <div id="siteLeadRoutesWrap" class="site-routes-wrap"></div>
+        </section>
       </section>
     </main>
 
