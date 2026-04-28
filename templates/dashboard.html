@@ -25,9 +25,12 @@
             do webhook em tempo real.
           </p>
         </div>
-        <div class="hero-badge">
-          <span id="connectionDot" class="dot pending"></span>
-          <strong id="connectionLabel">Conectando stream...</strong>
+        <div class="hero-status-stack">
+          <div class="hero-badge hero-badge-stream" title="Estado do EventSource /api/events/stream">
+            <span id="connectionDot" class="dot pending"></span>
+            <strong id="connectionLabel">Stream: a iniciar…</strong>
+          </div>
+          <div id="bootChecklist" class="boot-checklist" hidden aria-live="polite"></div>
         </div>
       </header>
 

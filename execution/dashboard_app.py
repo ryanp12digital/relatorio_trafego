@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hmac
 import json
+import logging
 import os
 import sys
 
@@ -28,6 +29,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import quote
 
 from flask import Flask, Response, jsonify, redirect, render_template, request, session, url_for
+from werkzeug.exceptions import HTTPException
 
 from execution import persistence
 from execution.evolution_catalog_webhook import (
@@ -66,6 +68,38 @@ app.secret_key = (
     or os.environ.get("FLASK_SECRET_KEY")
     or secrets.token_hex(32)
 )
+
+logger = logging.getLogger(__name__)
+
+
+@app.errorhandler(HTTPException)
+def _http_exception_for_api(e: HTTPException) -> Any:
+    """404/405/etc. em rotas /api/* passam a devolver JSON em vez de HTML."""
+    path = request.path or ""
+    if path.startswith("/api/") or path.startswith("/dash/api/"):
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "error": e.name.lower().replace(" ", "_"),
+                    "message": e.description,
+                }
+            ),
+            e.code,
+        )
+    return e.get_response()
+
+
+@app.errorhandler(Exception)
+def _unhandled_exception_for_api(e: Exception) -> Any:
+    if isinstance(e, HTTPException):
+        raise e
+    path = request.path or ""
+    if not (path.startswith("/api/") or path.startswith("/dash/api/")):
+        raise e
+    logger.exception("Erro não tratado na API da dashboard")
+    return jsonify({"ok": False, "error": "internal_error", "message": str(e)}), 500
+
 
 _CLIENTS_LOCK = threading.Lock()
 _GOOGLE_CLIENTS_LOCK = threading.Lock()
@@ -611,7 +645,16 @@ def logout() -> Any:
 
 @app.get("/api/health")
 def api_health() -> Any:
-    return jsonify({"ok": True, "db": persistence.db_enabled()})
+    ensure_data_dir()
+    cpath = clients_json_path()
+    gpath = google_clients_json_path()
+    checks: Dict[str, Any] = {
+        "data_dir": True,
+        "db_configured": persistence.db_enabled(),
+        "clients_source": "postgres" if persistence.db_enabled() else ("json_file" if os.path.isfile(cpath) else "json_missing"),
+        "google_clients_json": "postgres" if persistence.db_enabled() else ("present" if os.path.isfile(gpath) else "missing"),
+    }
+    return jsonify({"ok": True, "db": persistence.db_enabled(), "checks": checks})
 
 
 @app.get("/health")

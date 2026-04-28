@@ -51,6 +51,38 @@ function dashFetch(input, init) {
   });
 }
 
+/** Mensagem legível para falhas HTTP (JSON com error/hint ou HTML/proxy). */
+async function dashFetchErrorMessage(res, pathHint = "") {
+  const status = res.status;
+  const path = pathHint || (() => {
+    try {
+      const u = new URL(res.url, window.location.origin);
+      return (u.pathname || "") + (u.search || "");
+    } catch {
+      return "API";
+    }
+  })();
+  const prefix = `${path} → HTTP ${status}`;
+  const ct = (res.headers.get("content-type") || "").toLowerCase();
+  try {
+    if (ct.includes("application/json")) {
+      const j = await res.json();
+      const parts = [j.error, j.hint, j.message].filter(Boolean);
+      if (parts.length) return `${prefix}: ${parts.join(" — ")}`;
+      return prefix;
+    }
+    const text = await res.text();
+    const snippet = text.replace(/\s+/g, " ").trim().slice(0, 220);
+    if (snippet.startsWith("<") || snippet.toLowerCase().includes("<!doctype")) {
+      return `${prefix}: resposta não é JSON (HTML/proxy); verifique DASHBOARD_URL_PREFIX e o path.`;
+    }
+    if (snippet) return `${prefix}: ${snippet}`;
+  } catch (e) {
+    return `${prefix}: leitura do corpo falhou (${e?.message || e})`;
+  }
+  return prefix;
+}
+
 const flowSteps = ["RECEBIDO", "PAYLOAD_OK", "ROTA_RESOLVIDA", "MENSAGEM_FORMATADA", "WHATSAPP_ENVIADO_OK", "CONCLUIDO_OK"];
 
 function parseCsvValue(value) {
@@ -695,9 +727,12 @@ function fmtTime(iso) {
   return new Date(iso).toLocaleTimeString("pt-BR");
 }
 
-function setConnection(status, label) {
-  document.getElementById("connectionDot").className = `dot ${status}`;
-  document.getElementById("connectionLabel").textContent = label;
+/** Indicador exclusivo do stream SSE (não confundir com a carga inicial /bootChecklist). */
+function setStreamStatus(status, label) {
+  const dot = document.getElementById("connectionDot");
+  const lab = document.getElementById("connectionLabel");
+  if (dot) dot.className = `dot ${status}`;
+  if (lab) lab.textContent = label;
 }
 
 function statusPillClass(label) {
@@ -1031,7 +1066,7 @@ function renderFiltersForm() {
 
 async function fetchMetaClients() {
   const r = await dashFetch(apiUrl("/api/clients"));
-  if (!r.ok) throw new Error("Falha ao carregar clientes Meta");
+  if (!r.ok) throw new Error(await dashFetchErrorMessage(r, "/api/clients"));
   const data = await r.json();
   state.metaClients = data.clients || [];
   state.eventsByClient.clear();
@@ -1043,7 +1078,7 @@ async function fetchMetaClients() {
 
 async function fetchGoogleClients() {
   const r = await dashFetch(apiUrl("/api/google-clients"));
-  if (!r.ok) throw new Error("Falha ao carregar clientes Google");
+  if (!r.ok) throw new Error(await dashFetchErrorMessage(r, "/api/google-clients"));
   const data = await r.json();
   state.googleClients = data.clients || [];
   buildStats("googleStatsRow", state.googleClients);
@@ -1183,7 +1218,7 @@ function resetSiteLeadRouteForm() {
 
 async function fetchSiteLeadRoutes() {
   const res = await dashFetch(apiUrl("/api/site-lead-routes"));
-  if (!res.ok) throw new Error("Falha ao carregar rotas de leads site");
+  if (!res.ok) throw new Error(await dashFetchErrorMessage(res, "/api/site-lead-routes"));
   const body = await res.json().catch(() => ({}));
   state.siteLeadRoutes = Array.isArray(body.routes) ? body.routes : [];
   renderSiteLeadRoutes();
@@ -1222,7 +1257,7 @@ async function submitSiteLeadRoute(ev) {
 
 async function fetchTemplates() {
   const r = await dashFetch(apiUrl("/api/message-templates"));
-  if (!r.ok) throw new Error("Falha ao carregar templates");
+  if (!r.ok) throw new Error(await dashFetchErrorMessage(r, "/api/message-templates"));
   const data = await r.json();
   state.templates = data;
   renderTemplateVariables(document.getElementById("tplChannel").value);
@@ -1480,8 +1515,8 @@ function connectStream() {
   if (state.eventStream) state.eventStream.close();
   const es = new EventSource(apiUrl("/api/events/stream"));
   state.eventStream = es;
-  es.addEventListener("open", () => setConnection("live", "Stream ao vivo"));
-  es.addEventListener("error", () => setConnection("offline", "Stream desconectado"));
+  es.addEventListener("open", () => setStreamStatus("live", "Stream: ao vivo (SSE)"));
+  es.addEventListener("error", () => setStreamStatus("offline", "Stream: desligado (reconexão automática)"));
   es.addEventListener("bootstrap", (msg) => {
     try {
       const data = JSON.parse(msg.data);
@@ -1644,29 +1679,31 @@ function syncCatalogGroupSelects() {
   });
 }
 
+/** Carrega grupos do catálogo; em falha lança Error com mensagem do servidor. */
+async function loadCatalogGroupsPayload() {
+  const res = await dashFetch(apiUrl("/api/catalog-groups"));
+  if (!res.ok) throw new Error(await dashFetchErrorMessage(res, "/api/catalog-groups"));
+  const data = await res.json().catch(() => ({}));
+  state.catalogGroups = Array.isArray(data.groups) ? data.groups : [];
+  renderCatalogGroups();
+  syncCatalogGroupSelects();
+}
+
 async function fetchCatalogGroups() {
   setCatalogFeedback("", "");
   setGroupsStatus("A sincronizar…");
   const btn = document.getElementById("refreshCatalogGroupsBtn");
   if (btn) btn.disabled = true;
   try {
-    const res = await dashFetch(apiUrl("/api/catalog-groups"));
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const parts = [data.error, data.hint].filter(Boolean);
-      if (!parts.length && res.status === 404) {
-        parts.push(
-          "Rota da API nao encontrada. Se a Pulseboard abre em /dash/, defina DASHBOARD_URL_PREFIX=/dash no Easypanel ou actualize o deploy.",
-        );
-      }
-      setCatalogFeedback(parts.join(" — ") || "Falha ao carregar grupos.", "error");
+    try {
+      await loadCatalogGroupsPayload();
+    } catch (e) {
+      const msg = e?.message || "Falha ao carregar grupos.";
+      setCatalogFeedback(msg, "error");
       setGroupsStatus("");
       updateGroupsCount(state.catalogGroups.length);
       return;
     }
-    state.catalogGroups = Array.isArray(data.groups) ? data.groups : [];
-    renderCatalogGroups();
-    syncCatalogGroupSelects();
     const n = state.catalogGroups.length;
     setGroupsStatus(n ? `Lista actualizada · ${n} ${n === 1 ? "grupo" : "grupos"}` : "Lista vazia — aguardando eventos do webhook.");
     setCatalogFeedback("", "");
@@ -1907,16 +1944,91 @@ function bindUI() {
   setupChipFields(document.getElementById("filtersForm"), ["exclude_exact", "exclude_contains", "exclude_regex"]);
 }
 
+async function runBootStep(name, fn) {
+  try {
+    const extra = await fn();
+    if (extra && extra.state === "warn") {
+      return { name, state: "warn", detail: extra.detail || "" };
+    }
+    return { name, state: "ok", detail: (extra && extra.detail) || "" };
+  } catch (e) {
+    return { name, state: "err", detail: e?.message || String(e) };
+  }
+}
+
+function renderBootChecklistLoading() {
+  const host = document.getElementById("bootChecklist");
+  if (!host) return;
+  host.hidden = false;
+  const p = document.createElement("p");
+  p.className = "boot-checklist-loading";
+  p.textContent = "Carga inicial: a obter dados em paralelo…";
+  host.replaceChildren(p);
+}
+
+function renderBootChecklist(steps) {
+  const host = document.getElementById("bootChecklist");
+  if (!host) return;
+  if (!steps || !steps.length) {
+    host.hidden = true;
+    host.innerHTML = "";
+    return;
+  }
+  host.hidden = false;
+  const ul = document.createElement("ul");
+  ul.className = "boot-checklist-list";
+  for (const s of steps) {
+    const li = document.createElement("li");
+    li.className = `boot-check-item boot-state-${s.state}`;
+    const mark = document.createElement("span");
+    mark.className = "boot-check-mark";
+    mark.textContent = s.state === "ok" ? "OK" : s.state === "warn" ? "Aviso" : "ERRO";
+    const nm = document.createElement("span");
+    nm.className = "boot-check-name";
+    nm.textContent = s.name;
+    li.append(mark, document.createTextNode(" "), nm);
+    if (s.detail) {
+      const det = document.createElement("span");
+      det.className = "boot-check-detail";
+      det.textContent = s.detail;
+      li.appendChild(det);
+    }
+    ul.appendChild(li);
+  }
+  host.replaceChildren(ul);
+}
+
 async function boot() {
   bindUI();
-  await Promise.all([
-    fetchMetaClients(),
-    fetchGoogleClients(),
-    fetchTemplates(),
-    fetchCatalogGroups(),
-    fetchMetaCatalogs(),
-    fetchSiteLeadRoutes(),
+  setStreamStatus("pending", "Stream: a aguardar carga inicial…");
+  renderBootChecklistLoading();
+
+  const [s1, s2, s3, s4, s5, s6] = await Promise.all([
+    runBootStep("Clientes Meta", () => fetchMetaClients()),
+    runBootStep("Clientes Google", () => fetchGoogleClients()),
+    runBootStep("Templates e filtros", () => fetchTemplates()),
+    runBootStep("Grupos catálogo", () => loadCatalogGroupsPayload()),
+    runBootStep("Catálogo Meta (contas/páginas)", async () => {
+      await fetchMetaCatalogs();
+      const wa = (state.metaCatalog.warningsAccounts || []).filter(Boolean);
+      const wp = (state.metaCatalog.warningsPages || []).filter(Boolean);
+      const w = [...wa, ...wp];
+      if (w.length) return { state: "warn", detail: w.join(" · ") };
+      return {};
+    }),
+    runBootStep("Rotas leads site", () => fetchSiteLeadRoutes()),
   ]);
+
+  const steps = [s1, s2, s3, s4, s5, s6];
+  renderBootChecklist(steps);
+
+  const anyErr = steps.some((s) => s.state === "err");
+  if (anyErr) {
+    setStreamStatus("offline", "Stream: inativo (corrija erros na carga)");
+  } else {
+    setStreamStatus("pending", "Stream: a ligar…");
+  }
+
   renderSiteTargetClientOptions();
   resetSiteLeadRouteForm();
   connectStream();
@@ -1924,5 +2036,6 @@ async function boot() {
 
 boot().catch((err) => {
   console.error(err);
-  setConnection("offline", "Falha ao iniciar");
+  renderBootChecklist([{ name: "Inicialização (UI ou bind)", state: "err", detail: err?.message || String(err) }]);
+  setStreamStatus("offline", "Stream: falha antes da carga API");
 });

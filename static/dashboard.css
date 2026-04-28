@@ -59,6 +59,7 @@ body {
   justify-content: space-between;
   gap: 24px;
   align-items: flex-start;
+  flex-wrap: wrap;
   margin-bottom: 24px;
 }
 
@@ -85,6 +86,14 @@ h1 {
   max-width: 680px;
 }
 
+.hero-status-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  max-width: min(520px, 100%);
+}
+
 .hero-badge {
   border: 1px solid rgba(42, 48, 66, 0.95);
   border-radius: 999px;
@@ -97,11 +106,87 @@ h1 {
   white-space: nowrap;
 }
 
+.hero-badge-stream {
+  flex-shrink: 0;
+}
+
 .hero-badge #connectionLabel {
   font-family: var(--font-ui);
   font-weight: 600;
   font-size: 13px;
   letter-spacing: 0.02em;
+}
+
+.boot-checklist {
+  width: 100%;
+  border: 1px solid rgba(42, 48, 66, 0.9);
+  border-radius: 12px;
+  padding: 10px 12px 12px;
+  background: rgba(10, 12, 20, 0.75);
+  text-align: left;
+}
+
+.boot-checklist-loading {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.boot-checklist-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.boot-check-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 8px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.boot-check-mark {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 2.5em;
+}
+
+.boot-state-ok .boot-check-mark {
+  color: var(--ok);
+}
+
+.boot-state-warn .boot-check-mark {
+  color: var(--warn);
+}
+
+.boot-state-err .boot-check-mark {
+  color: var(--error);
+}
+
+.boot-check-name {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.boot-check-detail {
+  flex: 1 1 100%;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  word-break: break-word;
+}
+
+.boot-state-err .boot-check-detail {
+  color: #ffb8c3;
 }
 
 .dot {
