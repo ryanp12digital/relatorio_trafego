@@ -1170,11 +1170,19 @@ function renderSiteTargetClientOptions(selectedName = "") {
   const select = document.getElementById("siteRouteTargetClient");
   const typeSel = document.querySelector('#siteLeadRouteForm [name="target_type"]');
   if (!select || !typeSel) return;
-  const type = String(typeSel.value || "meta").trim().toLowerCase();
-  const source = type === "google" ? state.googleClients : state.metaClients;
-  const names = [...new Set((source || []).map((c) => String(c.client_name || "").trim()).filter(Boolean))].sort(
-    (a, b) => a.localeCompare(b, "pt-BR"),
+  populateSiteTargetClientSelect(select, String(typeSel.value || "meta").trim().toLowerCase(), selectedName || select.value || "");
+}
+
+function getSiteTargetClientNames(type) {
+  const source = String(type || "meta").trim().toLowerCase() === "google" ? state.googleClients : state.metaClients;
+  return [...new Set((source || []).map((c) => String(c.client_name || "").trim()).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, "pt-BR"),
   );
+}
+
+function populateSiteTargetClientSelect(select, type, selectedName = "") {
+  if (!select) return;
+  const names = getSiteTargetClientNames(type);
   const prev = String(selectedName || select.value || "").trim();
   select.replaceChildren();
   const ph = document.createElement("option");
@@ -1188,6 +1196,23 @@ function renderSiteTargetClientOptions(selectedName = "") {
     select.appendChild(o);
   });
   if (prev && [...select.options].some((o) => o.value === prev)) select.value = prev;
+}
+
+function siteRouteChecks(route) {
+  const codi = String(route?.codi_id || route?.form_id || "").trim();
+  const type = String(route?.target_type || "meta").trim().toLowerCase();
+  const clientName = String(route?.target_client_name || "").trim();
+  const leadTpl = String(route?.lead_template || "default").trim() || "default";
+  const intTpl = String(route?.internal_lead_template || "").trim();
+  const channelSite = state.templates?.channels?.site_lead || {};
+  const channelInternal = state.templates?.channels?.internal_lead || {};
+  const hasClient = getSiteTargetClientNames(type).includes(clientName);
+  return {
+    codiOk: /^\d{32}$/.test(codi),
+    clientOk: hasClient,
+    leadTemplateOk: !!channelSite[leadTpl],
+    internalTemplateOk: !intTpl || !!channelInternal[intTpl],
+  };
 }
 
 function renderSiteLeadRoutes() {
@@ -1212,49 +1237,144 @@ function renderSiteLeadRoutes() {
       const internalLeadTemplate = escHtml(r.internal_lead_template || "");
       const notes = escHtml(r.notes || "");
       const enabled = !!r.enabled;
-      return `<article class="site-route-card" data-route-id="${id}">
-        <div class="site-route-main">
-          <h3><code>${formId}</code></h3>
-          <p>Cliente: <strong>${targetType}</strong> · ${targetClient}</p>
-          <p>Template: <strong>${leadTemplate}</strong>${internalLeadTemplate ? ` · Interno: <strong>${internalLeadTemplate}</strong>` : ""}</p>
-          ${notes ? `<p class="site-route-notes">${notes}</p>` : ""}
-        </div>
-        <div class="site-route-actions">
-          <label class="check">
-            <input type="checkbox" data-action="toggle-enabled" ${enabled ? "checked" : ""} />
-            <span>${enabled ? "Ativa" : "Inativa"}</span>
-          </label>
-          <button type="button" class="small ghost" data-action="edit">Editar</button>
-          <button type="button" class="small action-err" data-action="delete">Remover</button>
+      const checks = siteRouteChecks(r);
+      const statusLabel = !enabled ? "Pausado" : checks.codiOk && checks.clientOk && checks.leadTemplateOk ? "Ativo completo" : "Inconsistente";
+      const statusClass = statusPillClass(statusLabel);
+      return `<article class="client-card site-client-card" data-route-id="${id}">
+        <div class="client-main">
+          <div class="client-head">
+            <h3 class="client-name"><code>${formId}</code></h3>
+            <div class="head-actions">
+              <span class="status-pill ${statusClass}">${statusLabel}</span>
+              <button
+                type="button"
+                class="gear-btn"
+                data-action="toggle-edit-site"
+                title="Editar cliente do site"
+                aria-label="Editar cliente do site"
+              >
+                ⚙
+              </button>
+            </div>
+          </div>
+          <dl class="meta-grid">
+            <div><dt>Tipo</dt><dd>${targetType}</dd></div>
+            <div><dt>Cliente</dt><dd>${targetClient || "—"}</dd></div>
+            <div><dt>Template site</dt><dd>${leadTemplate}</dd></div>
+            <div><dt>Template interno</dt><dd>${internalLeadTemplate || "Nenhum"}</dd></div>
+            <div><dt>Observações</dt><dd>${notes || "—"}</dd></div>
+            <div><dt>Enabled</dt><dd>${enabled ? "true" : "false"}</dd></div>
+          </dl>
+          <div class="checks">
+            <span class="check-pill ${checks.codiOk ? "ok" : "error"}">${checks.codiOk ? "OK" : "ERRO"} · codi_id</span>
+            <span class="check-pill ${checks.clientOk ? "ok" : "error"}">${checks.clientOk ? "OK" : "ERRO"} · cliente</span>
+            <span class="check-pill ${checks.leadTemplateOk ? "ok" : "error"}">${checks.leadTemplateOk ? "OK" : "ERRO"} · template site</span>
+            <span class="check-pill ${checks.internalTemplateOk ? "ok" : "error"}">${checks.internalTemplateOk ? "OK" : "ERRO"} · template interno</span>
+          </div>
+          <form class="edit-form edit-sheet hidden">
+            <header class="edit-sheet-head">
+              <h4 class="edit-sheet-title">Editar cliente do site</h4>
+              <p class="edit-sheet-sub">Ajuste codi_id, cliente de destino e templates para o fluxo de lead site.</p>
+            </header>
+            <div class="edit-field-grid">
+              <label class="edit-field">
+                CODI ID
+                <input
+                  name="codi_id"
+                  required
+                  inputmode="numeric"
+                  pattern="\\d{32}"
+                  minlength="32"
+                  maxlength="32"
+                />
+              </label>
+              <label class="edit-field">
+                Tipo cliente
+                <select name="target_type" class="field-select" required>
+                  <option value="meta">meta</option>
+                  <option value="google">google</option>
+                </select>
+              </label>
+              <label class="edit-field">
+                Cliente
+                <select name="target_client_name" class="field-select" required></select>
+              </label>
+              <label class="edit-field">
+                Template de mensagem
+                <select name="lead_template" class="field-select lead-template-select" required></select>
+              </label>
+              <label class="edit-field">
+                Template de mensagem interno
+                <select name="internal_lead_template" class="field-select internal-lead-template-select">
+                  <option value="">Nenhum</option>
+                </select>
+              </label>
+              <label class="edit-field edit-field--full">
+                Observações
+                <input name="notes" placeholder="Opcional" />
+              </label>
+            </div>
+            <div class="edit-bar">
+              <label class="check edit-check">
+                <input type="checkbox" name="enabled" />
+                <span>Cadastro ativo</span>
+              </label>
+              <div class="edit-actions">
+                <button type="submit" class="btn-edit-save">Salvar alterações</button>
+                <button type="button" class="btn-edit-cancel" data-action="cancel-edit-site">Cancelar</button>
+                <button type="button" class="small action-err" data-action="delete-site">Remover</button>
+              </div>
+            </div>
+            <p class="edit-feedback"></p>
+          </form>
         </div>
       </article>`;
     })
     .join("");
 
-  wrap.querySelectorAll('[data-action="toggle-enabled"]').forEach((el) => {
-    el.addEventListener("change", async (ev) => {
-      const card = ev.currentTarget.closest(".site-route-card");
-      if (!card) return;
-      const routeId = Number(card.dataset.routeId || 0);
-      const route = state.siteLeadRoutes.find((x) => Number(x.id) === routeId);
-      if (!route) return;
-      await saveSiteLeadRoute({ ...route, enabled: !!ev.currentTarget.checked }, routeId);
+  wrap.querySelectorAll(".site-client-card").forEach((card) => {
+    const routeId = Number(card.dataset.routeId || 0);
+    const route = state.siteLeadRoutes.find((x) => Number(x.id) === routeId);
+    if (!route) return;
+    const editForm = card.querySelector(".edit-form");
+    const feedback = card.querySelector(".edit-feedback");
+    if (!editForm) return;
+
+    editForm.elements.codi_id.value = route.codi_id || route.form_id || "";
+    editForm.elements.target_type.value = route.target_type || "meta";
+    populateSiteTargetClientSelect(
+      editForm.elements.target_client_name,
+      editForm.elements.target_type.value,
+      route.target_client_name || ""
+    );
+    if (editForm.elements.lead_template) {
+      populateSiteLeadTemplateSelect(editForm.elements.lead_template, route.lead_template || "default");
+    }
+    if (editForm.elements.internal_lead_template) {
+      populateChannelTemplateSelect(
+        editForm.elements.internal_lead_template,
+        "internal_lead",
+        INTERNAL_LEAD_BUILTIN_IDS,
+        route.internal_lead_template || "",
+        true
+      );
+    }
+    editForm.elements.notes.value = route.notes || "";
+    editForm.elements.enabled.checked = !!route.enabled;
+
+    editForm.elements.target_type.addEventListener("change", () => {
+      populateSiteTargetClientSelect(editForm.elements.target_client_name, editForm.elements.target_type.value, "");
     });
-  });
-  wrap.querySelectorAll('[data-action="edit"]').forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const card = btn.closest(".site-route-card");
-      const routeId = Number(card?.dataset.routeId || 0);
-      const route = state.siteLeadRoutes.find((x) => Number(x.id) === routeId);
-      if (!route) return;
-      fillSiteLeadRouteForm(route);
+
+    card.querySelector('[data-action="toggle-edit-site"]')?.addEventListener("click", () => {
+      editForm.classList.toggle("hidden");
+      if (feedback) feedback.textContent = "";
     });
-  });
-  wrap.querySelectorAll('[data-action="delete"]').forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const card = btn.closest(".site-route-card");
-      const routeId = Number(card?.dataset.routeId || 0);
-      if (!routeId) return;
+    card.querySelector('[data-action="cancel-edit-site"]')?.addEventListener("click", () => {
+      editForm.classList.add("hidden");
+      if (feedback) feedback.textContent = "";
+    });
+    card.querySelector('[data-action="delete-site"]')?.addEventListener("click", async () => {
       const ok = window.confirm("Remover este cadastro por codi_id?");
       if (!ok) return;
       const res = await dashFetch(apiUrl(`/api/site-lead-routes/${routeId}`), { method: "DELETE" });
@@ -1266,6 +1386,20 @@ function renderSiteLeadRoutes() {
       }
       if (fb) fb.textContent = "Cadastro removido com sucesso.";
       await fetchSiteLeadRoutes();
+    });
+
+    editForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      if (feedback) feedback.textContent = "Salvando alterações...";
+      const fd = new FormData(editForm);
+      const payload = Object.fromEntries(fd.entries());
+      payload.enabled = !!fd.get("enabled");
+      const ok = await saveSiteLeadRoute(payload, routeId);
+      if (!ok) {
+        if (feedback) feedback.textContent = "Erro ao salvar alterações.";
+        return;
+      }
+      editForm.classList.add("hidden");
     });
   });
 }

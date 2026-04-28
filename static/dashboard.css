@@ -1026,7 +1026,7 @@ textarea:focus-visible {
 .template-grid {
   margin-top: 14px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 12px 14px;
   align-items: start;
 }
@@ -1045,12 +1045,19 @@ textarea:focus-visible {
   box-sizing: border-box;
 }
 
+.template-grid > label:not(.template-textarea),
+.template-grid > .template-side,
+.template-grid > .template-actions {
+  grid-column: span 3;
+}
+
 .template-grid .template-textarea textarea {
   width: 100%;
+  min-height: 320px;
 }
 
 .template-textarea {
-  grid-column: 1 / 2;
+  grid-column: span 8 !important;
 }
 
 textarea {
@@ -1065,9 +1072,10 @@ textarea {
 }
 
 .template-side {
-  grid-column: 2 / 3;
+  grid-column: span 4 !important;
   display: grid;
   gap: 10px;
+  min-width: 0;
 }
 
 .vars-box {
@@ -1292,6 +1300,11 @@ textarea {
   }
   .template-grid {
     grid-template-columns: 1fr;
+  }
+  .template-grid > label:not(.template-textarea),
+  .template-grid > .template-side,
+  .template-grid > .template-actions {
+    grid-column: 1 / -1;
   }
   .template-textarea,
   .template-side {
