@@ -358,6 +358,9 @@ def _unwrap_json_strings(raw: Any, max_depth: int = 8) -> Any:
 
 
 def _is_meta_lead_body(d: Dict[str, Any]) -> bool:
+    top_level_keys = {str(k).strip().lower() for k in d.keys()}
+    if any(sig in top_level_keys for sig in _LEAD_BODY_SIGNAL_KEYS):
+        return True
     fd = d.get("field_data")
     if isinstance(fd, list) and len(fd) > 0:
         return True
@@ -420,6 +423,44 @@ def _inject_field_data_as_mappable(body: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def _inject_flat_payload_as_data(body: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Suporta payloads "flat" (ex.: n8n) onde os campos do lead ficam no topo do body:
+    {"NOME":"...", "TELEFONE":"...", ...}
+    """
+    if not isinstance(body, dict):
+        return body
+
+    if isinstance(body.get("data"), dict):
+        return body
+    if isinstance(body.get("mappable_field_data"), list) and body.get("mappable_field_data"):
+        return body
+
+    lowered = {str(k).strip().lower(): k for k in body.keys()}
+    has_signal = any(sig in lowered for sig in _LEAD_BODY_SIGNAL_KEYS)
+    if not has_signal:
+        return body
+
+    data: Dict[str, Any] = {}
+    mappable: List[Dict[str, Any]] = []
+    for key, value in body.items():
+        if not isinstance(key, str):
+            continue
+        name = key.strip()
+        if not name:
+            continue
+        data[name] = value
+        mappable.append({"name": name, "value": value})
+
+    if not data:
+        return body
+
+    out = dict(body)
+    out["data"] = data
+    out["mappable_field_data"] = mappable
+    return out
+
+
 def _first_non_empty(*values: Any) -> str:
     for v in values:
         if v is None:
@@ -458,6 +499,7 @@ def _extract_lead_event(item: Any) -> Optional[Dict[str, Any]]:
         if not inner:
             return None
         inner = _inject_field_data_as_mappable(inner)
+        inner = _inject_flat_payload_as_data(inner)
         page_id = _first_non_empty(
             item.get("page_id"),
             item.get("pageId"),
@@ -469,6 +511,7 @@ def _extract_lead_event(item: Any) -> Optional[Dict[str, Any]]:
 
     # Lead direto
     item = _inject_field_data_as_mappable(item)
+    item = _inject_flat_payload_as_data(item)
     if _is_meta_lead_body(item):
         return {"body": item, "page_id": _extract_page_id_from_dict(item)}
     return None

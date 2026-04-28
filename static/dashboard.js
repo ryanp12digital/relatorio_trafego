@@ -252,6 +252,64 @@ function bindFiltersHelpModal() {
   });
 }
 
+function renderFlowList(listEl, clientName) {
+  if (!listEl) return;
+  listEl.innerHTML = "";
+  const events = normalizeClientEvents(clientName);
+  events.reverse().forEach((ev) => listEl.appendChild(eventItem(ev)));
+  injectFlowPlaceholders(listEl, events);
+}
+
+function openFlowModal(clientName) {
+  const dlg = document.getElementById("flowDialog");
+  const listEl = document.getElementById("flowEventList");
+  const line = document.getElementById("flowModalClientLine");
+  if (!dlg || !listEl || !line) return;
+  const clean = String(clientName || "").trim() || "Cliente";
+  dlg.dataset.clientName = clean;
+  line.textContent = `Cliente: ${clean}`;
+  renderFlowList(listEl, clean);
+  dlg.hidden = false;
+  dlg.setAttribute("aria-hidden", "false");
+  const btn = dlg.querySelector(".flow-modal-close-btn");
+  (btn || dlg).focus();
+}
+
+function closeFlowModal() {
+  const dlg = document.getElementById("flowDialog");
+  if (!dlg) return;
+  dlg.hidden = true;
+  dlg.setAttribute("aria-hidden", "true");
+  delete dlg.dataset.clientName;
+}
+
+function refreshOpenFlowModal() {
+  const dlg = document.getElementById("flowDialog");
+  if (!dlg || dlg.hidden) return;
+  const clientName = String(dlg.dataset.clientName || "").trim();
+  if (!clientName) return;
+  renderFlowList(document.getElementById("flowEventList"), clientName);
+}
+
+function bindFlowModal() {
+  const dlg = document.getElementById("flowDialog");
+  if (!dlg) return;
+  if (dlg.dataset.bound === "1") return;
+  dlg.dataset.bound = "1";
+
+  const onKey = (ev) => {
+    if (dlg.hidden) return;
+    if (ev.key === "Escape") closeFlowModal();
+  };
+  document.addEventListener("keydown", onKey);
+
+  dlg.querySelectorAll("[data-flow-dismiss]").forEach((el) => {
+    el.addEventListener("click", (ev) => {
+      if (ev.target === el || ev.currentTarget === el) closeFlowModal();
+    });
+  });
+}
+
 /** IDs de template Meta Lead conhecidos no backend (integrados). */
 const META_LEAD_BUILTIN_IDS = ["default", "lorena", "pratical_life"];
 const META_REPORT_BUILTIN_IDS = ["default", "p12_resumo", "p12_dados"];
@@ -728,10 +786,10 @@ function renderMetaClients() {
     checks.appendChild(checkPill("p12_report_group_id", !!client.checks?.p12_report_group_id_ok));
     checks.appendChild(checkPill("interno", !!client.checks?.internal_notify_group_id_ok));
 
-    const list = card.querySelector(".event-list");
-    const events = normalizeClientEvents(client.client_name);
-    events.reverse().forEach((ev) => list.appendChild(eventItem(ev)));
-    injectFlowPlaceholders(list, events);
+    const flowBtn = card.querySelector('[data-action="open-flow"]');
+    if (flowBtn) {
+      flowBtn.addEventListener("click", () => openFlowModal(client.client_name || "Cliente"));
+    }
 
     const editForm = card.querySelector(".edit-form");
     const editFeedback = card.querySelector(".edit-feedback");
@@ -833,6 +891,10 @@ function renderGoogleClients() {
     checks.appendChild(checkPill("group_id", !!client.checks?.group_id_ok));
     checks.appendChild(checkPill("p12_grupo", !!client.checks?.p12_report_group_id_ok));
     checks.appendChild(checkPill("interno", !!client.checks?.internal_notify_group_id_ok));
+    const flowBtn = card.querySelector('[data-action="open-flow"]');
+    if (flowBtn) {
+      flowBtn.addEventListener("click", () => openFlowModal(client.client_name || "Cliente"));
+    }
 
     const editForm = card.querySelector(".edit-form");
     const feedback = card.querySelector(".edit-feedback");
@@ -1233,6 +1295,7 @@ function applyIncomingEvent(ev) {
   list.push(ev);
   state.eventsByClient.set(clientName, list.slice(-22));
   renderMetaClients();
+  refreshOpenFlowModal();
 }
 
 function connectStream() {
@@ -1628,6 +1691,7 @@ function renderCatalogGroups() {
 function bindUI() {
   bindTabs();
   bindFiltersHelpModal();
+  bindFlowModal();
   document.getElementById("newClientForm").addEventListener("submit", submitNewMetaClient);
   document.getElementById("newGoogleClientForm").addEventListener("submit", submitNewGoogleClient);
   document.getElementById("templateForm").addEventListener("submit", saveTemplate);

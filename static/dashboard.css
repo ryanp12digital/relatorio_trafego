@@ -451,7 +451,7 @@ button:focus-visible {
   border-radius: 18px;
   overflow: hidden;
   display: grid;
-  grid-template-columns: 1.6fr 1fr;
+  grid-template-columns: 1fr;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.025) 0%, rgba(100, 80, 200, 0.08) 100%);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
@@ -483,6 +483,28 @@ button:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.flow-open-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid rgba(93, 212, 255, 0.55);
+  background: rgba(74, 169, 255, 0.12);
+  color: #b7dfff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.flow-open-btn:hover {
+  background: rgba(74, 169, 255, 0.24);
+  border-color: rgba(93, 212, 255, 0.9);
+}
+
+.flow-open-icon {
+  display: block;
 }
 
 .client-name {
@@ -1036,21 +1058,6 @@ textarea {
   overflow: auto;
 }
 
-.flow-rail {
-  border-left: 1px solid var(--line);
-  background: rgba(9, 12, 19, 0.75);
-  padding: 16px;
-  min-width: 0;
-}
-
-.flow-rail h4 {
-  margin: 0 0 10px;
-  color: var(--muted);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-size: 11px;
-}
-
 .event-list {
   margin: 0;
   padding: 0;
@@ -1110,13 +1117,6 @@ textarea {
 @media (max-width: 1100px) {
   .new-client-fields {
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
-  }
-  .client-card {
-    grid-template-columns: 1fr;
-  }
-  .flow-rail {
-    border-left: none;
-    border-top: 1px solid var(--line);
   }
   .template-grid {
     grid-template-columns: 1fr;
@@ -2315,6 +2315,92 @@ textarea {
 
 .filters-help-close-btn {
   min-width: 120px;
+}
+
+.flow-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+}
+
+.flow-modal-overlay[hidden] {
+  display: none;
+}
+
+.flow-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 6, 12, 0.72);
+}
+
+.flow-modal-card {
+  position: relative;
+  width: min(860px, calc(100vw - 36px));
+  max-height: calc(100vh - 44px);
+  border: 1px solid rgba(129, 168, 255, 0.35);
+  border-radius: 16px;
+  background: linear-gradient(165deg, rgba(10, 14, 22, 0.97), rgba(12, 17, 28, 0.94));
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.flow-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(42, 48, 66, 0.8);
+}
+
+.flow-modal-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.flow-modal-client {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.flow-modal-close-x {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+}
+
+.flow-modal-close-x:hover {
+  border-color: rgba(255, 93, 115, 0.55);
+  color: var(--error);
+}
+
+.flow-modal-body {
+  padding: 14px 18px;
+  overflow: auto;
+}
+
+.flow-event-list {
+  max-height: none;
+}
+
+.flow-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 18px 18px;
+  border-top: 1px solid rgba(42, 48, 66, 0.75);
 }
 
 @keyframes pulsehero {
