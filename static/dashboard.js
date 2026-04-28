@@ -396,8 +396,8 @@ function refreshMetaReportTemplateSelects() {
       t1,
       "meta_report",
       META_REPORT_BUILTIN_IDS,
-      t1?.value || "default",
-      false
+      String((t1?.value ?? "").trim()),
+      true
     );
     populateChannelTemplateSelect(
       t2,
@@ -416,8 +416,8 @@ function refreshMetaReportTemplateSelects() {
       t1,
       "meta_report",
       META_REPORT_BUILTIN_IDS,
-      client?.p12_report_template || t1?.value || "default",
-      false
+      String((client?.p12_report_template ?? t1?.value ?? "").trim()),
+      true
     );
     populateChannelTemplateSelect(
       t2,
@@ -504,8 +504,8 @@ function refreshGoogleP12TemplateSelects() {
       t1,
       "google_report",
       GOOGLE_REPORT_BUILTIN_IDS,
-      t1?.value || "default",
-      false
+      String((t1?.value ?? "").trim()),
+      true
     );
     populateChannelTemplateSelect(
       t2,
@@ -524,8 +524,8 @@ function refreshGoogleP12TemplateSelects() {
       t1,
       "google_report",
       GOOGLE_REPORT_BUILTIN_IDS,
-      client?.p12_report_template || t1?.value || "default",
-      false
+      String((client?.p12_report_template ?? t1?.value ?? "").trim()),
+      true
     );
     populateChannelTemplateSelect(
       t2,

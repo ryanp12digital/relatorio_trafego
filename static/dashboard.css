@@ -251,6 +251,33 @@ h1 {
   color: var(--muted);
 }
 
+.new-client-fields select,
+.new-client-fields input:not([type="checkbox"]),
+.new-client-fields textarea {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.edit-field-grid select,
+.edit-field-grid input:not([type="checkbox"]),
+.edit-field-grid textarea {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Cartões Google — formulário em coluna antes era stack sem largura definida */
+.google-card .edit-sheet .edit-field-grid > label.edit-field {
+  margin: 0;
+}
+
+.google-card form.edit-sheet .edit-field-grid ~ .edit-bar {
+  margin-top: 8px;
+}
+
 .new-client-filters {
   border: 1px solid rgba(42, 48, 66, 0.88);
   border-radius: 14px;
@@ -415,6 +442,10 @@ button:focus-visible {
   gap: 14px;
 }
 
+.client-card > * {
+  min-width: 0;
+}
+
 .client-card {
   border: 1px solid rgba(42, 48, 66, 0.9);
   border-radius: 18px;
@@ -438,6 +469,7 @@ button:focus-visible {
 
 .client-main {
   padding: 16px;
+  min-width: 0;
 }
 
 .client-head {
@@ -720,6 +752,10 @@ select.meta-catalog-page-select {
 
 /* Chevron em SVG (data URL) — evita artefatos de subpixel do truque de dois linear-gradients. */
 .field-select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   cursor: pointer;
   -webkit-appearance: none;
   -moz-appearance: none;
@@ -796,8 +832,27 @@ textarea:focus-visible {
 .template-grid {
   margin-top: 14px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(200px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 12px 14px;
+  align-items: start;
+}
+
+.template-grid label {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.template-grid select,
+.template-grid input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.template-grid .template-textarea textarea {
+  width: 100%;
 }
 
 .template-textarea {
@@ -985,6 +1040,7 @@ textarea {
   border-left: 1px solid var(--line);
   background: rgba(9, 12, 19, 0.75);
   padding: 16px;
+  min-width: 0;
 }
 
 .flow-rail h4 {

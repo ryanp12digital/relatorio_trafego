@@ -93,9 +93,9 @@
               <label>
                 Template P12 relatório
                 <select name="p12_report_template" class="field-select meta-report-template-select">
-                  <option value="default">default</option>
+                  <option value="">Nenhum</option>
                 </select>
-                <span class="field-hint">Canal <code>meta_report</code> na aba Templates.</span>
+                <span class="field-hint">Canal <code>meta_report</code> na aba Templates. Em vazio, o envio usa o template <code>default</code>.</span>
               </label>
               <label>
                 Template relatório de dados
@@ -270,9 +270,9 @@
               <label>
                 Template P12 relatório
                 <select name="p12_report_template" class="field-select google-p12-template-select">
-                  <option value="default">default</option>
+                  <option value="">Nenhum</option>
                 </select>
-                <span class="field-hint">Canal <code>google_report</code> — ex.: p12_resumo</span>
+                <span class="field-hint">Canal <code>google_report</code> — ex.: p12_resumo. Em vazio, usa <code>default</code> no envio.</span>
               </label>
               <label>
                 Template relatório de dados
@@ -616,6 +616,34 @@
       </div>
     </div>
 
+    <div
+      id="flowDialog"
+      class="flow-modal-overlay"
+      hidden
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="flowModalHeading"
+      aria-describedby="flowModalClientLine"
+      aria-hidden="true"
+    >
+      <div class="flow-modal-backdrop" data-flow-dismiss tabindex="-1" aria-hidden="true"></div>
+      <div class="flow-modal-card" role="document">
+        <header class="flow-modal-header">
+          <div class="flow-modal-head-text">
+            <h2 id="flowModalHeading" class="flow-modal-title">Fluxo em tempo real</h2>
+            <p id="flowModalClientLine" class="flow-modal-client"></p>
+          </div>
+          <button type="button" class="flow-modal-close-x" data-flow-dismiss aria-label="Fechar">×</button>
+        </header>
+        <div class="flow-modal-body">
+          <ul id="flowEventList" class="event-list flow-event-list" aria-live="polite"></ul>
+        </div>
+        <footer class="flow-modal-footer">
+          <button type="button" class="primary flow-modal-close-btn" data-flow-dismiss>Fechar</button>
+        </footer>
+      </div>
+    </div>
+
     <template id="clientCardTemplate">
       <article class="client-card">
         <div class="client-main">
@@ -623,6 +651,24 @@
             <h3 class="client-name"></h3>
             <div class="head-actions">
               <span class="status-pill"></span>
+              <button
+                type="button"
+                class="flow-open-btn"
+                data-action="open-flow"
+                title="Ver fluxo em tempo real"
+                aria-label="Abrir fluxo em tempo real"
+              >
+                <svg class="flow-open-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none">
+                  <path
+                    d="M4 19h16M7 15l3-4 3 2 4-6 3 4"
+                    stroke="currentColor"
+                    stroke-width="1.75"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <path d="M4 5v14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />
+                </svg>
+              </button>
               <button
                 type="button"
                 class="gear-btn"
@@ -810,10 +856,6 @@
             <p class="edit-feedback"></p>
           </form>
         </div>
-        <aside class="flow-rail">
-          <h4>Fluxo em tempo real</h4>
-          <ul class="event-list"></ul>
-        </aside>
       </article>
     </template>
 
@@ -845,75 +887,82 @@
             <div><dt>Notas</dt><dd class="g-notes"></dd></div>
           </dl>
           <div class="checks"></div>
-          <form class="edit-form hidden">
-            <label>
-              Nome
-              <input name="client_name" required />
-            </label>
-            <label>
-              Customer ID
-              <input name="google_customer_id" required />
-            </label>
-            <label>
-              Grupo
-              <select name="group_id" class="field-select catalog-group-select" required data-catalog-optional="0">
-                <option value="">— Escolher do catálogo —</option>
-              </select>
-            </label>
-            <label>
-              Template Google (cliente)
-              <input name="google_template" />
-            </label>
-            <label>
-              Telefone lead
-              <input name="lead_phone_number" inputmode="tel" placeholder="Opcional" />
-            </label>
-            <label>
-              Grupo P12 relatório
-              <select name="p12_report_group_id" class="field-select catalog-group-select" data-catalog-optional="1">
-                <option value="">Nenhum</option>
-              </select>
-            </label>
-            <label>
-              Template P12 relatório
-              <select name="p12_report_template" class="field-select google-p12-template-select"></select>
-            </label>
-            <label>
-              Template relatório de dados
-              <select name="p12_data_report_template" class="field-select google-p12-data-template-select">
-                <option value="">Nenhum</option>
-              </select>
-            </label>
-            <label>
-              Grupo mensagem interna
-              <select name="internal_notify_group_id" class="field-select catalog-group-select" data-catalog-optional="1">
-                <option value="">Nenhum</option>
-              </select>
-            </label>
-            <label>
-              Template interno (após relatório)
-              <select
-                name="internal_weekly_template"
-                class="field-select internal-weekly-template-select"
-              >
-                <option value="">Nenhum</option>
-              </select>
-            </label>
-            <label>
-              Conversões (CSV)
-              <input name="primary_conversions" />
-            </label>
-            <label>
-              Notas
-              <input name="notes" />
-            </label>
-            <label class="check">
-              <input type="checkbox" name="enabled" />
-              <span>Automação ativa</span>
-            </label>
-            <div class="edit-actions">
-              <button type="submit" class="small action-ok">Salvar</button>
-              <button type="button" class="small ghost" data-action="cancel-edit-google">Cancelar</button>
+          <form class="edit-form edit-sheet hidden">
+            <header class="edit-sheet-head">
+              <h4 class="edit-sheet-title">Editar cliente Google Ads</h4>
+              <p class="edit-sheet-sub">Grupos WhatsApp, templates P12 e aviso interno após relatório semanal.</p>
+            </header>
+            <div class="edit-field-grid">
+              <label class="edit-field">
+                Nome
+                <input name="client_name" required />
+              </label>
+              <label class="edit-field">
+                Customer ID
+                <input name="google_customer_id" required />
+              </label>
+              <label class="edit-field">
+                Grupo
+                <select name="group_id" class="field-select catalog-group-select" required data-catalog-optional="0">
+                  <option value="">— Escolher do catálogo —</option>
+                </select>
+              </label>
+              <label class="edit-field">
+                Template Google (cliente)
+                <input name="google_template" />
+              </label>
+              <label class="edit-field">
+                Telefone lead
+                <input name="lead_phone_number" inputmode="tel" placeholder="Opcional" />
+              </label>
+              <label class="edit-field">
+                Grupo P12 relatório
+                <select name="p12_report_group_id" class="field-select catalog-group-select" data-catalog-optional="1">
+                  <option value="">Nenhum</option>
+                </select>
+              </label>
+              <label class="edit-field">
+                Template P12 relatório
+                <select name="p12_report_template" class="field-select google-p12-template-select">
+                  <option value="">Nenhum</option>
+                </select>
+              </label>
+              <label class="edit-field">
+                Template relatório de dados
+                <select name="p12_data_report_template" class="field-select google-p12-data-template-select">
+                  <option value="">Nenhum</option>
+                </select>
+              </label>
+              <label class="edit-field">
+                Grupo mensagem interna
+                <select name="internal_notify_group_id" class="field-select catalog-group-select" data-catalog-optional="1">
+                  <option value="">Nenhum</option>
+                </select>
+              </label>
+              <label class="edit-field">
+                Template interno (após relatório)
+                <select name="internal_weekly_template" class="field-select internal-weekly-template-select">
+                  <option value="">Nenhum</option>
+                </select>
+              </label>
+              <label class="edit-field edit-field--full">
+                Conversões (CSV)
+                <input name="primary_conversions" />
+              </label>
+              <label class="edit-field edit-field--full">
+                Notas
+                <input name="notes" />
+              </label>
+            </div>
+            <div class="edit-bar">
+              <label class="check edit-check">
+                <input type="checkbox" name="enabled" />
+                <span>Automação ativa</span>
+              </label>
+              <div class="edit-actions">
+                <button type="submit" class="btn-edit-save">Salvar</button>
+                <button type="button" class="btn-edit-cancel" data-action="cancel-edit-google">Cancelar</button>
+              </div>
             </div>
             <p class="edit-feedback"></p>
           </form>
