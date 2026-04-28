@@ -444,6 +444,9 @@ def _migrate_db_schema() -> None:
           target_type text NOT NULL DEFAULT 'meta',
           target_client_name text NOT NULL DEFAULT '',
           group_id text NOT NULL DEFAULT '',
+          lead_group_id text NOT NULL DEFAULT '',
+          lead_phone_number text NOT NULL DEFAULT '',
+          internal_notify_group_id text NOT NULL DEFAULT '',
           source_type text NOT NULL DEFAULT '',
           lead_template text NOT NULL DEFAULT 'default',
           internal_lead_template text NOT NULL DEFAULT '',
@@ -456,6 +459,9 @@ def _migrate_db_schema() -> None:
     ]
     site_routes_migrate_sql = [
         "ALTER TABLE site_lead_routes ADD COLUMN IF NOT EXISTS group_id text NOT NULL DEFAULT ''",
+        "ALTER TABLE site_lead_routes ADD COLUMN IF NOT EXISTS lead_group_id text NOT NULL DEFAULT ''",
+        "ALTER TABLE site_lead_routes ADD COLUMN IF NOT EXISTS lead_phone_number text NOT NULL DEFAULT ''",
+        "ALTER TABLE site_lead_routes ADD COLUMN IF NOT EXISTS internal_notify_group_id text NOT NULL DEFAULT ''",
         "ALTER TABLE site_lead_routes ADD COLUMN IF NOT EXISTS lead_template text NOT NULL DEFAULT 'default'",
         "ALTER TABLE site_lead_routes ADD COLUMN IF NOT EXISTS internal_lead_template text NOT NULL DEFAULT ''",
     ]
@@ -954,6 +960,9 @@ def _site_route_row(row: Dict[str, Any]) -> Dict[str, Any]:
         "target_type": str(row.get("target_type") or "meta").strip() or "meta",
         "target_client_name": str(row.get("target_client_name") or "").strip(),
         "group_id": str(row.get("group_id") or "").strip(),
+        "lead_group_id": str(row.get("lead_group_id") or "").strip(),
+        "lead_phone_number": str(row.get("lead_phone_number") or "").strip(),
+        "internal_notify_group_id": str(row.get("internal_notify_group_id") or "").strip(),
         "source_type": str(row.get("source_type") or "").strip(),
         "lead_template": str(row.get("lead_template") or "default").strip() or "default",
         "internal_lead_template": str(row.get("internal_lead_template") or "").strip(),
@@ -973,7 +982,8 @@ def list_site_lead_routes() -> List[Dict[str, Any]]:
                 cur.execute(
                     """
                     SELECT id, form_id, target_type, target_client_name, source_type,
-                           group_id, lead_template, internal_lead_template, enabled, notes
+                           group_id, lead_group_id, lead_phone_number, internal_notify_group_id,
+                           lead_template, internal_lead_template, enabled, notes
                     FROM site_lead_routes
                     ORDER BY lower(form_id) ASC, id ASC
                     """
@@ -992,7 +1002,8 @@ def get_site_lead_route(route_id: int) -> Optional[Dict[str, Any]]:
                 cur.execute(
                     """
                     SELECT id, form_id, target_type, target_client_name, source_type,
-                           group_id, lead_template, internal_lead_template, enabled, notes
+                           group_id, lead_group_id, lead_phone_number, internal_notify_group_id,
+                           lead_template, internal_lead_template, enabled, notes
                     FROM site_lead_routes
                     WHERE id = %s
                     """,
@@ -1018,10 +1029,12 @@ def insert_site_lead_route(data: Dict[str, Any]) -> int:
                 cur.execute(
                     """
                     INSERT INTO site_lead_routes (
-                      form_id, target_type, target_client_name, group_id, source_type,
+                      form_id, target_type, target_client_name, group_id, lead_group_id,
+                      lead_phone_number, internal_notify_group_id, source_type,
                       lead_template, internal_lead_template, enabled, notes
                     ) VALUES (
-                      %(form_id)s, %(target_type)s, %(target_client_name)s, %(group_id)s, %(source_type)s,
+                      %(form_id)s, %(target_type)s, %(target_client_name)s, %(group_id)s, %(lead_group_id)s,
+                      %(lead_phone_number)s, %(internal_notify_group_id)s, %(source_type)s,
                       %(lead_template)s, %(internal_lead_template)s, %(enabled)s, %(notes)s
                     )
                     RETURNING id
@@ -1031,6 +1044,9 @@ def insert_site_lead_route(data: Dict[str, Any]) -> int:
                         "target_type": str(data.get("target_type") or "meta").strip() or "meta",
                         "target_client_name": str(data.get("target_client_name") or "").strip(),
                         "group_id": str(data.get("group_id") or "").strip(),
+                        "lead_group_id": str(data.get("lead_group_id") or "").strip(),
+                        "lead_phone_number": str(data.get("lead_phone_number") or "").strip(),
+                        "internal_notify_group_id": str(data.get("internal_notify_group_id") or "").strip(),
                         "source_type": str(data.get("source_type") or "").strip(),
                         "lead_template": str(data.get("lead_template") or "default").strip() or "default",
                         "internal_lead_template": str(data.get("internal_lead_template") or "").strip(),
@@ -1056,6 +1072,9 @@ def insert_site_lead_route(data: Dict[str, Any]) -> int:
                 "target_type": str(data.get("target_type") or "meta").strip() or "meta",
                 "target_client_name": str(data.get("target_client_name") or "").strip(),
                 "group_id": str(data.get("group_id") or "").strip(),
+                "lead_group_id": str(data.get("lead_group_id") or "").strip(),
+                "lead_phone_number": str(data.get("lead_phone_number") or "").strip(),
+                "internal_notify_group_id": str(data.get("internal_notify_group_id") or "").strip(),
                 "source_type": str(data.get("source_type") or "").strip(),
                 "lead_template": str(data.get("lead_template") or "default").strip() or "default",
                 "internal_lead_template": str(data.get("internal_lead_template") or "").strip(),
@@ -1085,6 +1104,9 @@ def update_site_lead_route(route_id: int, data: Dict[str, Any]) -> None:
                       target_type = %(target_type)s,
                       target_client_name = %(target_client_name)s,
                       group_id = %(group_id)s,
+                      lead_group_id = %(lead_group_id)s,
+                      lead_phone_number = %(lead_phone_number)s,
+                      internal_notify_group_id = %(internal_notify_group_id)s,
                       source_type = %(source_type)s,
                       lead_template = %(lead_template)s,
                       internal_lead_template = %(internal_lead_template)s,
@@ -1099,6 +1121,9 @@ def update_site_lead_route(route_id: int, data: Dict[str, Any]) -> None:
                         "target_type": str(data.get("target_type") or "meta").strip() or "meta",
                         "target_client_name": str(data.get("target_client_name") or "").strip(),
                         "group_id": str(data.get("group_id") or "").strip(),
+                        "lead_group_id": str(data.get("lead_group_id") or "").strip(),
+                        "lead_phone_number": str(data.get("lead_phone_number") or "").strip(),
+                        "internal_notify_group_id": str(data.get("internal_notify_group_id") or "").strip(),
                         "source_type": str(data.get("source_type") or "").strip(),
                         "lead_template": str(data.get("lead_template") or "default").strip() or "default",
                         "internal_lead_template": str(data.get("internal_lead_template") or "").strip(),
@@ -1123,6 +1148,9 @@ def update_site_lead_route(route_id: int, data: Dict[str, Any]) -> None:
             "target_type": str(data.get("target_type") or "meta").strip() or "meta",
             "target_client_name": str(data.get("target_client_name") or "").strip(),
             "group_id": str(data.get("group_id") or "").strip(),
+            "lead_group_id": str(data.get("lead_group_id") or "").strip(),
+            "lead_phone_number": str(data.get("lead_phone_number") or "").strip(),
+            "internal_notify_group_id": str(data.get("internal_notify_group_id") or "").strip(),
             "source_type": str(data.get("source_type") or "").strip(),
             "lead_template": str(data.get("lead_template") or "default").strip() or "default",
             "internal_lead_template": str(data.get("internal_lead_template") or "").strip(),

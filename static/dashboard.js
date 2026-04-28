@@ -1236,6 +1236,9 @@ function renderSiteLeadRoutes() {
       const targetType = escHtml(r.target_type || "meta");
       const targetClient = escHtml(r.target_client_name || "");
       const groupId = escHtml(r.group_id || "");
+      const leadGroupId = escHtml(r.lead_group_id || "");
+      const leadPhone = escHtml(r.lead_phone_number || "");
+      const internalNotifyGroup = escHtml(r.internal_notify_group_id || "");
       const leadTemplate = escHtml(r.lead_template || "default");
       const internalLeadTemplate = escHtml(r.internal_lead_template || "");
       const notes = escHtml(r.notes || "");
@@ -1269,6 +1272,9 @@ function renderSiteLeadRoutes() {
             <div><dt>CODI ID</dt><dd><code>${formId}</code></dd></div>
             <div><dt>Tipo</dt><dd>${targetType}</dd></div>
             <div><dt>Grupo envio</dt><dd>${groupId || "—"}</dd></div>
+            <div><dt>Grupo leads</dt><dd>${leadGroupId || "fallback group_id"}</dd></div>
+            <div><dt>Telefone lead</dt><dd>${leadPhone || "—"}</dd></div>
+            <div><dt>Grupo msg interna</dt><dd>${internalNotifyGroup || "—"}</dd></div>
             <div><dt>Template site</dt><dd>${leadTemplate}</dd></div>
             <div><dt>Template interno</dt><dd>${internalLeadTemplate || "Nenhum"}</dd></div>
             <div><dt>Observações</dt><dd>${notes || "—"}</dd></div>
@@ -1313,6 +1319,22 @@ function renderSiteLeadRoutes() {
                 Grupo envio (lead)
                 <select name="group_id" class="field-select catalog-group-select" required data-catalog-optional="0">
                   <option value="">— Escolher do catálogo —</option>
+                </select>
+              </label>
+              <label class="edit-field">
+                Grupo leads
+                <select name="lead_group_id" class="field-select catalog-group-select" data-catalog-optional="1">
+                  <option value="">Nenhum</option>
+                </select>
+              </label>
+              <label class="edit-field">
+                Telefone lead
+                <input name="lead_phone_number" inputmode="tel" placeholder="Opcional" />
+              </label>
+              <label class="edit-field">
+                Grupo mensagem interna (novo lead)
+                <select name="internal_notify_group_id" class="field-select catalog-group-select" data-catalog-optional="1">
+                  <option value="">Nenhum</option>
                 </select>
               </label>
               <label class="edit-field">
@@ -1364,6 +1386,11 @@ function renderSiteLeadRoutes() {
       route.target_client_name || ""
     );
     if (editForm.elements.group_id) editForm.elements.group_id.value = route.group_id || "";
+    if (editForm.elements.lead_group_id) editForm.elements.lead_group_id.value = route.lead_group_id || "";
+    if (editForm.elements.lead_phone_number) editForm.elements.lead_phone_number.value = route.lead_phone_number || "";
+    if (editForm.elements.internal_notify_group_id) {
+      editForm.elements.internal_notify_group_id.value = route.internal_notify_group_id || "";
+    }
     if (editForm.elements.lead_template) {
       populateSiteLeadTemplateSelect(editForm.elements.lead_template, route.lead_template || "default");
     }
@@ -1431,6 +1458,9 @@ function fillSiteLeadRouteForm(route) {
   renderSiteTargetClientOptions(route.target_client_name || "");
   form.elements.target_client_name.value = route.target_client_name || "";
   if (form.elements.group_id) form.elements.group_id.value = route.group_id || "";
+  if (form.elements.lead_group_id) form.elements.lead_group_id.value = route.lead_group_id || "";
+  if (form.elements.lead_phone_number) form.elements.lead_phone_number.value = route.lead_phone_number || "";
+  if (form.elements.internal_notify_group_id) form.elements.internal_notify_group_id.value = route.internal_notify_group_id || "";
   if (form.elements.lead_template) form.elements.lead_template.value = route.lead_template || "default";
   if (form.elements.internal_lead_template) {
     form.elements.internal_lead_template.value = route.internal_lead_template || "";
@@ -1449,6 +1479,9 @@ function resetSiteLeadRouteForm() {
   form.elements.enabled.checked = true;
   renderSiteTargetClientOptions("");
   if (form.elements.group_id) form.elements.group_id.value = "";
+  if (form.elements.lead_group_id) form.elements.lead_group_id.value = "";
+  if (form.elements.lead_phone_number) form.elements.lead_phone_number.value = "";
+  if (form.elements.internal_notify_group_id) form.elements.internal_notify_group_id.value = "";
   if (form.elements.lead_template) form.elements.lead_template.value = "default";
   if (form.elements.internal_lead_template) form.elements.internal_lead_template.value = "";
   const submitBtn = form.querySelector('button[type="submit"]');

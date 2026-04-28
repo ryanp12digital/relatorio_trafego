@@ -884,6 +884,9 @@ def _resolve_site_lead_route(codi_id: str) -> Optional[Dict[str, Any]]:
     target_type = str(target.get("target_type", "meta")).strip().lower()
     target_name = str(target.get("target_client_name", "")).strip()
     route_group_id = str(target.get("group_id", "")).strip()
+    route_lead_group_id = str(target.get("lead_group_id", "")).strip()
+    route_lead_phone = str(target.get("lead_phone_number", "")).strip()
+    route_internal_group_id = str(target.get("internal_notify_group_id", "")).strip()
     route_template = str(target.get("lead_template", "")).strip()
     route_internal_tpl = str(target.get("internal_lead_template", "")).strip()
     if target_type == "google":
@@ -894,6 +897,12 @@ def _resolve_site_lead_route(codi_id: str) -> Optional[Dict[str, Any]]:
                 route = _route_from_google_client(c)
                 if route_group_id:
                     route["group_id"] = route_group_id
+                if route_lead_group_id:
+                    route["group_id"] = route_lead_group_id
+                if route_lead_phone:
+                    route["phone_number"] = route_lead_phone
+                if route_internal_group_id:
+                    route["internal_notify_group_id"] = route_internal_group_id
                 if route_template:
                     route["template"] = route_template
                 if route_internal_tpl:
@@ -911,6 +920,12 @@ def _resolve_site_lead_route(codi_id: str) -> Optional[Dict[str, Any]]:
             route = _route_from_meta_client(c)
             if route_group_id:
                 route["group_id"] = route_group_id
+            if route_lead_group_id:
+                route["group_id"] = route_lead_group_id
+            if route_lead_phone:
+                route["phone_number"] = route_lead_phone
+            if route_internal_group_id:
+                route["internal_notify_group_id"] = route_internal_group_id
             if route_template:
                 route["template"] = route_template
             if route_internal_tpl:

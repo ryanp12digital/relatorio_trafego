@@ -633,6 +633,25 @@
                 <span class="field-hint">Grupo que vai receber a mensagem de novo lead do site.</span>
               </label>
               <label>
+                Grupo leads
+                <select name="lead_group_id" class="field-select catalog-group-select" data-catalog-optional="1">
+                  <option value="">Nenhum</option>
+                </select>
+                <span class="field-hint">Opcional; em vazio usa o grupo de envio (lead) como fallback.</span>
+              </label>
+              <label>
+                Telefone lead
+                <input name="lead_phone_number" inputmode="tel" placeholder="Opcional — wa.me extra / testes" />
+                <span class="field-hint">Usado em fluxos com envio extra para número, quando aplicável.</span>
+              </label>
+              <label>
+                Grupo mensagem interna (novo lead)
+                <select name="internal_notify_group_id" class="field-select catalog-group-select" data-catalog-optional="1">
+                  <option value="">Nenhum</option>
+                </select>
+                <span class="field-hint">Cópia opcional para time interno no recebimento de lead.</span>
+              </label>
+              <label>
                 Template de mensagem
                 <select name="lead_template" class="field-select lead-template-select">
                   <option value="default">Carregando…</option>
