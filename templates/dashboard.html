@@ -50,8 +50,6 @@
       <nav class="tabs-nav panel">
         <button class="tab-btn is-active" data-tab="meta"><span class="tab-ico">📣</span><span>Meta Ads</span></button>
         <button class="tab-btn" data-tab="google"><span class="tab-ico">🔎</span><span>Google Ads</span></button>
-        <button class="tab-btn" data-tab="templates"><span class="tab-ico">💬</span><span>Mensagens</span></button>
-        <button class="tab-btn" data-tab="groups"><span class="tab-ico">👥</span><span>Grupos de WhatsApp</span></button>
         <button class="tab-btn" data-tab="site-leads"><span class="tab-ico">🧭</span><span>Leads Site</span></button>
       </nav>
 
@@ -615,6 +613,13 @@
                 <select name="target_client_name" id="siteRouteTargetClient" class="field-select" required>
                   <option value="">Selecione o tipo primeiro</option>
                 </select>
+              </label>
+              <label>
+                Grupo envio (lead)
+                <select name="group_id" class="field-select catalog-group-select" required data-catalog-optional="0">
+                  <option value="">— Escolher do catálogo —</option>
+                </select>
+                <span class="field-hint">Grupo que vai receber a mensagem de novo lead do site.</span>
               </label>
               <label>
                 Template de mensagem

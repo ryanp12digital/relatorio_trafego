@@ -443,6 +443,7 @@ def _public_site_lead_route_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
         "codi_id": str(raw.get("codi_id", raw.get("form_id", ""))).strip(),
         "target_type": target_type,
         "target_client_name": str(raw.get("target_client_name", "")).strip(),
+        "group_id": str(raw.get("group_id", "")).strip(),
         "source_type": str(raw.get("source_type", "")).strip().lower(),
         "lead_template": str(raw.get("lead_template", "")).strip() or "default",
         "internal_lead_template": str(raw.get("internal_lead_template", "")).strip(),
@@ -1240,6 +1241,7 @@ def api_add_site_lead_route() -> Any:
         "codi_id": str(payload.get("codi_id", payload.get("form_id", ""))).strip(),
         "target_type": str(payload.get("target_type", "meta")).strip().lower() or "meta",
         "target_client_name": str(payload.get("target_client_name", "")).strip(),
+        "group_id": str(payload.get("group_id", "")).strip(),
         "source_type": str(payload.get("source_type", "")).strip().lower(),
         "lead_template": str(payload.get("lead_template", "")).strip() or "default",
         "internal_lead_template": str(payload.get("internal_lead_template", "")).strip(),
@@ -1254,6 +1256,8 @@ def api_add_site_lead_route() -> Any:
         return jsonify({"ok": False, "error": "target_type_invalido"}), 400
     if not route_data["target_client_name"]:
         return jsonify({"ok": False, "error": "target_client_name_obrigatorio"}), 400
+    if not route_data["group_id"]:
+        return jsonify({"ok": False, "error": "group_id_obrigatorio"}), 400
     try:
         if persistence.db_enabled():
             persistence.ensure_db_ready()
@@ -1299,6 +1303,7 @@ def api_update_site_lead_route(route_id: int) -> Any:
         "form_id",
         "target_type",
         "target_client_name",
+        "group_id",
         "source_type",
         "lead_template",
         "internal_lead_template",
@@ -1327,6 +1332,8 @@ def api_update_site_lead_route(route_id: int) -> Any:
         return jsonify({"ok": False, "error": "target_type_invalido"}), 400
     if not str(current.get("target_client_name", "")).strip():
         return jsonify({"ok": False, "error": "target_client_name_obrigatorio"}), 400
+    if not str(current.get("group_id", "")).strip():
+        return jsonify({"ok": False, "error": "group_id_obrigatorio"}), 400
     try:
         if persistence.db_enabled():
             persistence.update_site_lead_route(route_id, current)

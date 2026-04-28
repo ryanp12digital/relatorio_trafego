@@ -1202,6 +1202,7 @@ function siteRouteChecks(route) {
   const codi = String(route?.codi_id || route?.form_id || "").trim();
   const type = String(route?.target_type || "meta").trim().toLowerCase();
   const clientName = String(route?.target_client_name || "").trim();
+  const groupId = String(route?.group_id || "").trim();
   const leadTpl = String(route?.lead_template || "default").trim() || "default";
   const intTpl = String(route?.internal_lead_template || "").trim();
   const channelSite = state.templates?.channels?.site_lead || {};
@@ -1210,6 +1211,7 @@ function siteRouteChecks(route) {
   return {
     codiOk: /^\d{32}$/.test(codi),
     clientOk: hasClient,
+    groupOk: /^\d+@g\.us$/.test(groupId),
     leadTemplateOk: !!channelSite[leadTpl],
     internalTemplateOk: !intTpl || !!channelInternal[intTpl],
   };
@@ -1233,12 +1235,18 @@ function renderSiteLeadRoutes() {
       const formId = escHtml(r.codi_id || r.form_id || "");
       const targetType = escHtml(r.target_type || "meta");
       const targetClient = escHtml(r.target_client_name || "");
+      const groupId = escHtml(r.group_id || "");
       const leadTemplate = escHtml(r.lead_template || "default");
       const internalLeadTemplate = escHtml(r.internal_lead_template || "");
       const notes = escHtml(r.notes || "");
       const enabled = !!r.enabled;
       const checks = siteRouteChecks(r);
-      const statusLabel = !enabled ? "Pausado" : checks.codiOk && checks.clientOk && checks.leadTemplateOk ? "Ativo completo" : "Inconsistente";
+      const statusLabel =
+        !enabled
+          ? "Pausado"
+          : checks.codiOk && checks.clientOk && checks.groupOk && checks.leadTemplateOk
+            ? "Ativo completo"
+            : "Inconsistente";
       const statusClass = statusPillClass(statusLabel);
       return `<article class="client-card site-client-card" data-route-id="${id}">
         <div class="client-main">
@@ -1260,6 +1268,7 @@ function renderSiteLeadRoutes() {
           <dl class="meta-grid">
             <div><dt>CODI ID</dt><dd><code>${formId}</code></dd></div>
             <div><dt>Tipo</dt><dd>${targetType}</dd></div>
+            <div><dt>Grupo envio</dt><dd>${groupId || "—"}</dd></div>
             <div><dt>Template site</dt><dd>${leadTemplate}</dd></div>
             <div><dt>Template interno</dt><dd>${internalLeadTemplate || "Nenhum"}</dd></div>
             <div><dt>Observações</dt><dd>${notes || "—"}</dd></div>
@@ -1268,6 +1277,7 @@ function renderSiteLeadRoutes() {
           <div class="checks">
             <span class="check-pill ${checks.codiOk ? "ok" : "error"}">${checks.codiOk ? "OK" : "ERRO"} · codi_id</span>
             <span class="check-pill ${checks.clientOk ? "ok" : "error"}">${checks.clientOk ? "OK" : "ERRO"} · cliente</span>
+            <span class="check-pill ${checks.groupOk ? "ok" : "error"}">${checks.groupOk ? "OK" : "ERRO"} · group_id</span>
             <span class="check-pill ${checks.leadTemplateOk ? "ok" : "error"}">${checks.leadTemplateOk ? "OK" : "ERRO"} · template site</span>
             <span class="check-pill ${checks.internalTemplateOk ? "ok" : "error"}">${checks.internalTemplateOk ? "OK" : "ERRO"} · template interno</span>
           </div>
@@ -1298,6 +1308,12 @@ function renderSiteLeadRoutes() {
               <label class="edit-field">
                 Cliente
                 <select name="target_client_name" class="field-select" required></select>
+              </label>
+              <label class="edit-field">
+                Grupo envio (lead)
+                <select name="group_id" class="field-select catalog-group-select" required data-catalog-optional="0">
+                  <option value="">— Escolher do catálogo —</option>
+                </select>
               </label>
               <label class="edit-field">
                 Template de mensagem
@@ -1347,6 +1363,7 @@ function renderSiteLeadRoutes() {
       editForm.elements.target_type.value,
       route.target_client_name || ""
     );
+    if (editForm.elements.group_id) editForm.elements.group_id.value = route.group_id || "";
     if (editForm.elements.lead_template) {
       populateSiteLeadTemplateSelect(editForm.elements.lead_template, route.lead_template || "default");
     }
@@ -1402,6 +1419,7 @@ function renderSiteLeadRoutes() {
       editForm.classList.add("hidden");
     });
   });
+  syncCatalogGroupSelects();
 }
 
 function fillSiteLeadRouteForm(route) {
@@ -1412,6 +1430,7 @@ function fillSiteLeadRouteForm(route) {
   form.elements.target_type.value = route.target_type || "meta";
   renderSiteTargetClientOptions(route.target_client_name || "");
   form.elements.target_client_name.value = route.target_client_name || "";
+  if (form.elements.group_id) form.elements.group_id.value = route.group_id || "";
   if (form.elements.lead_template) form.elements.lead_template.value = route.lead_template || "default";
   if (form.elements.internal_lead_template) {
     form.elements.internal_lead_template.value = route.internal_lead_template || "";
@@ -1429,6 +1448,7 @@ function resetSiteLeadRouteForm() {
   form.dataset.editId = "";
   form.elements.enabled.checked = true;
   renderSiteTargetClientOptions("");
+  if (form.elements.group_id) form.elements.group_id.value = "";
   if (form.elements.lead_template) form.elements.lead_template.value = "default";
   if (form.elements.internal_lead_template) form.elements.internal_lead_template.value = "";
   const submitBtn = form.querySelector('button[type="submit"]');
