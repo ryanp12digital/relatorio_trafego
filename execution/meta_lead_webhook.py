@@ -898,6 +898,7 @@ def _resolve_site_lead_route(codi_id: str) -> Optional[Dict[str, Any]]:
                 route["route_origin"] = "site_codi_id"
                 route["site_codi_id"] = cid
                 route["route_target_type"] = "google"
+                route["template_channel"] = "site_lead"
                 return route
         return None
     for c in _load_clients():
@@ -912,6 +913,7 @@ def _resolve_site_lead_route(codi_id: str) -> Optional[Dict[str, Any]]:
             route["route_origin"] = "site_codi_id"
             route["site_codi_id"] = cid
             route["route_target_type"] = "meta"
+            route["template_channel"] = "site_lead"
             return route
     return None
 
@@ -1259,7 +1261,8 @@ def _format_lead_message(
     route: Optional[Dict[str, Any]] = None,
     page_id: str = "",
 ) -> str:
-    custom_content = get_template_content("meta_lead", template_id)
+    template_channel = str((route or {}).get("template_channel") or "meta_lead").strip() or "meta_lead"
+    custom_content = get_template_content(template_channel, template_id)
     if custom_content:
         base = _base_message_fields(body, route=route)
         rendered = render_template_text(

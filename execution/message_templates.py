@@ -60,6 +60,22 @@ DEFAULT_TEMPLATES: Dict[str, Dict[str, Dict[str, str]]] = {
             ),
         },
     },
+    "site_lead": {
+        "default": {
+            "name": "Lead Site - Padrão",
+            "description": "Template padrão de lead vindo do site (roteado por codi_id).",
+            "content": (
+                "Novo lead do site - {{client_name}}\n"
+                "Recebido em: {{chegada_em}}\n"
+                "Nome do Lead: {{nome}}\n"
+                "WhatsApp do Lead: {{whatsapp}}\n"
+                "E-mail do Lead: {{email}}\n\n"
+                "==========\n\n"
+                "Respostas do Lead:\n"
+                "{{respostas}}"
+            ),
+        },
+    },
     "google_report": {
         "default": {
             "name": "Google Report - Padrão",
@@ -154,6 +170,25 @@ TEMPLATE_VARIABLES: Dict[str, Dict[str, str]] = {
     "meta_lead": {
         "client_name": "Nome do cliente",
         "page_id": "ID da página Meta",
+        "template_id": "ID do template aplicado",
+        "nome": "Nome do lead (nome_completo, nome, full_name ou name no payload)",
+        "email": "Email do lead",
+        "whatsapp": "Link wa.me (telefone, phone_number, phone, mobile ou celular)",
+        "telefone_digitos": "Telefone só dígitos (mesmas chaves que whatsapp)",
+        "form_name": "Nome do formulário",
+        "respostas": "Bloco de respostas filtradas",
+        "respostas_filtradas": "Alias de respostas filtradas",
+        "respostas_raw": "Bloco bruto sem filtros",
+        "respostas_omitidas": "Perguntas removidas pelos filtros",
+        "respostas_count": "Quantidade de respostas enviadas",
+        "respostas_raw_count": "Quantidade de respostas brutas",
+        "respostas_omitidas_count": "Quantidade de respostas removidas",
+        "received_at": "Data/hora de recebimento do webhook (alias técnico)",
+        "chegada_em": "Data/hora em que o lead chegou ao servidor (mesmo instante que received_at)",
+    },
+    "site_lead": {
+        "client_name": "Nome do cliente",
+        "page_id": "ID da página Meta (quando existir)",
         "template_id": "ID do template aplicado",
         "nome": "Nome do lead (nome_completo, nome, full_name ou name no payload)",
         "email": "Email do lead",

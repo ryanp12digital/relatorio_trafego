@@ -353,6 +353,7 @@ function bindFlowModal() {
 
 /** IDs de template Meta Lead conhecidos no backend (integrados). */
 const META_LEAD_BUILTIN_IDS = ["default", "lorena", "pratical_life"];
+const SITE_LEAD_BUILTIN_IDS = ["default"];
 const META_REPORT_BUILTIN_IDS = ["default", "p12_resumo", "p12_dados"];
 const GOOGLE_REPORT_BUILTIN_IDS = ["default", "p12_resumo", "p12_dados"];
 const INTERNAL_LEAD_BUILTIN_IDS = ["default"];
@@ -415,6 +416,16 @@ function populateLeadTemplateSelect(selectEl, currentValue) {
     selectEl.insertBefore(orphan, selectEl.firstChild);
   }
   selectEl.value = cur;
+}
+
+function populateSiteLeadTemplateSelect(selectEl, currentValue) {
+  populateChannelTemplateSelect(
+    selectEl,
+    "site_lead",
+    SITE_LEAD_BUILTIN_IDS,
+    String(currentValue || "default").trim() || "default",
+    false
+  );
 }
 
 function channelTemplateBucket(channel) {
@@ -651,7 +662,7 @@ function refreshLeadTemplateSelects() {
   const newSel = document.getElementById("newClientLeadTemplate");
   if (newSel) populateLeadTemplateSelect(newSel, newSel.value || "default");
   const siteSel = document.querySelector('#siteLeadRouteForm select[name="lead_template"]');
-  if (siteSel) populateLeadTemplateSelect(siteSel, siteSel.value || "default");
+  if (siteSel) populateSiteLeadTemplateSelect(siteSel, siteSel.value || "default");
 
   document.querySelectorAll('.edit-form select[name="lead_template"]').forEach((sel) => {
     const card = sel.closest(".client-card");

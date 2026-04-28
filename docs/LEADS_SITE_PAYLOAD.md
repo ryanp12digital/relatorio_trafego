@@ -2,6 +2,11 @@
 
 Este webhook aceita leads de site no mesmo endpoint de lead (`/meta-new-lead`), com roteamento por `codi_id`.
 
+## Endpoint de produção
+
+- URL completa do webhook para os formulários:
+  `https://python-auto-relatorio-trafego.axmxa0.easypanel.host/meta-new-lead`
+
 ## Campos mínimos
 
 - `codi_id`: identificador único do formulário no site com **exatamente 32 dígitos numéricos** (obrigatório para rota de site)
