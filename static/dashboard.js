@@ -735,6 +735,61 @@ function setStreamStatus(status, label) {
   if (lab) lab.textContent = label;
 }
 
+function setBootChecklistButtonState(steps = []) {
+  const btn = document.getElementById("bootChecklistToggle");
+  if (!btn) return;
+  const items = Array.isArray(steps) ? steps : [];
+  const errCount = items.filter((s) => s?.state === "err").length;
+  const warnCount = items.filter((s) => s?.state === "warn").length;
+  btn.classList.toggle("has-error", errCount > 0);
+  if (!items.length) {
+    btn.textContent = "Diagnóstico";
+    return;
+  }
+  if (errCount > 0) {
+    btn.textContent = `Erros: ${errCount}`;
+    return;
+  }
+  if (warnCount > 0) {
+    btn.textContent = `Avisos: ${warnCount}`;
+    return;
+  }
+  btn.textContent = "Tudo OK";
+}
+
+function bindBootChecklistTooltip() {
+  const btn = document.getElementById("bootChecklistToggle");
+  const pop = document.getElementById("bootChecklistPopover");
+  if (!btn || !pop) return;
+  if (btn.dataset.bound === "1") return;
+  btn.dataset.bound = "1";
+
+  const close = () => {
+    pop.hidden = true;
+    btn.setAttribute("aria-expanded", "false");
+  };
+  const open = () => {
+    pop.hidden = false;
+    btn.setAttribute("aria-expanded", "true");
+  };
+
+  btn.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    if (pop.hidden) open();
+    else close();
+  });
+
+  document.addEventListener("click", (ev) => {
+    const t = ev.target;
+    if (!(t instanceof Element)) return;
+    if (!pop.hidden && !pop.contains(t) && t !== btn) close();
+  });
+
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape" && !pop.hidden) close();
+  });
+}
+
 function statusPillClass(label) {
   if (label === "Ativo completo") return "pill-ok";
   if (label === "Ativo parcial" || label === "Pausado") return "pill-warn";
@@ -1912,6 +1967,7 @@ function bindUI() {
   bindTabs();
   bindFiltersHelpModal();
   bindFlowModal();
+  bindBootChecklistTooltip();
   document.getElementById("newClientForm").addEventListener("submit", submitNewMetaClient);
   document.getElementById("newGoogleClientForm").addEventListener("submit", submitNewGoogleClient);
   document.getElementById("templateForm").addEventListener("submit", saveTemplate);
@@ -1964,6 +2020,7 @@ function renderBootChecklistLoading() {
   p.className = "boot-checklist-loading";
   p.textContent = "Carga inicial: a obter dados em paralelo…";
   host.replaceChildren(p);
+  setBootChecklistButtonState([]);
 }
 
 function renderBootChecklist(steps) {
@@ -1972,6 +2029,7 @@ function renderBootChecklist(steps) {
   if (!steps || !steps.length) {
     host.hidden = true;
     host.innerHTML = "";
+    setBootChecklistButtonState([]);
     return;
   }
   host.hidden = false;
@@ -1996,6 +2054,7 @@ function renderBootChecklist(steps) {
     ul.appendChild(li);
   }
   host.replaceChildren(ul);
+  setBootChecklistButtonState(steps);
 }
 
 async function boot() {

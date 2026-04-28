@@ -29,8 +29,21 @@
           <div class="hero-badge hero-badge-stream" title="Estado do EventSource /api/events/stream">
             <span id="connectionDot" class="dot pending"></span>
             <strong id="connectionLabel">Stream: a iniciar…</strong>
+            <button
+              id="bootChecklistToggle"
+              class="boot-check-trigger"
+              type="button"
+              aria-haspopup="dialog"
+              aria-expanded="false"
+              aria-controls="bootChecklistPopover"
+              title="Ver diagnóstico da carga inicial"
+            >
+              Diagnóstico
+            </button>
+            <section id="bootChecklistPopover" class="boot-check-popover" role="dialog" aria-label="Diagnóstico da carga inicial" hidden>
+              <div id="bootChecklist" class="boot-checklist" hidden aria-live="polite"></div>
+            </section>
           </div>
-          <div id="bootChecklist" class="boot-checklist" hidden aria-live="polite"></div>
         </div>
       </header>
 

@@ -1756,6 +1756,26 @@ def dash_api_update_google_client(client_id: int):
     return dashboard_module.api_update_google_client(client_id)
 
 
+@app.get("/dash/api/site-lead-routes")
+def dash_api_site_lead_routes() -> Any:
+    return dashboard_module.api_site_lead_routes()
+
+
+@app.post("/dash/api/site-lead-routes")
+def dash_api_add_site_lead_route() -> Any:
+    return dashboard_module.api_add_site_lead_route()
+
+
+@app.put("/dash/api/site-lead-routes/<int:route_id>")
+def dash_api_update_site_lead_route(route_id: int) -> Any:
+    return dashboard_module.api_update_site_lead_route(route_id)
+
+
+@app.delete("/dash/api/site-lead-routes/<int:route_id>")
+def dash_api_delete_site_lead_route(route_id: int) -> Any:
+    return dashboard_module.api_delete_site_lead_route(route_id)
+
+
 @app.get("/dash/api/message-templates")
 def dash_api_message_templates():
     return dashboard_module.api_message_templates()

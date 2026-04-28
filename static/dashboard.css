@@ -108,6 +108,7 @@ h1 {
 
 .hero-badge-stream {
   flex-shrink: 0;
+  position: relative;
 }
 
 .hero-badge #connectionLabel {
@@ -117,13 +118,56 @@ h1 {
   letter-spacing: 0.02em;
 }
 
+.boot-check-trigger {
+  margin-left: 8px;
+  border: 1px solid rgba(58, 247, 214, 0.32);
+  border-radius: 999px;
+  background: rgba(58, 247, 214, 0.08);
+  color: var(--hot);
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  padding: 7px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.boot-check-trigger:hover,
+.boot-check-trigger:focus-visible {
+  outline: none;
+  border-color: rgba(58, 247, 214, 0.62);
+  box-shadow: 0 0 0 2px rgba(58, 247, 214, 0.18);
+}
+
+.boot-check-trigger.has-error {
+  border-color: rgba(255, 93, 115, 0.55);
+  color: #ffc0cb;
+  background: rgba(255, 93, 115, 0.12);
+}
+
+.boot-check-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(560px, calc(100vw - 56px));
+  z-index: 20;
+}
+
+.boot-check-popover[hidden] {
+  display: none;
+}
+
 .boot-checklist {
   width: 100%;
-  border: 1px solid rgba(42, 48, 66, 0.9);
-  border-radius: 12px;
-  padding: 10px 12px 12px;
-  background: rgba(10, 12, 20, 0.75);
+  border: 1px solid rgba(42, 48, 66, 0.92);
+  border-radius: 14px;
+  padding: 12px 14px 14px;
+  background: linear-gradient(165deg, rgba(14, 16, 26, 0.96), rgba(8, 10, 18, 0.96));
   text-align: left;
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.44);
+  backdrop-filter: blur(10px);
 }
 
 .boot-checklist-loading {
