@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from execution.data_processor import format_currency, format_number
 from execution.evolution_client import get_evolution_client
-from execution.message_templates import get_template_content, render_template_text
+from execution.message_templates import get_template_content, render_internal_weekly_notify, render_template_text
 from execution.project_paths import google_clients_json_path
 
 log_dir = os.path.join(os.path.dirname(__file__), "..", ".tmp")
@@ -550,8 +550,7 @@ def _send_google_p12_and_internal(
             if msg_b.strip() and not evolution.send_text_message(p12_gid, msg_b):
                 logger.warning("Falha no envio P12 (2) Google | cliente=%s", client_name)
     int_gid = str(client.get("internal_notify_group_id", "")).strip()
-    int_msg = str(client.get("internal_notify_message", "")).strip()
-    if int_gid and int_msg:
+    if int_gid:
         ctx = {
             "client_name": client_name,
             "customer_id": _normalize_customer_id(customer_id),
@@ -559,7 +558,7 @@ def _send_google_p12_and_internal(
             "period_end_br": _date_iso_to_br(period_end),
             "period_label": f"{_date_iso_to_br(period_start)} a {_date_iso_to_br(period_end)}",
         }
-        body = render_template_text(int_msg, ctx)
+        body = render_internal_weekly_notify(client, ctx)
         if body.strip() and not evolution.send_text_message(int_gid, body):
             logger.warning("Falha no envio interno Google | cliente=%s", client_name)
 

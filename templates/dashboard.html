@@ -108,12 +108,27 @@
                 <select name="internal_notify_group_id" class="field-select catalog-group-select" data-catalog-optional="1">
                   <option value="">(Opcional) sem cópia interna</option>
                 </select>
-                <span class="field-hint">Cópia opcional para equipe interna ao chegar novo lead.</span>
+                <span class="field-hint">Cópia opcional; o texto vem dos templates do canal <code>internal_lead</code> / <code>internal_report</code>.</span>
               </label>
-              <label class="edit-field--full">
-                Mensagem interna (template)
-                <textarea name="internal_notify_message" rows="3" placeholder="Ex.: Novo lead · {{client_name}} · {{nome}}"></textarea>
-                <span class="field-hint">Variáveis como em Template lead: {{nome}}, {{respostas}}, {{chegada_em}}, etc.</span>
+              <label>
+                Template interno (novo lead)
+                <select
+                  name="internal_lead_template"
+                  class="field-select internal-lead-template-select"
+                >
+                  <option value="">— Opcional —</option>
+                </select>
+                <span class="field-hint">Aba Templates, canal <code>internal_lead</code> (mesmas variáveis do lead).</span>
+              </label>
+              <label>
+                Template interno (após relatório semanal)
+                <select
+                  name="internal_weekly_template"
+                  class="field-select internal-weekly-template-select"
+                >
+                  <option value="">— Opcional —</option>
+                </select>
+                <span class="field-hint">Aba Templates, canal <code>internal_report</code> (após envio P12 Meta).</span>
               </label>
               <label class="new-client-field-template">
                 Template lead
@@ -271,11 +286,17 @@
                 <select name="internal_notify_group_id" class="field-select catalog-group-select" data-catalog-optional="1">
                   <option value="">(Opcional)</option>
                 </select>
+                <span class="field-hint">Aviso após envio do relatório; conteúdo no template <code>internal_report</code>.</span>
               </label>
-              <label class="edit-field--full">
-                Mensagem interna
-                <textarea name="internal_notify_message" rows="2" placeholder="Ex.: Relatório Google · {{client_name}} · {{period_label}}"></textarea>
-                <span class="field-hint">Variáveis: {{client_name}}, {{customer_id}}, {{period_start_br}}, {{period_end_br}}, {{period_label}}</span>
+              <label>
+                Template interno (após relatório semanal)
+                <select
+                  name="internal_weekly_template"
+                  class="field-select internal-weekly-template-select"
+                >
+                  <option value="">— Opcional —</option>
+                </select>
+                <span class="field-hint">Canal <code>internal_report</code> — variáveis Google (ver aba Templates).</span>
               </label>
               <label>
                 Conversões primárias (CSV)
@@ -315,9 +336,12 @@
           <form id="templateForm" class="template-grid">
             <label>
               Canal
-              <select name="channel" id="tplChannel">
+              <select name="channel" id="tplChannel" class="field-select">
                 <option value="meta_lead">meta_lead</option>
+                <option value="meta_report">meta_report</option>
                 <option value="google_report">google_report</option>
+                <option value="internal_lead">internal_lead</option>
+                <option value="internal_report">internal_report</option>
               </select>
             </label>
             <label>
@@ -686,9 +710,23 @@
                   <option value="">(Opcional)</option>
                 </select>
               </label>
-              <label class="edit-field edit-field--full">
-                Mensagem interna
-                <textarea name="internal_notify_message" rows="2" placeholder="Template com {{variaveis}} do lead"></textarea>
+              <label class="edit-field">
+                Template interno (novo lead)
+                <select
+                  name="internal_lead_template"
+                  class="field-select internal-lead-template-select"
+                >
+                  <option value="">— Opcional —</option>
+                </select>
+              </label>
+              <label class="edit-field">
+                Template interno (após relatório)
+                <select
+                  name="internal_weekly_template"
+                  class="field-select internal-weekly-template-select"
+                >
+                  <option value="">— Opcional —</option>
+                </select>
               </label>
               <label class="edit-field edit-field--full">
                 Template lead
@@ -853,8 +891,13 @@
               </select>
             </label>
             <label>
-              Mensagem interna
-              <textarea name="internal_notify_message" rows="2"></textarea>
+              Template interno (após relatório)
+              <select
+                name="internal_weekly_template"
+                class="field-select internal-weekly-template-select"
+              >
+                <option value="">— Opcional —</option>
+              </select>
             </label>
             <label>
               Conversões (CSV)

@@ -124,6 +124,30 @@ DEFAULT_TEMPLATES: Dict[str, Dict[str, Dict[str, str]]] = {
             ),
         },
     },
+    "internal_lead": {
+        "default": {
+            "name": "Interno — cópia de lead",
+            "description": "Mensagem para o grupo interno ao receber lead; variáveis iguais ao template de lead.",
+            "content": (
+                "🔔 *Interno* · {{client_name}}\n"
+                "{{nome}} · {{chegada_em}}\n\n"
+                "{{respostas}}"
+            ),
+        },
+    },
+    "internal_report": {
+        "default": {
+            "name": "Interno — aviso após relatório semanal",
+            "description": (
+                "Ping ao grupo interno após enviar relatório Meta/Google. "
+                "Use variáveis conforme o canal (Meta: períodos A/B e report_full; Google: customer_id e período)."
+            ),
+            "content": (
+                "📎 Relatório enviado ao cliente — *{{client_name}}*\n"
+                "📅 {{period_label}}\n"
+            ),
+        },
+    },
 }
 
 TEMPLATE_VARIABLES: Dict[str, Dict[str, str]] = {
@@ -165,6 +189,39 @@ TEMPLATE_VARIABLES: Dict[str, Dict[str, str]] = {
         "week_report_block": "Texto formatado da semana atual",
         "compare_report_block": "Texto formatado do comparativo",
         "report_full": "Semana atual + comparativo já concatenados",
+    },
+    "internal_lead": {
+        "client_name": "Nome do cliente",
+        "page_id": "ID da página Meta",
+        "template_id": "ID do template de lead aplicado ao cliente",
+        "nome": "Nome do lead",
+        "email": "E-mail do lead",
+        "whatsapp": "Link wa.me",
+        "telefone_digitos": "Telefone só dígitos",
+        "form_name": "Nome do formulário",
+        "respostas": "Bloco de respostas (filtrado)",
+        "respostas_filtradas": "Alias respostas filtradas",
+        "respostas_raw": "Bloco bruto",
+        "respostas_omitidas": "Perguntas omitidas",
+        "respostas_count": "Qtd. respostas",
+        "respostas_raw_count": "Qtd. respostas raw",
+        "respostas_omitidas_count": "Qtd. omitidas",
+        "received_at": "Data/hora recebimento",
+        "chegada_em": "Data/hora chegada do lead",
+    },
+    "internal_report": {
+        "client_name": "Nome do cliente",
+        "period_label": "Intervalo do relatório (texto livre)",
+        "period_start_br": "Início (Google ou período único)",
+        "period_end_br": "Fim",
+        "period_a_start_br": "Meta — início período A",
+        "period_a_end_br": "Meta — fim período A",
+        "period_b_start_br": "Meta — início período B",
+        "period_b_end_br": "Meta — fim período B",
+        "customer_id": "Google Ads — ID da conta formatado",
+        "report_full": "Meta — relatório completo (texto)",
+        "week_report_block": "Meta — bloco semana atual",
+        "compare_report_block": "Meta — bloco comparativo",
     },
 }
 
@@ -291,6 +348,32 @@ def get_template_content(channel: str, template_id: str) -> str:
     data = templates.get(channel, {}).get(template_id, {})
     if isinstance(data, dict):
         return str(data.get("content", "")).strip()
+    return ""
+
+
+def render_internal_lead_notify(client_or_route: Dict[str, Any], context: Dict[str, Any]) -> str:
+    """Template do canal internal_lead, com fallback para internal_notify_message (legado)."""
+    tid = str(client_or_route.get("internal_lead_template") or "").strip()
+    if tid:
+        body = get_template_content("internal_lead", tid)
+        if body:
+            return render_template_text(body, context)
+    legacy = str(client_or_route.get("internal_notify_message") or "").strip()
+    if legacy:
+        return render_template_text(legacy, context)
+    return ""
+
+
+def render_internal_weekly_notify(client: Dict[str, Any], context: Dict[str, Any]) -> str:
+    """Template do canal internal_report, com fallback para internal_notify_message (legado)."""
+    tid = str(client.get("internal_weekly_template") or "").strip()
+    if tid:
+        body = get_template_content("internal_report", tid)
+        if body:
+            return render_template_text(body, context)
+    legacy = str(client.get("internal_notify_message") or "").strip()
+    if legacy:
+        return render_template_text(legacy, context)
     return ""
 
 

@@ -28,7 +28,7 @@ from execution.evolution_client import get_evolution_client
 from execution import dashboard_app as dashboard_module
 from execution.flask_server import serve_flask_app
 from execution.live_events import publish_event
-from execution.message_templates import get_filter_rules, get_template_content, render_template_text
+from execution.message_templates import get_filter_rules, get_template_content, render_internal_lead_notify, render_template_text
 from execution.project_paths import clients_json_path
 
 log_dir = os.path.join(os.path.dirname(__file__), "..", ".tmp")
@@ -669,6 +669,8 @@ def _resolve_lead_route(page_id: str) -> Optional[Dict[str, Any]]:
             "exclude_contains": _csv_to_list(c.get("lead_exclude_contains")),
             "exclude_regex": _csv_to_list(c.get("lead_exclude_regex")),
             "internal_notify_group_id": str(c.get("internal_notify_group_id", "")).strip(),
+            "internal_lead_template": str(c.get("internal_lead_template", "")).strip(),
+            "internal_weekly_template": str(c.get("internal_weekly_template", "")).strip(),
             "internal_notify_message": str(c.get("internal_notify_message", "")).strip(),
         }
     return None
@@ -695,6 +697,8 @@ def _resolve_legacy_lorena_route() -> Optional[Dict[str, Any]]:
             "exclude_contains": [],
             "exclude_regex": [],
             "internal_notify_group_id": str(c.get("internal_notify_group_id", "")).strip(),
+            "internal_lead_template": str(c.get("internal_lead_template", "")).strip(),
+            "internal_weekly_template": str(c.get("internal_weekly_template", "")).strip(),
             "internal_notify_message": str(c.get("internal_notify_message", "")).strip(),
         }
     return None
@@ -1273,8 +1277,7 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
             )
 
             int_gid = (route.get("internal_notify_group_id") or "").strip()
-            int_msg = (route.get("internal_notify_message") or "").strip()
-            if int_gid and int_msg:
+            if int_gid:
                 base_fields = _base_message_fields(body, route=route)
                 int_ctx = {
                     "client_name": route["client_name"],
@@ -1295,7 +1298,7 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
                     "received_at": base_fields["received_at"],
                     "chegada_em": base_fields["chegada_em"],
                 }
-                int_body = render_template_text(int_msg, int_ctx)
+                int_body = render_internal_lead_notify(route, int_ctx)
                 if int_body.strip() and not client.send_text_message(int_gid, int_body):
                     logger.warning(
                         "Falha ao enviar copia interna da empresa | group=%s | cliente=%s",

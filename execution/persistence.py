@@ -93,7 +93,8 @@ def list_meta_clients() -> List[Dict[str, Any]]:
                        lead_phone_number, lead_template, lead_exclude_fields, lead_exclude_contains,
                        lead_exclude_regex, enabled,
                        p12_report_group_id, p12_report_template, p12_data_report_template,
-                       internal_notify_group_id, internal_notify_message
+                       internal_notify_group_id, internal_notify_message,
+                       internal_lead_template, internal_weekly_template
                 FROM meta_clients
                 ORDER BY sort_order ASC, id ASC
                 """
@@ -120,6 +121,8 @@ def list_meta_clients() -> List[Dict[str, Any]]:
                 "p12_data_report_template": str(r.get("p12_data_report_template") or ""),
                 "internal_notify_group_id": str(r.get("internal_notify_group_id") or ""),
                 "internal_notify_message": str(r.get("internal_notify_message") or ""),
+                "internal_lead_template": str(r.get("internal_lead_template") or ""),
+                "internal_weekly_template": str(r.get("internal_weekly_template") or ""),
             }
         )
     return out
@@ -142,13 +145,15 @@ def insert_meta_client(data: Dict[str, Any]) -> int:
                   lead_phone_number, lead_template, lead_exclude_fields, lead_exclude_contains,
                   lead_exclude_regex, enabled,
                   p12_report_group_id, p12_report_template, p12_data_report_template,
-                  internal_notify_group_id, internal_notify_message
+                  internal_notify_group_id, internal_notify_message,
+                  internal_lead_template, internal_weekly_template
                 ) VALUES (
                   %(client_name)s, %(ad_account_id)s, %(group_id)s, %(meta_page_id)s, %(lead_group_id)s,
                   %(lead_phone_number)s, %(lead_template)s, %(lead_exclude_fields)s,
                   %(lead_exclude_contains)s, %(lead_exclude_regex)s, %(enabled)s,
                   %(p12_report_group_id)s, %(p12_report_template)s, %(p12_data_report_template)s,
-                  %(internal_notify_group_id)s, %(internal_notify_message)s
+                  %(internal_notify_group_id)s, %(internal_notify_message)s,
+                  %(internal_lead_template)s, %(internal_weekly_template)s
                 )
                 RETURNING id
                 """,
@@ -169,6 +174,8 @@ def insert_meta_client(data: Dict[str, Any]) -> int:
                     "p12_data_report_template": data.get("p12_data_report_template", ""),
                     "internal_notify_group_id": data.get("internal_notify_group_id", ""),
                     "internal_notify_message": data.get("internal_notify_message", ""),
+                    "internal_lead_template": data.get("internal_lead_template", ""),
+                    "internal_weekly_template": data.get("internal_weekly_template", ""),
                 },
             )
             row = cur.fetchone()
@@ -197,6 +204,8 @@ def update_meta_client(client_id: int, data: Dict[str, Any]) -> None:
                   p12_data_report_template = %(p12_data_report_template)s,
                   internal_notify_group_id = %(internal_notify_group_id)s,
                   internal_notify_message = %(internal_notify_message)s,
+                  internal_lead_template = %(internal_lead_template)s,
+                  internal_weekly_template = %(internal_weekly_template)s,
                   updated_at = now()
                 WHERE id = %(id)s
                 """,
@@ -218,6 +227,8 @@ def update_meta_client(client_id: int, data: Dict[str, Any]) -> None:
                     "p12_data_report_template": data.get("p12_data_report_template", ""),
                     "internal_notify_group_id": data.get("internal_notify_group_id", ""),
                     "internal_notify_message": data.get("internal_notify_message", ""),
+                    "internal_lead_template": data.get("internal_lead_template", ""),
+                    "internal_weekly_template": data.get("internal_weekly_template", ""),
                 },
             )
 
@@ -230,7 +241,8 @@ def list_google_clients() -> List[Dict[str, Any]]:
                 SELECT id, client_name, google_customer_id, group_id, notes, google_template,
                        primary_conversions, enabled,
                        lead_phone_number, p12_report_group_id, p12_report_template,
-                       p12_data_report_template, internal_notify_group_id, internal_notify_message
+                       p12_data_report_template, internal_notify_group_id, internal_notify_message,
+                       internal_lead_template, internal_weekly_template
                 FROM google_clients
                 ORDER BY sort_order ASC, id ASC
                 """
@@ -257,6 +269,8 @@ def list_google_clients() -> List[Dict[str, Any]]:
                 "p12_data_report_template": str(r.get("p12_data_report_template") or ""),
                 "internal_notify_group_id": str(r.get("internal_notify_group_id") or ""),
                 "internal_notify_message": str(r.get("internal_notify_message") or ""),
+                "internal_lead_template": str(r.get("internal_lead_template") or ""),
+                "internal_weekly_template": str(r.get("internal_weekly_template") or ""),
             }
         )
     return out
@@ -281,12 +295,14 @@ def insert_google_client(data: Dict[str, Any]) -> int:
                   client_name, google_customer_id, group_id, notes, google_template,
                   primary_conversions, enabled,
                   lead_phone_number, p12_report_group_id, p12_report_template,
-                  p12_data_report_template, internal_notify_group_id, internal_notify_message
+                  p12_data_report_template, internal_notify_group_id, internal_notify_message,
+                  internal_lead_template, internal_weekly_template
                 ) VALUES (
                   %(client_name)s, %(google_customer_id)s, %(group_id)s, %(notes)s, %(google_template)s,
                   %(primary_conversions)s, %(enabled)s,
                   %(lead_phone_number)s, %(p12_report_group_id)s, %(p12_report_template)s,
-                  %(p12_data_report_template)s, %(internal_notify_group_id)s, %(internal_notify_message)s
+                  %(p12_data_report_template)s, %(internal_notify_group_id)s, %(internal_notify_message)s,
+                  %(internal_lead_template)s, %(internal_weekly_template)s
                 )
                 RETURNING id
                 """,
@@ -304,6 +320,8 @@ def insert_google_client(data: Dict[str, Any]) -> int:
                     "p12_data_report_template": data.get("p12_data_report_template", ""),
                     "internal_notify_group_id": data.get("internal_notify_group_id", ""),
                     "internal_notify_message": data.get("internal_notify_message", ""),
+                    "internal_lead_template": data.get("internal_lead_template", ""),
+                    "internal_weekly_template": data.get("internal_weekly_template", ""),
                 },
             )
             return int(cur.fetchone()["id"])
@@ -331,6 +349,8 @@ def update_google_client(client_id: int, data: Dict[str, Any]) -> None:
                   p12_data_report_template = %(p12_data_report_template)s,
                   internal_notify_group_id = %(internal_notify_group_id)s,
                   internal_notify_message = %(internal_notify_message)s,
+                  internal_lead_template = %(internal_lead_template)s,
+                  internal_weekly_template = %(internal_weekly_template)s,
                   updated_at = now()
                 WHERE id = %(id)s
                 """,
@@ -349,6 +369,8 @@ def update_google_client(client_id: int, data: Dict[str, Any]) -> None:
                     "p12_data_report_template": data.get("p12_data_report_template", ""),
                     "internal_notify_group_id": data.get("internal_notify_group_id", ""),
                     "internal_notify_message": data.get("internal_notify_message", ""),
+                    "internal_lead_template": data.get("internal_lead_template", ""),
+                    "internal_weekly_template": data.get("internal_weekly_template", ""),
                 },
             )
 
@@ -398,6 +420,8 @@ def _migrate_db_schema() -> None:
         "ALTER TABLE meta_clients ADD COLUMN IF NOT EXISTS p12_data_report_template text NOT NULL DEFAULT ''",
         "ALTER TABLE meta_clients ADD COLUMN IF NOT EXISTS internal_notify_group_id text NOT NULL DEFAULT ''",
         "ALTER TABLE meta_clients ADD COLUMN IF NOT EXISTS internal_notify_message text NOT NULL DEFAULT ''",
+        "ALTER TABLE meta_clients ADD COLUMN IF NOT EXISTS internal_lead_template text NOT NULL DEFAULT ''",
+        "ALTER TABLE meta_clients ADD COLUMN IF NOT EXISTS internal_weekly_template text NOT NULL DEFAULT ''",
     ]
     google_sql = [
         "ALTER TABLE google_clients ADD COLUMN IF NOT EXISTS lead_phone_number text NOT NULL DEFAULT ''",
@@ -406,6 +430,8 @@ def _migrate_db_schema() -> None:
         "ALTER TABLE google_clients ADD COLUMN IF NOT EXISTS p12_data_report_template text NOT NULL DEFAULT ''",
         "ALTER TABLE google_clients ADD COLUMN IF NOT EXISTS internal_notify_group_id text NOT NULL DEFAULT ''",
         "ALTER TABLE google_clients ADD COLUMN IF NOT EXISTS internal_notify_message text NOT NULL DEFAULT ''",
+        "ALTER TABLE google_clients ADD COLUMN IF NOT EXISTS internal_lead_template text NOT NULL DEFAULT ''",
+        "ALTER TABLE google_clients ADD COLUMN IF NOT EXISTS internal_weekly_template text NOT NULL DEFAULT ''",
     ]
     with _connect() as conn:
         with conn.cursor() as cur:

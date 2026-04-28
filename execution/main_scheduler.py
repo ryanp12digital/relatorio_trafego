@@ -26,7 +26,7 @@ from execution.webhook_notify import (
     notify_meta_token_expirado,
 )
 from execution.project_paths import clients_json_path
-from execution.message_templates import get_template_content, render_template_text
+from execution.message_templates import get_template_content, render_internal_weekly_notify, render_template_text
 
 # Configuração de logging
 log_dir = os.path.join(os.path.dirname(__file__), '..', '.tmp')
@@ -60,11 +60,12 @@ def _meta_p12_preview(client: Dict[str, Any], meta_report_ctx: Dict[str, Any]) -
             c2 = get_template_content("meta_report", t2)
             if c2:
                 parts.append("## P12 (dados)\n" + render_template_text(c2, meta_report_ctx))
-    int_msg = str(client.get("internal_notify_message", "")).strip()
     int_gid = str(client.get("internal_notify_group_id", "")).strip()
-    if int_gid and int_msg:
+    if int_gid:
         pl = f"{meta_report_ctx.get('period_a_start_br', '')} a {meta_report_ctx.get('period_a_end_br', '')}"
-        parts.append("## Interno\n" + render_template_text(int_msg, {**meta_report_ctx, "period_label": pl}))
+        int_body = render_internal_weekly_notify(client, {**meta_report_ctx, "period_label": pl})
+        if int_body.strip():
+            parts.append("## Interno\n" + int_body)
     return "\n\n".join(parts) if parts else "(sem P12 / interno configurado no cliente)\n"
 
 
@@ -90,9 +91,8 @@ def _send_meta_p12_and_internal(
                 if text2.strip() and not evolution_client.send_text_message(p12_gid, text2):
                     logger.warning("Falha no envio P12 (2) Meta | cliente=%s", client.get("client_name", ""))
     int_gid = str(client.get("internal_notify_group_id", "")).strip()
-    int_msg = str(client.get("internal_notify_message", "")).strip()
-    if int_gid and int_msg:
-        body = render_template_text(int_msg, {**meta_report_ctx, "period_label": period_label})
+    if int_gid:
+        body = render_internal_weekly_notify(client, {**meta_report_ctx, "period_label": period_label})
         if body.strip() and not evolution_client.send_text_message(int_gid, body):
             logger.warning("Falha no envio notificacao interna Meta | cliente=%s", client.get("client_name", ""))
 

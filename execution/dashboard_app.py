@@ -283,7 +283,8 @@ def _public_google_client_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
         "p12_report_template": str(raw.get("p12_report_template", "")).strip(),
         "p12_data_report_template": str(raw.get("p12_data_report_template", "")).strip(),
         "internal_notify_group_id": str(raw.get("internal_notify_group_id", "")).strip(),
-        "internal_notify_message": str(raw.get("internal_notify_message", "")).strip(),
+        "internal_lead_template": str(raw.get("internal_lead_template", "")).strip(),
+        "internal_weekly_template": str(raw.get("internal_weekly_template", "")).strip(),
     }
     client["checks"] = _validate_google_client(client)
     return client
@@ -318,7 +319,8 @@ def _public_client_payload(raw: Dict[str, Any], events_map: Dict[str, List[Dict[
         "p12_report_template": str(raw.get("p12_report_template", "")).strip(),
         "p12_data_report_template": str(raw.get("p12_data_report_template", "")).strip(),
         "internal_notify_group_id": str(raw.get("internal_notify_group_id", "")).strip(),
-        "internal_notify_message": str(raw.get("internal_notify_message", "")).strip(),
+        "internal_lead_template": str(raw.get("internal_lead_template", "")).strip(),
+        "internal_weekly_template": str(raw.get("internal_weekly_template", "")).strip(),
     }
     checks = _validate_client(client)
     client_events = events_map.get(client["client_name"], [])
@@ -868,7 +870,9 @@ def api_add_client() -> Any:
         "p12_report_template": str(payload.get("p12_report_template", "")).strip(),
         "p12_data_report_template": str(payload.get("p12_data_report_template", "")).strip(),
         "internal_notify_group_id": str(payload.get("internal_notify_group_id", "")).strip(),
-        "internal_notify_message": str(payload.get("internal_notify_message", "")).strip(),
+        "internal_lead_template": str(payload.get("internal_lead_template", "")).strip(),
+        "internal_weekly_template": str(payload.get("internal_weekly_template", "")).strip(),
+        "internal_notify_message": "",
     }
     if persistence.db_enabled():
         persistence.ensure_db_ready()
@@ -928,7 +932,8 @@ def api_update_client(client_id: int) -> Any:
         "p12_report_template",
         "p12_data_report_template",
         "internal_notify_group_id",
-        "internal_notify_message",
+        "internal_lead_template",
+        "internal_weekly_template",
     }
     for key in updatable_fields:
         if key not in payload:
@@ -1007,7 +1012,9 @@ def api_add_google_client() -> Any:
         "p12_report_template": str(payload.get("p12_report_template", "")).strip(),
         "p12_data_report_template": str(payload.get("p12_data_report_template", "")).strip(),
         "internal_notify_group_id": str(payload.get("internal_notify_group_id", "")).strip(),
-        "internal_notify_message": str(payload.get("internal_notify_message", "")).strip(),
+        "internal_lead_template": "",
+        "internal_weekly_template": str(payload.get("internal_weekly_template", "")).strip(),
+        "internal_notify_message": "",
     }
     if persistence.db_enabled():
         persistence.ensure_db_ready()
@@ -1063,7 +1070,8 @@ def api_update_google_client(client_id: int) -> Any:
         "p12_report_template",
         "p12_data_report_template",
         "internal_notify_group_id",
-        "internal_notify_message",
+        "internal_lead_template",
+        "internal_weekly_template",
     }
     for key in updatable:
         if key not in payload:

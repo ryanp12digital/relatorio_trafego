@@ -256,6 +256,8 @@ function bindFiltersHelpModal() {
 const META_LEAD_BUILTIN_IDS = ["default", "lorena", "pratical_life"];
 const META_REPORT_BUILTIN_IDS = ["default", "p12_resumo", "p12_dados"];
 const GOOGLE_REPORT_BUILTIN_IDS = ["default", "p12_resumo", "p12_dados"];
+const INTERNAL_LEAD_BUILTIN_IDS = ["default"];
+const INTERNAL_REPORT_BUILTIN_IDS = ["default"];
 
 function metaLeadTemplateBucket() {
   const ch = state.templates?.channels?.meta_lead;
@@ -427,6 +429,72 @@ function refreshMetaReportTemplateSelects() {
   });
 }
 
+function refreshInternalTemplateSelects() {
+  const newForm = document.getElementById("newClientForm");
+  if (newForm) {
+    const sLead = newForm.querySelector('select[name="internal_lead_template"]');
+    const sWeek = newForm.querySelector('select[name="internal_weekly_template"]');
+    populateChannelTemplateSelect(
+      sLead,
+      "internal_lead",
+      INTERNAL_LEAD_BUILTIN_IDS,
+      sLead?.value ?? "",
+      true
+    );
+    populateChannelTemplateSelect(
+      sWeek,
+      "internal_report",
+      INTERNAL_REPORT_BUILTIN_IDS,
+      sWeek?.value ?? "",
+      true
+    );
+  }
+  document.querySelectorAll("#clientsGrid .client-card").forEach((card) => {
+    const cid = card.dataset.clientId;
+    const client = state.metaClients.find((c) => String(c.id) === String(cid));
+    const sLead = card.querySelector('select[name="internal_lead_template"]');
+    const sWeek = card.querySelector('select[name="internal_weekly_template"]');
+    populateChannelTemplateSelect(
+      sLead,
+      "internal_lead",
+      INTERNAL_LEAD_BUILTIN_IDS,
+      client?.internal_lead_template ?? sLead?.value ?? "",
+      true
+    );
+    populateChannelTemplateSelect(
+      sWeek,
+      "internal_report",
+      INTERNAL_REPORT_BUILTIN_IDS,
+      client?.internal_weekly_template ?? sWeek?.value ?? "",
+      true
+    );
+  });
+
+  const newG = document.getElementById("newGoogleClientForm");
+  if (newG) {
+    const gWeek = newG.querySelector('select[name="internal_weekly_template"]');
+    populateChannelTemplateSelect(
+      gWeek,
+      "internal_report",
+      INTERNAL_REPORT_BUILTIN_IDS,
+      gWeek?.value ?? "",
+      true
+    );
+  }
+  document.querySelectorAll("#googleClientsGrid .client-card").forEach((card) => {
+    const cid = card.dataset.clientId;
+    const client = state.googleClients.find((c) => String(c.id) === String(cid));
+    const gWeek = card.querySelector('select[name="internal_weekly_template"]');
+    populateChannelTemplateSelect(
+      gWeek,
+      "internal_report",
+      INTERNAL_REPORT_BUILTIN_IDS,
+      client?.internal_weekly_template ?? gWeek?.value ?? "",
+      true
+    );
+  });
+}
+
 function refreshGoogleP12TemplateSelects() {
   const newG = document.getElementById("newGoogleClientForm");
   if (newG) {
@@ -481,6 +549,7 @@ function refreshLeadTemplateSelects() {
   });
   refreshMetaReportTemplateSelects();
   refreshGoogleP12TemplateSelects();
+  refreshInternalTemplateSelects();
 }
 
 function ensureChipControl(form, fieldName) {
@@ -679,8 +748,6 @@ function renderMetaClients() {
       editForm.elements.p12_report_group_id.value = client.p12_report_group_id || "";
     if (editForm.elements.internal_notify_group_id)
       editForm.elements.internal_notify_group_id.value = client.internal_notify_group_id || "";
-    if (editForm.elements.internal_notify_message)
-      editForm.elements.internal_notify_message.value = client.internal_notify_message || "";
     setupChipFields(editForm, ["lead_exclude_fields", "lead_exclude_contains", "lead_exclude_regex"]);
 
     card.querySelector('[data-action="toggle-edit"]').addEventListener("click", () => {
@@ -735,9 +802,9 @@ function renderMetaClients() {
     if (t1) t1.value = client.p12_report_template || "default";
     if (t2) t2.value = client.p12_data_report_template ?? "";
     if (ef.elements.internal_notify_group_id) ef.elements.internal_notify_group_id.value = client.internal_notify_group_id || "";
-    if (ef.elements.internal_notify_message) ef.elements.internal_notify_message.value = client.internal_notify_message || "";
   });
   syncMetaCatalogSelects();
+  refreshInternalTemplateSelects();
 }
 
 function renderGoogleClients() {
@@ -780,8 +847,6 @@ function renderGoogleClients() {
     if (editForm.elements.p12_report_group_id) editForm.elements.p12_report_group_id.value = client.p12_report_group_id || "";
     if (editForm.elements.internal_notify_group_id)
       editForm.elements.internal_notify_group_id.value = client.internal_notify_group_id || "";
-    if (editForm.elements.internal_notify_message)
-      editForm.elements.internal_notify_message.value = client.internal_notify_message || "";
 
     card.querySelector('[data-action="toggle-edit-google"]').addEventListener("click", () => {
       editForm.classList.toggle("hidden");
@@ -826,8 +891,8 @@ function renderGoogleClients() {
     if (t2) t2.value = client.p12_data_report_template ?? "";
     if (ef.elements.p12_report_group_id) ef.elements.p12_report_group_id.value = client.p12_report_group_id || "";
     if (ef.elements.internal_notify_group_id) ef.elements.internal_notify_group_id.value = client.internal_notify_group_id || "";
-    if (ef.elements.internal_notify_message) ef.elements.internal_notify_message.value = client.internal_notify_message || "";
   });
+  refreshInternalTemplateSelects();
 }
 
 function renderTemplateVariables(channel) {
@@ -957,6 +1022,7 @@ async function submitNewMetaClient(ev) {
   setupChipFields(form, ["lead_exclude_fields", "lead_exclude_contains", "lead_exclude_regex"]);
   syncCatalogGroupSelects();
   syncMetaCatalogSelects();
+  refreshInternalTemplateSelects();
   await fetchMetaClients();
 }
 
@@ -983,6 +1049,7 @@ async function submitNewGoogleClient(ev) {
   const enG = form.querySelector('[name="enabled"]');
   if (enG && "checked" in enG) enG.checked = true;
   syncCatalogGroupSelects();
+  refreshInternalTemplateSelects();
   await fetchGoogleClients();
 }
 
