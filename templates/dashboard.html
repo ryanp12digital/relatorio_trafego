@@ -347,7 +347,15 @@
       </section>
 
       <section id="tab-templates" class="tab-panel">
-        <section class="panel panel-form">
+        <header class="messages-tab-hero" role="region" aria-label="Mensagens — visão geral">
+          <p class="messages-tab-kicker">P12 · Conteúdo e regras</p>
+          <h2 class="messages-tab-title">Mensagens</h2>
+          <p class="messages-tab-lede">
+            Modele textos, ligue o payload do webhook às variáveis, personalize saída e defina exclusões. Cada bloco
+            abaixo é autónomo: guarde após editar.
+          </p>
+        </header>
+        <section class="panel panel-form messages-card messages-card--templates">
           <div class="filters-panel-head">
             <div class="panel-title-wrap">
               <h2>Templates de Mensagem</h2>
@@ -417,7 +425,7 @@
           <p id="templateFeedback" class="feedback"></p>
         </section>
 
-        <section class="panel" id="varResolutionSection">
+        <section class="panel messages-card messages-card--origem" id="varResolutionSection">
           <div class="filters-panel-head">
             <div class="panel-title-wrap">
               <h2>Origem dos campos (webhook)</h2>
@@ -454,7 +462,7 @@
           <p id="varResFeedback" class="feedback"></p>
         </section>
 
-        <section class="panel" id="customVarsSection">
+        <section class="panel messages-card messages-card--custom" id="customVarsSection">
           <div class="filters-panel-head">
             <div class="panel-title-wrap">
               <h2>Variáveis personalizadas</h2>
@@ -494,7 +502,7 @@
           <p id="customVarsFeedback" class="feedback"></p>
         </section>
 
-        <section class="panel">
+        <section class="panel messages-card messages-card--filters">
           <div class="filters-panel-head">
             <div class="panel-title-wrap filters-panel-titles">
               <h2>Filtros globais</h2>
@@ -583,7 +591,7 @@
           <p id="filtersFeedback" class="feedback"></p>
         </section>
 
-        <section class="panel">
+        <section class="panel messages-card messages-card--catalog">
           <div class="filters-panel-head">
             <div class="panel-title-wrap">
               <h2>Templates cadastrados</h2>

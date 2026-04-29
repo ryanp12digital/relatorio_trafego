@@ -1413,7 +1413,7 @@ function renderVariableResolutionPanel() {
     grid.appendChild(row);
   });
   const extra = document.createElement("div");
-  extra.className = "var-resolution-extra";
+  extra.className = "var-resolution-extra messages-vr-extra";
   const extraHead = document.createElement("div");
   extraHead.className = "var-resolution-extra-head";
   const h2 = document.createElement("h3");
@@ -1470,8 +1470,9 @@ function renderVariableResolutionPanel() {
   extSlots.forEach((s) => addRow(s));
   const addBtn = document.createElement("button");
   addBtn.type = "button";
-  addBtn.className = "ghost";
+  addBtn.className = "ghost var-resolution-extra-add";
   addBtn.id = "varResAddExtBtn";
+  addBtn.setAttribute("aria-label", "Adicionar mapeamento de nome de variável a chaves JSON do payload");
   addBtn.textContent = "Adicionar campo de origem";
   addBtn.addEventListener("click", () => {
     const base = "campo_extra";
@@ -1488,7 +1489,10 @@ function renderVariableResolutionPanel() {
     }
     addRow(name);
   });
-  extra.append(extraHead, extraList, addBtn);
+  const extToolbar = document.createElement("div");
+  extToolbar.className = "var-resolution-extra-toolbar";
+  extToolbar.appendChild(addBtn);
+  extra.append(extraHead, extraList, extToolbar);
   grid.appendChild(extra);
 }
 

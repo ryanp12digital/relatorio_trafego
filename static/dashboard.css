@@ -365,11 +365,125 @@ h1 {
   display: block;
 }
 
-/* Aba Templates / Mensagens: respiro entre painéis (ex.: variáveis personalizadas e filtros globais). */
+/* Aba Templates / Mensagens: hub, ritmo e cartões (estrutura). */
 #tab-templates.tab-panel.is-active {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 28px;
+  padding-bottom: 12px;
+}
+
+.messages-tab-hero {
+  position: relative;
+  margin: 0 0 4px;
+  padding: 20px 22px 24px 26px;
+  border-radius: 16px;
+  background: linear-gradient(130deg, rgba(14, 16, 24, 0.75) 0%, rgba(8, 10, 18, 0.5) 100%);
+  border: 1px solid rgba(58, 247, 214, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+  animation: messagesTabHeroIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.messages-tab-hero::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 3px 0 0 3px;
+  background: linear-gradient(180deg, var(--hot) 0%, rgba(196, 181, 253, 0.55) 100%);
+  opacity: 0.9;
+}
+
+.messages-tab-kicker {
+  margin: 0 0 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hot);
+  font-family: var(--font-ui);
+}
+
+.messages-tab-title {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: clamp(30px, 4.8vw, 46px);
+  line-height: 0.95;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+
+.messages-tab-lede {
+  margin: 0;
+  max-width: 60ch;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+#tab-templates .messages-card {
+  position: relative;
+  animation: messagesCardIn 0.45s ease backwards;
+}
+
+#tab-templates .messages-card:nth-of-type(1) { animation-delay: 0.04s; }
+#tab-templates .messages-card:nth-of-type(2) { animation-delay: 0.08s; }
+#tab-templates .messages-card:nth-of-type(3) { animation-delay: 0.12s; }
+#tab-templates .messages-card:nth-of-type(4) { animation-delay: 0.16s; }
+#tab-templates .messages-card:nth-of-type(5) { animation-delay: 0.2s; }
+
+#tab-templates .messages-card .filters-panel-head {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(42, 48, 66, 0.5);
+}
+
+#tab-templates .messages-card .filters-panel-head p {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--muted);
+  max-width: 80ch;
+}
+
+#tab-templates .new-client-filters-grid {
+  margin-top: 4px;
+  margin-bottom: 12px;
+}
+
+#varResolutionSection .new-client-actions {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(42, 48, 66, 0.4);
+}
+
+#customVarsSection .new-client-actions {
+  margin-top: 10px;
+  padding-top: 4px;
+}
+
+@keyframes messagesTabHeroIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes messagesCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .site-routes-wrap {
@@ -2722,8 +2836,8 @@ textarea {
 
 .var-resolution-grid {
   display: grid;
-  gap: 12px;
-  margin-top: 14px;
+  gap: 16px;
+  margin-top: 6px;
 }
 
 .var-resolution-row {
@@ -2750,21 +2864,77 @@ textarea {
 }
 
 .var-resolution-extra {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(42, 48, 66, 0.6);
+  margin-top: 12px;
+  padding: 20px 18px 20px 22px;
+  border-radius: 14px;
+  border: 1px solid rgba(58, 247, 214, 0.1);
+  background: radial-gradient(ellipse 120% 80% at 100% 0%, rgba(58, 247, 214, 0.06) 0%, transparent 50%),
+    rgba(6, 8, 14, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   grid-column: 1 / -1;
 }
 
+.messages-vr-extra.var-resolution-extra {
+  border-top: none;
+  margin-top: 4px;
+}
+
+.var-resolution-extra-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
 .var-resolution-extra-title {
-  font-size: 14px;
-  font-weight: 600;
-  margin: 0 0 6px 0;
-  letter-spacing: 0.02em;
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: 0.01em;
 }
 
 .var-resolution-extra .field-micro {
-  margin: 0 0 10px 0;
+  margin: 0 0 0 0;
+}
+
+.var-resolution-extra-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0 0 0 0;
+}
+
+.var-resolution-extra-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(42, 48, 66, 0.5);
+}
+
+.var-resolution-extra-add {
+  font-weight: 600;
+  font-size: 13px;
+  border: 1px solid rgba(58, 247, 214, 0.45);
+  background: rgba(58, 247, 214, 0.08);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 9px 16px;
+  transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.var-resolution-extra-add:hover {
+  background: rgba(58, 247, 214, 0.14);
+  border-color: rgba(58, 247, 214, 0.6);
+  box-shadow: 0 0 0 1px rgba(58, 247, 214, 0.1);
+}
+
+.var-resolution-extra-add:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 
 .var-resolution-row-ext {
@@ -2772,11 +2942,17 @@ textarea {
   grid-template-columns: minmax(100px, 1fr) minmax(140px, 2.5fr) auto;
   gap: 10px 12px;
   align-items: start;
-  margin-top: 10px;
-  padding: 10px 12px;
+  margin-top: 0;
+  padding: 12px 14px;
   border-radius: 10px;
-  background: rgba(14, 16, 26, 0.4);
-  border: 1px solid rgba(42, 48, 66, 0.5);
+  background: rgba(10, 12, 20, 0.65);
+  border: 1px solid rgba(42, 48, 66, 0.6);
+  transition: border-color 0.16s ease, background 0.16s ease;
+}
+
+.var-resolution-row-ext:hover {
+  border-color: rgba(58, 247, 214, 0.2);
+  background: rgba(12, 16, 26, 0.7);
 }
 
 .var-resolution-name-wrap {
@@ -3026,6 +3202,12 @@ textarea {
   .var-resolution-row {
     grid-template-columns: 1fr;
   }
+  .var-resolution-row-ext {
+    grid-template-columns: 1fr;
+  }
+  .var-resolution-row-ext .ghost.small {
+    justify-self: start;
+  }
   .map-row,
   .cv-map-row {
     grid-template-columns: 1fr;
@@ -3043,6 +3225,11 @@ textarea {
   }
 
   .dot.pending {
+    animation: none;
+  }
+
+  .messages-tab-hero,
+  #tab-templates .messages-card {
     animation: none;
   }
 }
