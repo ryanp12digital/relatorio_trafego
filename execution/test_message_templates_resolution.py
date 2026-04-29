@@ -169,6 +169,38 @@ class TestPersistenceRoundTrip(unittest.TestCase):
                 self.assertEqual(doc["variable_resolution"]["meta_lead"]["nome"]["source_keys"], ["apelido", "nome"])
 
 
+class TestExtendedOriginField(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self._path = os.path.join(self._tmpdir.name, "message_templates.json")
+
+    def tearDown(self) -> None:
+        self._tmpdir.cleanup()
+
+    def test_get_effective_source_keys_for_custom_origin(self) -> None:
+        with patch("execution.message_templates.message_templates_json_path", return_value=self._path):
+            with patch("execution.message_templates._use_db_templates", return_value=False):
+                upsert_variable_resolution_channel(
+                    "meta_lead",
+                    {
+                        "codigo_bairro": {"source_keys": ["referencia", "ref", "bairro_id"]},
+                    },
+                )
+                keys = get_effective_source_keys("meta_lead", "codigo_bairro")
+        self.assertEqual(keys, ("referencia", "ref", "bairro_id"))
+
+    def test_internal_lead_upsert_goes_to_meta_lead(self) -> None:
+        with patch("execution.message_templates.message_templates_json_path", return_value=self._path):
+            with patch("execution.message_templates._use_db_templates", return_value=False):
+                upsert_variable_resolution_channel(
+                    "internal_lead",
+                    {"x_extra": {"source_keys": ["campo_x"]}},
+                )
+                with open(self._path, "r", encoding="utf-8") as f:
+                    doc = json.load(f)
+                self.assertIn("x_extra", doc.get("variable_resolution", {}).get("meta_lead", {}))
+
+
 class TestApplyCustomVariables(unittest.TestCase):
     def setUp(self) -> None:
         self._tmpdir = tempfile.TemporaryDirectory()

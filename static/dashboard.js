@@ -1364,16 +1364,31 @@ function renderTemplateVariables(channel) {
   });
 }
 
+const LEAD_ORIGIN_CHANNELS = new Set(["meta_lead", "site_lead", "internal_lead"]);
+
+function listLeadOriginChannels() {
+  return listTemplateChannels().filter((c) => LEAD_ORIGIN_CHANNELS.has(c));
+}
+
 function renderVariableResolutionPanel() {
   const channelSelect = document.getElementById("varResChannel");
-  const channels = listTemplateChannels();
+  const channels = listLeadOriginChannels();
   ensureSelectOptions(channelSelect, channels, channelSelect?.value || "meta_lead");
   const ch = channelSelect?.value || channels[0] || "meta_lead";
   const grid = document.getElementById("varResolutionGrid");
   if (!grid) return;
-  const vr = state.templates.variable_resolution?.[ch] || {};
+  const storageKey = ch === "internal_lead" ? "meta_lead" : ch;
+  const vr = state.templates.variable_resolution?.[storageKey] || {};
   const labels = state.templates.variables?.[ch] || {};
   grid.innerHTML = "";
+  if (!channels.length) {
+    const p = document.createElement("p");
+    p.className = "field-micro";
+    p.textContent =
+      "Nenhum canal de lead no catálogo. A origem de campos aplica-se a Meta, Site e interno (P12).";
+    grid.appendChild(p);
+    return;
+  }
   LEAD_RESOLVABLE_SLOTS.forEach((slot) => {
     const row = document.createElement("div");
     row.className = "var-resolution-row";
@@ -1397,6 +1412,84 @@ function renderVariableResolutionPanel() {
     row.appendChild(wrap);
     grid.appendChild(row);
   });
+  const extra = document.createElement("div");
+  extra.className = "var-resolution-extra";
+  const extraHead = document.createElement("div");
+  extraHead.className = "var-resolution-extra-head";
+  const h2 = document.createElement("h3");
+  h2.className = "var-resolution-extra-title";
+  h2.textContent = "Campos de origem adicionais";
+  const hint = document.createElement("p");
+  hint.className = "field-micro";
+  hint.textContent =
+    "Crie nomes de variável (só letras, números e _; p.ex. referencia, bairro_cod). Ficam disponíveis em {{nome}} no template e nas variáveis personalizadas (fonte «contexto»).";
+  extraHead.append(h2, hint);
+  const extraList = document.createElement("div");
+  extraList.className = "var-resolution-extra-list";
+  extraList.id = "varResolutionExtraList";
+  const extSlots = Object.keys(vr).filter((k) => !LEAD_RESOLVABLE_SLOTS.includes(k));
+  const addRow = (slotName) => {
+    const row = document.createElement("div");
+    row.className = "var-resolution-row var-resolution-row-ext";
+    row.dataset.vrExtSlot = slotName;
+    const nameWrap = document.createElement("label");
+    nameWrap.className = "var-resolution-name-wrap";
+    const nameIn = document.createElement("input");
+    nameIn.type = "text";
+    nameIn.className = "vr-ext-name";
+    nameIn.value = slotName;
+    nameIn.autocomplete = "off";
+    nameIn.placeholder = "minha_variavel";
+    const keys = vr[slotName]?.source_keys;
+    const val = Array.isArray(keys) ? keys.join(", ") : "";
+    const wrap = document.createElement("label");
+    wrap.className = "var-resolution-input-wrap";
+    const span = document.createElement("span");
+    span.className = "field-micro";
+    span.textContent = "Chaves do JSON (ordem de tentativa)";
+    const inp = document.createElement("input");
+    inp.type = "text";
+    inp.className = "vr-ext-keys";
+    inp.autocomplete = "off";
+    inp.placeholder = "ex.: referencia, ref";
+    inp.value = val;
+    const rm = document.createElement("button");
+    rm.type = "button";
+    rm.className = "ghost small";
+    rm.textContent = "Remover";
+    rm.addEventListener("click", () => row.remove());
+    nameWrap.appendChild(document.createTextNode("Nome no template"));
+    nameWrap.appendChild(nameIn);
+    wrap.appendChild(span);
+    wrap.appendChild(inp);
+    row.appendChild(nameWrap);
+    row.appendChild(wrap);
+    row.appendChild(rm);
+    extraList.appendChild(row);
+  };
+  extSlots.forEach((s) => addRow(s));
+  const addBtn = document.createElement("button");
+  addBtn.type = "button";
+  addBtn.className = "ghost";
+  addBtn.id = "varResAddExtBtn";
+  addBtn.textContent = "Adicionar campo de origem";
+  addBtn.addEventListener("click", () => {
+    const base = "campo_extra";
+    let n = document.querySelectorAll("#varResolutionExtraList .var-resolution-row-ext").length;
+    let name = base;
+    const used = new Set(
+      Array.from(document.querySelectorAll("#varResolutionExtraList .var-resolution-row-ext .vr-ext-name")).map(
+        (el) => (el.value || "").trim().toLowerCase(),
+      ),
+    );
+    while (used.has(name)) {
+      n += 1;
+      name = `${base}_${n}`;
+    }
+    addRow(name);
+  });
+  extra.append(extraHead, extraList, addBtn);
+  grid.appendChild(extra);
 }
 
 function renderCustomVariablesPanel() {
@@ -1771,10 +1864,21 @@ function appendEmptyCustomVarCard() {
   );
 }
 
+const _VR_NAME_RE = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+/** Alineado ao backend: reservados de sistema, não reutilizáveis como origem adicional. */
+const VR_EXT_FORBIDDEN = new Set(
+  "client_name page_id template_id form_name respostas respostas_filtradas respostas_raw respostas_omitidas respostas_count respostas_raw_count respostas_omitidas_count received_at chegada_em traffic_source traffic_origin_url origem_anuncio cliente_origem"
+    .split(/\s+/),
+);
+
 async function saveVariableResolution() {
   const fb = document.getElementById("varResFeedback");
   const ch = document.getElementById("varResChannel")?.value || "meta_lead";
   if (!fb) return;
+  if (!LEAD_ORIGIN_CHANNELS.has(ch)) {
+    fb.textContent = "Selecione um canal de lead (Meta, Site ou interno P12).";
+    return;
+  }
   fb.textContent = "Salvando...";
   const payload = {};
   LEAD_RESOLVABLE_SLOTS.forEach((slot) => {
@@ -1787,6 +1891,38 @@ async function saveVariableResolution() {
       .filter(Boolean);
     if (keys.length) payload[slot] = { source_keys: keys };
   });
+  const seen = new Set(Object.keys(payload));
+  for (const row of document.querySelectorAll("#varResolutionExtraList .var-resolution-row-ext")) {
+    const name = (row.querySelector(".vr-ext-name")?.value || "").trim();
+    const raw = (row.querySelector(".vr-ext-keys")?.value || "").trim();
+    if (!name && !raw) continue;
+    if ((name && !raw) || (!name && raw)) {
+      fb.textContent = "Em cada linha de campo adicional, preencha o nome e as chaves do JSON.";
+      return;
+    }
+    if (!_VR_NAME_RE.test(name)) {
+      fb.textContent = "Nome de variável inválido: use a-z, 0-9 e _ (começando com letra).";
+      return;
+    }
+    if (LEAD_RESOLVABLE_SLOTS.includes(name) || seen.has(name)) {
+      fb.textContent = "Nome de campo em duplicado ou reservado aos blocos padrão.";
+      return;
+    }
+    if (VR_EXT_FORBIDDEN.has(name)) {
+      fb.textContent = `O nome «${name}» é reservado ao sistema. Escolha outro.`;
+      return;
+    }
+    const keys = raw
+      .split(/[,;]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!keys.length) {
+      fb.textContent = "Indique pelo menos uma chave de JSON em cada linha de campo adicional.";
+      return;
+    }
+    seen.add(name);
+    payload[name] = { source_keys: keys };
+  }
   const r = await dashFetch(apiUrl(`/api/message-templates/variable-resolution/${encodeURIComponent(ch)}`), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },

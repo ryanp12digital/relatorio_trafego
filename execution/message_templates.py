@@ -59,6 +59,18 @@ _DEFAULT_LEAD_SOURCE_KEYS: Dict[str, Tuple[str, ...]] = {
     "utm_content": ("utm_content", "utmContent"),
 }
 
+def _is_extended_origin_var_name(name: str) -> bool:
+    """Nome extra em «Origem dos campos» (além dos slots padrão). Torna-se `{{name}}` no contexto de lead."""
+    s = (name or "").strip()
+    if not s or not _VAR_NAME_RE.match(s):
+        return False
+    if s in LEAD_RESOLVABLE_SLOTS:
+        return False
+    if s in _RESERVED_LEAD_RENDER_KEYS:
+        return False
+    return True
+
+
 # Nomes de variável já usados no contexto de lead (não permitir colisão com variável personalizada)
 _RESERVED_LEAD_RENDER_KEYS = frozenset(
     {
@@ -452,11 +464,27 @@ def save_templates(data: Dict[str, Dict[str, Dict[str, str]]]) -> None:
 def list_templates_payload() -> Dict[str, Any]:
     templates = load_templates()
     filters = load_filter_rules()
+    base_vars: Dict[str, Dict[str, str]] = {k: dict(v) for k, v in TEMPLATE_VARIABLES.items()}
+    label_extra = "Campo de origem adicional (chaves do payload, como os campos padrão)"
+    vr = load_merged_variable_resolution()
+    for ch, bucket in vr.items():
+        if ch not in base_vars:
+            continue
+        t = base_vars[ch]
+        for slot in bucket:
+            if slot in LEAD_RESOLVABLE_SLOTS:
+                continue
+            if _is_extended_origin_var_name(slot) and slot not in t:
+                t[slot] = label_extra
+    if "meta_lead" in base_vars and "internal_lead" in base_vars:
+        for k, v in base_vars["meta_lead"].items():
+            if k not in base_vars["internal_lead"] and _is_extended_origin_var_name(k):
+                base_vars["internal_lead"][k] = v
     return {
         "channels": templates,
-        "variables": TEMPLATE_VARIABLES,
+        "variables": base_vars,
         "filters": filters,
-        "variable_resolution": load_merged_variable_resolution(),
+        "variable_resolution": vr,
         "custom_variables": load_merged_custom_variables(),
     }
 
@@ -677,24 +705,56 @@ def _default_variable_resolution() -> Dict[str, Dict[str, Dict[str, Any]]]:
     return {"meta_lead": deepcopy(slot_defaults), "site_lead": deepcopy(slot_defaults)}
 
 
+def variable_resolution_storage_channel(template_channel: str) -> Optional[str]:
+    """ONde a origem de campos é guardada. Só canais de lead; `internal_lead` → `meta_lead` (P12)."""
+    c = (template_channel or "").strip() or "meta_lead"
+    if c in ("meta_lead", "internal_lead"):
+        return "meta_lead"
+    if c == "site_lead":
+        return "site_lead"
+    return None
+
+
+def _variable_resolution_target_channel(stored_key: str) -> Optional[str]:
+    """Chave no JSON → bucket de merge (só meta_lead / site_lead). Ignora chaves alheias (ex. relatórios)."""
+    if not isinstance(stored_key, str):
+        return "meta_lead"
+    c = (stored_key or "").strip()
+    if c in ("meta_lead", "internal_lead"):
+        return "meta_lead"
+    if c == "site_lead":
+        return "site_lead"
+    return None
+
+
 def load_merged_variable_resolution() -> Dict[str, Dict[str, Dict[str, Any]]]:
     out = _default_variable_resolution()
     raw_doc = _load_full_templates_document()
     stored = raw_doc.get("variable_resolution")
     if not isinstance(stored, dict):
         return out
+    # Reagrupar chaves (ex.: variable_resolution["internal_lead"] → meta_lead)
+    normalized: Dict[str, Dict[str, Any]] = {}
     for ch, over in stored.items():
         if not isinstance(ch, str) or not isinstance(over, dict):
             continue
-        bucket = out.setdefault(ch, {})
+        target = _variable_resolution_target_channel(ch)
+        if not target:
+            continue
+        dest = normalized.setdefault(target, {})
         for var_name, meta in over.items():
-            if var_name not in LEAD_RESOLVABLE_SLOTS or not isinstance(meta, dict):
+            if not isinstance(var_name, str) or not isinstance(meta, dict):
                 continue
-            sk = meta.get("source_keys")
-            if isinstance(sk, list) and sk:
-                clean = [str(x).strip() for x in sk if str(x).strip()]
-                if clean:
-                    bucket[var_name] = {"source_keys": clean}
+            if var_name in LEAD_RESOLVABLE_SLOTS or _is_extended_origin_var_name(var_name):
+                sk = meta.get("source_keys")
+                if isinstance(sk, list) and sk:
+                    clean = [str(x).strip() for x in sk if str(x).strip()]
+                    if clean:
+                        dest[var_name] = {"source_keys": clean}
+    for ch, bucket in normalized.items():
+        out_b = out.setdefault(ch, {})
+        for var_name, meta in bucket.items():
+            out_b[var_name] = meta
     return out
 
 
@@ -717,7 +777,7 @@ def custom_variables_storage_channel(template_channel: str) -> str:
 
 
 def get_effective_source_keys(channel: str, slot: str) -> Tuple[str, ...]:
-    if slot not in LEAD_RESOLVABLE_SLOTS:
+    if slot not in LEAD_RESOLVABLE_SLOTS and not _is_extended_origin_var_name(slot):
         return ()
     ch = resolution_channel_for_lead(channel)
     merged = load_merged_variable_resolution()
@@ -728,7 +788,9 @@ def get_effective_source_keys(channel: str, slot: str) -> Tuple[str, ...]:
         t = tuple(str(x).strip() for x in sk if str(x).strip())
         if t:
             return t
-    return _DEFAULT_LEAD_SOURCE_KEYS.get(slot, ())
+    if slot in LEAD_RESOLVABLE_SLOTS:
+        return _DEFAULT_LEAD_SOURCE_KEYS.get(slot, ())
+    return ()
 
 
 def _forbidden_custom_var_output_key(storage_ch: str, key: str) -> bool:
@@ -760,7 +822,9 @@ def _validate_custom_variable_entry(
     if not source_keys:
         return None
     if src_raw == "context":
-        allowed = set(TEMPLATE_VARIABLES.get(template_ch, {}) or {}) | (sibling_keys - {key})
+        vr_merge = load_merged_variable_resolution().get(resolution_channel_for_lead(template_ch), {}) or {}
+        from_vr = set(vr_merge.keys()) if isinstance(vr_merge, dict) else set()
+        allowed = set(TEMPLATE_VARIABLES.get(template_ch, {}) or {}) | (sibling_keys - {key}) | from_vr
         for ckey in source_keys:
             if ckey not in allowed:
                 return None
@@ -934,11 +998,14 @@ def upsert_variable_resolution_channel(channel: str, payload: Dict[str, Any]) ->
     ch = (channel or "").strip()
     if not ch:
         raise ValueError("channel_obrigatorio")
+    storage = variable_resolution_storage_channel(ch)
+    if not storage:
+        raise ValueError("canal_sem_origem_de_campos_lead")
     bucket: Dict[str, Dict[str, Any]] = {}
     for var_name, meta in (payload or {}).items():
-        if var_name not in LEAD_RESOLVABLE_SLOTS:
+        if not isinstance(var_name, str) or not isinstance(meta, dict):
             continue
-        if not isinstance(meta, dict):
+        if not (var_name in LEAD_RESOLVABLE_SLOTS or _is_extended_origin_var_name(var_name)):
             continue
         sk = meta.get("source_keys")
         if not isinstance(sk, list):
@@ -952,11 +1019,13 @@ def upsert_variable_resolution_channel(channel: str, payload: Dict[str, Any]) ->
     vr = data.get("variable_resolution")
     if not isinstance(vr, dict):
         vr = {}
-    vr[ch] = bucket
+    vr[storage] = bucket
+    if storage == "meta_lead" and "internal_lead" in vr:
+        del vr["internal_lead"]
     data["variable_resolution"] = vr
     _save_full_templates_document(data)
     merged = load_merged_variable_resolution()
-    return merged.get(ch, {})
+    return merged.get(storage, {})
 
 
 def upsert_custom_variables_channel(channel: str, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

@@ -30,12 +30,15 @@ from execution import dashboard_app as dashboard_module
 from execution.flask_server import serve_flask_app
 from execution.live_events import publish_event
 from execution.message_templates import (
+    LEAD_RESOLVABLE_SLOTS,
     apply_custom_variables,
     get_effective_source_keys,
     get_filter_rules,
     get_template_content,
+    load_merged_variable_resolution,
     render_internal_lead_notify,
     render_template_text,
+    resolution_channel_for_lead,
 )
 from execution.project_paths import clients_json_path, google_clients_json_path
 
@@ -1180,7 +1183,7 @@ def _base_message_fields(body: Dict[str, Any], route: Optional[Dict[str, Any]] =
         utm_term,
         utm_content,
     )
-    return {
+    out: Dict[str, str] = {
         "nome": nome or "(nao informado)",
         "email": email or "(nao informado)",
         "whatsapp": wa_link,
@@ -1204,6 +1207,16 @@ def _base_message_fields(body: Dict[str, Any], route: Optional[Dict[str, Any]] =
         "received_at": received_ts,
         "chegada_em": received_ts,
     }
+    merged_vr = load_merged_variable_resolution()
+    vr_b = merged_vr.get(resolution_channel_for_lead(fc), {}) or {}
+    for slot, _m in vr_b.items():
+        if slot in LEAD_RESOLVABLE_SLOTS:
+            continue
+        tkeys = get_effective_source_keys(fc, str(slot))
+        if not tkeys:
+            continue
+        out[str(slot)] = (_first_field_from_data_and_mappable(tkeys, data, mappable) or "")
+    return out
 
 
 def _form_name_from_nested_objects(body: Dict[str, Any], data: Dict[str, Any]) -> str:

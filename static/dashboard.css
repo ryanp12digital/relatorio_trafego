@@ -365,6 +365,13 @@ h1 {
   display: block;
 }
 
+/* Aba Templates / Mensagens: respiro entre painéis (ex.: variáveis personalizadas e filtros globais). */
+#tab-templates.tab-panel.is-active {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
 .site-routes-wrap {
   display: grid;
   gap: 10px;
@@ -2740,6 +2747,48 @@ textarea {
   width: 100%;
   font-family: var(--font-mono);
   font-size: 12px;
+}
+
+.var-resolution-extra {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(42, 48, 66, 0.6);
+  grid-column: 1 / -1;
+}
+
+.var-resolution-extra-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 6px 0;
+  letter-spacing: 0.02em;
+}
+
+.var-resolution-extra .field-micro {
+  margin: 0 0 10px 0;
+}
+
+.var-resolution-row-ext {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) minmax(140px, 2.5fr) auto;
+  gap: 10px 12px;
+  align-items: start;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(14, 16, 26, 0.4);
+  border: 1px solid rgba(42, 48, 66, 0.5);
+}
+
+.var-resolution-name-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.var-resolution-name-wrap .vr-ext-name {
+  width: 100%;
 }
 
 .custom-vars-list {
