@@ -435,9 +435,9 @@ def _build_google_clients_response() -> Dict[str, Any]:
 
 
 def _public_site_lead_route_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
-    target_type = str(raw.get("target_type", "meta")).strip().lower()
-    if target_type not in {"meta", "google"}:
-        target_type = "meta"
+    target_type = str(raw.get("target_type", "site")).strip().lower() or "site"
+    if target_type not in {"meta", "google", "site"}:
+        target_type = "site"
     return {
         "id": int(raw.get("id", 0)),
         "codi_id": str(raw.get("codi_id", raw.get("form_id", ""))).strip(),
@@ -448,6 +448,8 @@ def _public_site_lead_route_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
         "lead_phone_number": str(raw.get("lead_phone_number", "")).strip(),
         "internal_notify_group_id": str(raw.get("internal_notify_group_id", "")).strip(),
         "source_type": str(raw.get("source_type", "")).strip().lower(),
+        "origem_anuncio": str(raw.get("origem_anuncio", "")).strip(),
+        "cliente_origem": str(raw.get("cliente_origem", "")).strip(),
         "lead_template": str(raw.get("lead_template", "")).strip() or "default",
         "internal_lead_template": str(raw.get("internal_lead_template", "")).strip(),
         "enabled": bool(raw.get("enabled", True)),
@@ -1258,13 +1260,15 @@ def api_add_site_lead_route() -> Any:
     payload = request.get_json(silent=True) or {}
     route_data = {
         "codi_id": str(payload.get("codi_id", payload.get("form_id", ""))).strip(),
-        "target_type": str(payload.get("target_type", "meta")).strip().lower() or "meta",
+        "target_type": str(payload.get("target_type", "site")).strip().lower() or "site",
         "target_client_name": str(payload.get("target_client_name", "")).strip(),
         "group_id": str(payload.get("group_id", "")).strip(),
         "lead_group_id": str(payload.get("group_id", "")).strip(),
         "lead_phone_number": str(payload.get("lead_phone_number", "")).strip(),
         "internal_notify_group_id": str(payload.get("internal_notify_group_id", "")).strip(),
         "source_type": str(payload.get("source_type", "")).strip().lower(),
+        "origem_anuncio": str(payload.get("origem_anuncio", "")).strip(),
+        "cliente_origem": str(payload.get("cliente_origem", "")).strip(),
         "lead_template": str(payload.get("lead_template", "")).strip() or "default",
         "internal_lead_template": str(payload.get("internal_lead_template", "")).strip(),
         "enabled": _as_bool(payload.get("enabled"), default=True),
@@ -1274,10 +1278,8 @@ def api_add_site_lead_route() -> Any:
         return jsonify({"ok": False, "error": "codi_id_obrigatorio"}), 400
     if not _is_valid_site_codi_id(route_data["codi_id"]):
         return jsonify({"ok": False, "error": "codi_id_invalido_32_digitos_numericos"}), 400
-    if route_data["target_type"] not in {"meta", "google"}:
+    if route_data["target_type"] not in {"meta", "google", "site"}:
         return jsonify({"ok": False, "error": "target_type_invalido"}), 400
-    if not route_data["target_client_name"]:
-        return jsonify({"ok": False, "error": "target_client_name_obrigatorio"}), 400
     if not route_data["group_id"]:
         return jsonify({"ok": False, "error": "group_id_obrigatorio"}), 400
     if not route_data["lead_phone_number"]:
@@ -1333,6 +1335,8 @@ def api_update_site_lead_route(route_id: int) -> Any:
         "lead_phone_number",
         "internal_notify_group_id",
         "source_type",
+        "origem_anuncio",
+        "cliente_origem",
         "lead_template",
         "internal_lead_template",
         "enabled",
@@ -1356,10 +1360,8 @@ def api_update_site_lead_route(route_id: int) -> Any:
         return jsonify({"ok": False, "error": "codi_id_obrigatorio"}), 400
     if not _is_valid_site_codi_id(str(current.get("codi_id", ""))):
         return jsonify({"ok": False, "error": "codi_id_invalido_32_digitos_numericos"}), 400
-    if str(current.get("target_type", "")).strip() not in {"meta", "google"}:
+    if str(current.get("target_type", "")).strip() not in {"meta", "google", "site"}:
         return jsonify({"ok": False, "error": "target_type_invalido"}), 400
-    if not str(current.get("target_client_name", "")).strip():
-        return jsonify({"ok": False, "error": "target_client_name_obrigatorio"}), 400
     if not str(current.get("group_id", "")).strip():
         return jsonify({"ok": False, "error": "group_id_obrigatorio"}), 400
     current["lead_group_id"] = str(current.get("group_id", "")).strip()

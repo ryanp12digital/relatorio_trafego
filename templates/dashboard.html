@@ -588,7 +588,7 @@
         <section class="panel panel-form">
           <div class="panel-title-wrap">
             <h2>Leads Site</h2>
-            <p>Cadastre cliente e templates por <code>codi_id</code> para leads vindos do site.</p>
+            <p>Cadastre envio e rótulos internos por <code>codi_id</code> (o roteamento usa só o codi_id; origem Meta/Google na mensagem vem de <code>{{traffic_source}}</code>).</p>
           </div>
           <form id="siteLeadRouteForm" class="new-client-form">
             <div class="new-client-fields" aria-label="Cadastro de cliente leads site por codi_id">
@@ -606,17 +606,14 @@
                 <span class="field-hint">Obrigatório: exatamente 32 dígitos numéricos (codi_id).</span>
               </label>
               <label>
-                Tipo cliente
-                <select name="target_type" class="field-select" required>
-                  <option value="meta">meta</option>
-                  <option value="google">google</option>
-                </select>
+                Rótulo interno — identificação / campanha
+                <input name="cliente_origem" type="text" placeholder="Ex.: Tainã · Vila Mariana / campanha Meta Q2" />
+                <span class="field-hint">Não roteia envio; só identifica no painel e nas variáveis <code>{{cliente_origem}}</code> / <code>{{origem_anuncio}}</code>.</span>
               </label>
               <label>
-                Cliente
-                <select name="target_client_name" id="siteRouteTargetClient" class="field-select" required>
-                  <option value="">Selecione o tipo primeiro</option>
-                </select>
+                Rótulo interno — origem do anúncio
+                <input name="origem_anuncio" type="text" placeholder="Ex.: Google PMax / Formulário modal" />
+                <span class="field-hint">Opcional. Uso interno (qual anúncio/canal você associa a este <code>codi_id</code>).</span>
               </label>
               <label>
                 Grupo cliente

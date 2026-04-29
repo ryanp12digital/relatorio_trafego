@@ -1163,45 +1163,10 @@ async function fetchGoogleClients() {
   buildStats("googleStatsRow", state.googleClients);
   renderGoogleClients();
   syncCatalogGroupSelects();
-  renderSiteTargetClientOptions();
-}
-
-function renderSiteTargetClientOptions(selectedName = "") {
-  const select = document.getElementById("siteRouteTargetClient");
-  const typeSel = document.querySelector('#siteLeadRouteForm [name="target_type"]');
-  if (!select || !typeSel) return;
-  populateSiteTargetClientSelect(select, String(typeSel.value || "meta").trim().toLowerCase(), selectedName || select.value || "");
-}
-
-function getSiteTargetClientNames(type) {
-  const source = String(type || "meta").trim().toLowerCase() === "google" ? state.googleClients : state.metaClients;
-  return [...new Set((source || []).map((c) => String(c.client_name || "").trim()).filter(Boolean))].sort((a, b) =>
-    a.localeCompare(b, "pt-BR"),
-  );
-}
-
-function populateSiteTargetClientSelect(select, type, selectedName = "") {
-  if (!select) return;
-  const names = getSiteTargetClientNames(type);
-  const prev = String(selectedName || select.value || "").trim();
-  select.replaceChildren();
-  const ph = document.createElement("option");
-  ph.value = "";
-  ph.textContent = names.length ? "— Escolher cliente —" : "Sem clientes nesse tipo";
-  select.appendChild(ph);
-  names.forEach((name) => {
-    const o = document.createElement("option");
-    o.value = name;
-    o.textContent = name;
-    select.appendChild(o);
-  });
-  if (prev && [...select.options].some((o) => o.value === prev)) select.value = prev;
 }
 
 function siteRouteChecks(route) {
   const codi = String(route?.codi_id || route?.form_id || "").trim();
-  const type = String(route?.target_type || "meta").trim().toLowerCase();
-  const clientName = String(route?.target_client_name || "").trim();
   const groupId = String(route?.group_id || "").trim();
   const phone = String(route?.lead_phone_number || "").trim();
   const internalGroupId = String(route?.internal_notify_group_id || "").trim();
@@ -1209,10 +1174,12 @@ function siteRouteChecks(route) {
   const intTpl = String(route?.internal_lead_template || "").trim();
   const channelSite = state.templates?.channels?.site_lead || {};
   const channelInternal = state.templates?.channels?.internal_lead || {};
-  const hasClient = getSiteTargetClientNames(type).includes(clientName);
+  const hasLabel = Boolean(
+    String(route?.cliente_origem || "").trim() || String(route?.origem_anuncio || "").trim() || String(route?.target_client_name || "").trim(),
+  );
   return {
     codiOk: /^\d{32}$/.test(codi),
-    clientOk: hasClient,
+    labelOk: hasLabel,
     groupOk: /^\d+@g\.us$/.test(groupId),
     phoneOk: phone.length > 0,
     internalGroupOk: /^\d+@g\.us$/.test(internalGroupId),
@@ -1237,8 +1204,11 @@ function renderSiteLeadRoutes() {
     .map((r) => {
       const id = Number(r.id || 0);
       const formId = escHtml(r.codi_id || r.form_id || "");
-      const targetType = escHtml(r.target_type || "meta");
-      const targetClient = escHtml(r.target_client_name || "");
+      const clienteOrigem = escHtml(r.cliente_origem || r.target_client_name || "");
+      const origemAnuncio = escHtml(r.origem_anuncio || "");
+      const displayName = escHtml(
+        (r.cliente_origem || r.target_client_name || r.origem_anuncio || r.codi_id || "").toString().trim() || "(sem rótulo)",
+      );
       const groupId = escHtml(r.group_id || "");
       const leadPhone = escHtml(r.lead_phone_number || "");
       const internalNotifyGroup = escHtml(r.internal_notify_group_id || "");
@@ -1251,7 +1221,6 @@ function renderSiteLeadRoutes() {
         !enabled
           ? "Pausado"
           : checks.codiOk &&
-              checks.clientOk &&
               checks.groupOk &&
               checks.phoneOk &&
               checks.internalGroupOk &&
@@ -1262,7 +1231,7 @@ function renderSiteLeadRoutes() {
       return `<article class="client-card site-client-card" data-route-id="${id}">
         <div class="client-main">
           <div class="client-head">
-            <h3 class="client-name">${targetClient || "(sem cliente)"}</h3>
+            <h3 class="client-name">${displayName}</h3>
             <div class="head-actions">
               <span class="status-pill ${statusClass}">${statusLabel}</span>
               <button
@@ -1278,7 +1247,8 @@ function renderSiteLeadRoutes() {
           </div>
           <dl class="meta-grid">
             <div><dt>CODI ID</dt><dd><code>${formId}</code></dd></div>
-            <div><dt>Tipo</dt><dd>${targetType}</dd></div>
+            <div><dt>Rótulo interno</dt><dd>${clienteOrigem || "—"}</dd></div>
+            <div><dt>Origem anúncio</dt><dd>${origemAnuncio || "—"}</dd></div>
             <div><dt>Grupo cliente</dt><dd>${groupId || "—"}</dd></div>
             <div><dt>Telefone cliente</dt><dd>${leadPhone || "—"}</dd></div>
             <div><dt>Grupo msg interna</dt><dd>${internalNotifyGroup || "—"}</dd></div>
@@ -1289,7 +1259,7 @@ function renderSiteLeadRoutes() {
           </dl>
           <div class="checks">
             <span class="check-pill ${checks.codiOk ? "ok" : "error"}">${checks.codiOk ? "OK" : "ERRO"} · codi_id</span>
-            <span class="check-pill ${checks.clientOk ? "ok" : "error"}">${checks.clientOk ? "OK" : "ERRO"} · cliente</span>
+            <span class="check-pill ${checks.labelOk ? "ok" : "error"}">${checks.labelOk ? "OK" : "aviso"} · rótulo interno</span>
             <span class="check-pill ${checks.groupOk ? "ok" : "error"}">${checks.groupOk ? "OK" : "ERRO"} · group_id</span>
             <span class="check-pill ${checks.phoneOk ? "ok" : "error"}">${checks.phoneOk ? "OK" : "ERRO"} · telefone_cliente</span>
             <span class="check-pill ${checks.internalGroupOk ? "ok" : "error"}">${checks.internalGroupOk ? "OK" : "ERRO"} · grupo_interno</span>
@@ -1299,7 +1269,7 @@ function renderSiteLeadRoutes() {
           <form class="edit-form edit-sheet hidden">
             <header class="edit-sheet-head">
               <h4 class="edit-sheet-title">Editar cliente do site</h4>
-              <p class="edit-sheet-sub">Ajuste codi_id, cliente de destino e templates para o fluxo de lead site.</p>
+              <p class="edit-sheet-sub">Ajuste codi_id, rótulos internos, grupos e templates. O envio roteia só por codi_id.</p>
             </header>
             <div class="edit-field-grid">
               <label class="edit-field">
@@ -1313,16 +1283,13 @@ function renderSiteLeadRoutes() {
                   maxlength="32"
                 />
               </label>
-              <label class="edit-field">
-                Tipo cliente
-                <select name="target_type" class="field-select" required>
-                  <option value="meta">meta</option>
-                  <option value="google">google</option>
-                </select>
+              <label class="edit-field edit-field--full">
+                Rótulo interno — identificação / campanha
+                <input name="cliente_origem" type="text" placeholder="Identificação no painel e no template" />
               </label>
-              <label class="edit-field">
-                Cliente
-                <select name="target_client_name" class="field-select" required></select>
+              <label class="edit-field edit-field--full">
+                Rótulo interno — origem do anúncio
+                <input name="origem_anuncio" type="text" placeholder="Ex.: PMax / Modal / Remarketing" />
               </label>
               <label class="edit-field">
                 Grupo cliente
@@ -1382,12 +1349,12 @@ function renderSiteLeadRoutes() {
     if (!editForm) return;
 
     editForm.elements.codi_id.value = route.codi_id || route.form_id || "";
-    editForm.elements.target_type.value = route.target_type || "meta";
-    populateSiteTargetClientSelect(
-      editForm.elements.target_client_name,
-      editForm.elements.target_type.value,
-      route.target_client_name || ""
-    );
+    if (editForm.elements.cliente_origem) {
+      editForm.elements.cliente_origem.value = route.cliente_origem || route.target_client_name || "";
+    }
+    if (editForm.elements.origem_anuncio) {
+      editForm.elements.origem_anuncio.value = route.origem_anuncio || "";
+    }
     if (editForm.elements.group_id) {
       editForm.elements.group_id.dataset.currentValue = route.group_id || "";
       editForm.elements.group_id.value = route.group_id || "";
@@ -1411,10 +1378,6 @@ function renderSiteLeadRoutes() {
     }
     editForm.elements.notes.value = route.notes || "";
     editForm.elements.enabled.checked = !!route.enabled;
-
-    editForm.elements.target_type.addEventListener("change", () => {
-      populateSiteTargetClientSelect(editForm.elements.target_client_name, editForm.elements.target_type.value, "");
-    });
 
     card.querySelector('[data-action="toggle-edit-site"]')?.addEventListener("click", () => {
       editForm.classList.toggle("hidden");
@@ -1460,9 +1423,12 @@ function fillSiteLeadRouteForm(route) {
   if (!form || !route) return;
   form.dataset.editId = String(route.id || "");
   form.elements.codi_id.value = route.codi_id || route.form_id || "";
-  form.elements.target_type.value = route.target_type || "meta";
-  renderSiteTargetClientOptions(route.target_client_name || "");
-  form.elements.target_client_name.value = route.target_client_name || "";
+  if (form.elements.cliente_origem) {
+    form.elements.cliente_origem.value = route.cliente_origem || route.target_client_name || "";
+  }
+  if (form.elements.origem_anuncio) {
+    form.elements.origem_anuncio.value = route.origem_anuncio || "";
+  }
   if (form.elements.group_id) {
     form.elements.group_id.dataset.currentValue = route.group_id || "";
     form.elements.group_id.value = route.group_id || "";
@@ -1488,7 +1454,8 @@ function resetSiteLeadRouteForm() {
   form.reset();
   form.dataset.editId = "";
   form.elements.enabled.checked = true;
-  renderSiteTargetClientOptions("");
+  if (form.elements.cliente_origem) form.elements.cliente_origem.value = "";
+  if (form.elements.origem_anuncio) form.elements.origem_anuncio.value = "";
   if (form.elements.group_id) {
     form.elements.group_id.dataset.currentValue = "";
     form.elements.group_id.value = "";
@@ -1908,7 +1875,6 @@ function bindTabs() {
       }
       if (btn.dataset.tab === "site-leads") {
         fetchSiteLeadRoutes().catch((e) => console.error(e));
-        renderSiteTargetClientOptions();
       }
     });
   });
@@ -2226,9 +2192,6 @@ function bindUI() {
   document.getElementById("refreshSiteRoutesBtn")?.addEventListener("click", () =>
     fetchSiteLeadRoutes().catch((e) => console.error(e)),
   );
-  document.querySelector('#siteLeadRouteForm [name="target_type"]')?.addEventListener("change", () =>
-    renderSiteTargetClientOptions(""),
-  );
   setupChipFields(document.getElementById("newClientForm"), [
     "lead_exclude_fields",
     "lead_exclude_contains",
@@ -2325,7 +2288,6 @@ async function boot() {
     setStreamStatus("pending", "Stream: a ligar…");
   }
 
-  renderSiteTargetClientOptions();
   resetSiteLeadRouteForm();
   connectStream();
 }

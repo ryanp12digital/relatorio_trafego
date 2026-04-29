@@ -67,6 +67,8 @@ DEFAULT_TEMPLATES: Dict[str, Dict[str, Dict[str, str]]] = {
             "content": (
                 "Novo lead do site - {{client_name}}\n"
                 "Recebido em: {{chegada_em}}\n"
+                "Tráfego (inferido): {{traffic_source}}\n"
+                "URL origem: {{traffic_origin_url}}\n"
                 "Nome do Lead: {{nome}}\n"
                 "WhatsApp do Lead: {{whatsapp}}\n"
                 "E-mail do Lead: {{email}}\n\n"
@@ -191,9 +193,13 @@ TEMPLATE_VARIABLES: Dict[str, Dict[str, str]] = {
         "respostas_omitidas_count": "Quantidade de respostas removidas",
         "received_at": "Data/hora de recebimento do webhook (alias técnico)",
         "chegada_em": "Data/hora em que o lead chegou ao servidor (mesmo instante que received_at)",
+        "traffic_source": "Origem inferida: meta, google ou unknown",
+        "traffic_origin_url": "URL de origem (pagina/page_path) usada na inferência",
+        "origem_anuncio": "Rótulo interno cadastrado no Leads Site (campanha/origem)",
+        "cliente_origem": "Rótulo interno cadastrado no Leads Site (identificação / nome exibido)",
     },
     "site_lead": {
-        "client_name": "Nome do cliente",
+        "client_name": "Nome exibido (geralmente cliente_origem + origem_anuncio do cadastro Leads Site)",
         "page_id": "ID da página Meta (quando existir)",
         "page_path": "Path/rota da página onde ocorreu a conversão (ex.: /contato)",
         "utm_source": "UTM Source",
@@ -216,6 +222,10 @@ TEMPLATE_VARIABLES: Dict[str, Dict[str, str]] = {
         "respostas_omitidas_count": "Quantidade de respostas removidas",
         "received_at": "Data/hora de recebimento do webhook (alias técnico)",
         "chegada_em": "Data/hora em que o lead chegou ao servidor (mesmo instante que received_at)",
+        "traffic_source": "Origem inferida: meta, google ou unknown",
+        "traffic_origin_url": "URL de origem (pagina/page_path) usada na inferência",
+        "origem_anuncio": "Rótulo interno cadastrado no Leads Site (campanha/origem)",
+        "cliente_origem": "Rótulo interno cadastrado no Leads Site (identificação / nome exibido)",
     },
     "google_report": {
         "client_name": "Nome do cliente",
@@ -261,6 +271,10 @@ TEMPLATE_VARIABLES: Dict[str, Dict[str, str]] = {
         "respostas_omitidas_count": "Qtd. omitidas",
         "received_at": "Data/hora recebimento",
         "chegada_em": "Data/hora chegada do lead",
+        "traffic_source": "Origem inferida: meta, google ou unknown",
+        "traffic_origin_url": "URL de origem (pagina/page_path) usada na inferência",
+        "origem_anuncio": "Rótulo interno cadastrado no Leads Site (campanha/origem)",
+        "cliente_origem": "Rótulo interno cadastrado no Leads Site (identificação / nome exibido)",
     },
     "internal_report": {
         "client_name": "Nome do cliente",

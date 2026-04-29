@@ -32,8 +32,13 @@ Este webhook aceita leads de site no mesmo endpoint de lead (`/meta-new-lead`), 
 ## Regras de decisão no webhook
 
 1. Se chegar `page_id` válido, segue o roteamento Meta atual.
-2. Se não houver `page_id` e existir `codi_id`, busca em `site_lead_routes`.
+2. Se não houver `page_id` e existir `codi_id`, busca em `site_lead_routes` e monta o envio **a partir do cadastro da rota** (não depende de cliente Meta/Google por nome).
 3. Sem `page_id` e sem `codi_id`, ou `codi_id` sem rota, o lead é bloqueado (sem fallback para cliente errado).
+
+## Origem de tráfego (templates)
+
+- Variáveis: `{{traffic_source}}` (valores: `meta`, `google` ou `unknown`) e `{{traffic_origin_url}}`.
+- Inferência: `traffic_source` explícito no payload, depois UTMs, depois URL (ex. `gclid` / domínio Google = `google`), tokens de Meta (`fb`, `ig`, `facebook`… = `meta`). Se não houver sinal confiável, fica `unknown` (não adivinha Meta “por exclusão”).
 
 ## Organização de contexto (roteamento)
 
@@ -44,6 +49,6 @@ Este webhook aceita leads de site no mesmo endpoint de lead (`/meta-new-lead`), 
 ## Observações práticas (n8n)
 
 - Pode enviar payload plano (campos no topo do JSON) ou com `data`.
-- O `codi_id` precisa existir na aba **Leads Site** do dashboard e estar com a regra ativa.
+- O `codi_id` precisa existir na aba **Leads Site** do dashboard e o cadastro deve estar ativo, com `group_id`, `lead_phone_number` e `internal_notify_group_id` preenchidos.
 - Se o `codi_id` não tiver 32 dígitos numéricos, o webhook bloqueia o lead (`CODI_ID_INVALID_FORMAT`).
-- Se a rota apontar para cliente desativado/inexistente, o webhook bloqueia.
+- Opcional: `traffic_source` / `fonte` no JSON para forçar a origem exibida na mensagem.

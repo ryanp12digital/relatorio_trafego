@@ -14,6 +14,7 @@ import os
 import re
 import secrets
 import sys
+import unicodedata
 import requests
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -73,7 +74,64 @@ _EXCLUDE_RESPOSTAS = frozenset(
 # Ordem: legado Meta PT primeiro; depois chaves comuns em formulários instantâneos / Make.
 _LEAD_NAME_FIELD_KEYS = ("nome_completo", "nome", "full_name", "name")
 _LEAD_PHONE_FIELD_KEYS = ("telefone", "phone_number", "phone", "mobile", "celular")
-_PAGE_PATH_FIELD_KEYS = ("page_path", "pagePath", "path", "pathname", "url_path", "landing_page", "landingPage")
+_PAGE_PATH_FIELD_KEYS = (
+    "pagina",
+    "page",
+    "page_path",
+    "pagePath",
+    "path",
+    "pathname",
+    "url",
+    "url_path",
+    "landing_page",
+    "landingPage",
+    "landing_url",
+)
+_TRAFFIC_EXPLICIT_KEYS = ("traffic_source", "fonte", "trafego", "canal_trafego", "source")
+_URL_HINT_KEYS = (
+    "pagina",
+    "page",
+    "url",
+    "landing_url",
+    "page_path",
+    "pagePath",
+    "path",
+    "referrer",
+    "referer",
+    "referrer_url",
+    "landing_page",
+    "landingPage",
+)
+# Tokens para heurística (normalizado sem acentos, minúsculo).
+_GOOGLE_TOKENS = (
+    "google",
+    "gads",
+    "adwords",
+    "googleads",
+    "gclid",
+    "gbraid",
+    "wbraid",
+    "youtube",
+    "youtu",
+    "dv360",
+    "gmail",
+    "gdoubleclick",
+)
+_META_TOKENS = (
+    "meta",
+    "facebook",
+    "face",
+    "instagram",
+    "insta",
+    "fb",
+    "ig",
+    "mta",
+    "lfacebook",
+    "fbinternal",
+    "fbanalytics",
+    "fbbusiness",
+    "fbinstagram",
+)
 _UTM_SOURCE_FIELD_KEYS = ("utm_source", "utmSource")
 _UTM_MEDIUM_FIELD_KEYS = ("utm_medium", "utmMedium")
 _UTM_CAMPAIGN_FIELD_KEYS = ("utm_campaign", "utmCampaign")
@@ -863,6 +921,112 @@ def _is_valid_site_codi_id(value: str) -> bool:
     return bool(re.fullmatch(r"\d{32}", (value or "").strip()))
 
 
+def _fold_ascii_lower(s: str) -> str:
+    s = (s or "").lower()
+    return "".join(
+        c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn"
+    )
+
+
+def _haystack_has_token(hay: str, tokens: Tuple[str, ...]) -> bool:
+    h = _fold_ascii_lower(hay)
+    return any(t in h for t in tokens)
+
+
+def _strong_google_url(url: str) -> bool:
+    u = (url or "").lower()
+    if any(p in u for p in ("gclid=", "gbraid=", "wbraid=")):
+        return True
+    if "google." in u or "googleadservices" in u or "doubleclick" in u or "g.co/" in u:
+        return True
+    if "youtube.com" in u or "youtu.be" in u:
+        return True
+    return False
+
+
+def _first_url_from_lead_body(
+    body: Dict[str, Any], data: Dict[str, Any], mappable: List[Dict[str, Any]]
+) -> str:
+    for key in _URL_HINT_KEYS:
+        if isinstance(data, dict):
+            v = _format_field_value(data.get(key))
+            if v:
+                return v.strip()
+        if isinstance(body, dict):
+            v2 = _format_field_value(body.get(key))
+            if v2:
+                return v2.strip()
+        m = _mappable_lookup(mappable, key)
+        if m:
+            return m.strip()
+    return ""
+
+
+def _infer_traffic_source_and_url(
+    body: Dict[str, Any],
+    data: Dict[str, Any],
+    mappable: List[Dict[str, Any]],
+    page_path: str,
+    utm_source: str,
+    utm_medium: str,
+    utm_campaign: str,
+    utm_term: str,
+    utm_content: str,
+) -> Tuple[str, str]:
+    origin_url = _first_url_from_lead_body(body, data, mappable) or (page_path or "")
+    for key in _TRAFFIC_EXPLICIT_KEYS:
+        raw = _first_field_from_data_and_mappable((key,), data, mappable)
+        if not raw and isinstance(body, dict):
+            raw = _format_field_value(body.get(key))
+        if not raw:
+            continue
+        t = _fold_ascii_lower(str(raw).strip())
+        if t in ("google", "g", "gads", "adwords", "pmax", "search", "yt", "youtube"):
+            return "google", origin_url
+        if t in ("meta", "m", "fb", "ig", "face", "insta", "facebook", "instagram"):
+            return "meta", origin_url
+    utm_blob = " ".join(
+        [utm_source, utm_medium, utm_campaign, utm_term, utm_content, origin_url]
+    )
+    if _strong_google_url(origin_url) or _haystack_has_token(utm_blob, _GOOGLE_TOKENS):
+        return "google", origin_url
+    if _haystack_has_token(utm_blob, _META_TOKENS):
+        return "meta", origin_url
+    if _haystack_has_token(origin_url, _GOOGLE_TOKENS):
+        return "google", origin_url
+    if _haystack_has_token(origin_url, _META_TOKENS):
+        return "meta", origin_url
+    return "unknown", origin_url
+
+
+def _build_route_from_site_lead_target(target: Dict[str, Any], codi_id: str) -> Dict[str, Any]:
+    """Rota de envio a partir do cadastro site_lead_routes (somente codi_id + campos da rota)."""
+    oa = str(target.get("origem_anuncio", "")).strip()
+    co = str(target.get("cliente_origem", "")).strip()
+    legacy = str(target.get("target_client_name", "")).strip()
+    display = co or oa or legacy or "Cliente"
+    route_group_id = str(target.get("group_id", "")).strip()
+    return {
+        "client_name": display,
+        "group_id": route_group_id,
+        "phone_number": str(target.get("lead_phone_number", "")).strip(),
+        "template": str(target.get("lead_template", "")).strip() or "default",
+        "exclude_exact": [],
+        "exclude_contains": [],
+        "exclude_regex": [],
+        "internal_notify_group_id": str(target.get("internal_notify_group_id", "")).strip(),
+        "internal_lead_template": str(target.get("internal_lead_template", "")).strip(),
+        "internal_weekly_template": "",
+        "internal_notify_message": "",
+        "template_channel": "site_lead",
+        "route_origin": "site_codi_id",
+        "site_codi_id": codi_id,
+        "origem_anuncio": oa,
+        "cliente_origem": co,
+        "route_target_type": str(target.get("target_type", "site") or "site").strip() or "site",
+    }
+
+
 def _resolve_site_lead_route(codi_id: str) -> Optional[Dict[str, Any]]:
     cid = (codi_id or "").strip()
     if not cid:
@@ -887,61 +1051,7 @@ def _resolve_site_lead_route(codi_id: str) -> Optional[Dict[str, Any]]:
     )
     if not target:
         return None
-    target_type = str(target.get("target_type", "meta")).strip().lower()
-    target_name = str(target.get("target_client_name", "")).strip()
-    route_group_id = str(target.get("group_id", "")).strip()
-    route_group_id = str(target.get("group_id", "")).strip()
-    route_lead_phone = str(target.get("lead_phone_number", "")).strip()
-    route_internal_group_id = str(target.get("internal_notify_group_id", "")).strip()
-    route_template = str(target.get("lead_template", "")).strip()
-    route_internal_tpl = str(target.get("internal_lead_template", "")).strip()
-    if target_type == "google":
-        for c in _load_google_clients():
-            if c.get("enabled", True) is False:
-                continue
-            if str(c.get("client_name", "")).strip() == target_name:
-                route = _route_from_google_client(c)
-                if route_group_id:
-                    route["group_id"] = route_group_id
-                if route_group_id:
-                    route["group_id"] = route_group_id
-                if route_lead_phone:
-                    route["phone_number"] = route_lead_phone
-                if route_internal_group_id:
-                    route["internal_notify_group_id"] = route_internal_group_id
-                if route_template:
-                    route["template"] = route_template
-                if route_internal_tpl:
-                    route["internal_lead_template"] = route_internal_tpl
-                route["route_origin"] = "site_codi_id"
-                route["site_codi_id"] = cid
-                route["route_target_type"] = "google"
-                route["template_channel"] = "site_lead"
-                return route
-        return None
-    for c in _load_clients():
-        if c.get("enabled", True) is False:
-            continue
-        if str(c.get("client_name", "")).strip() == target_name:
-            route = _route_from_meta_client(c)
-            if route_group_id:
-                route["group_id"] = route_group_id
-            if route_group_id:
-                route["group_id"] = route_group_id
-            if route_lead_phone:
-                route["phone_number"] = route_lead_phone
-            if route_internal_group_id:
-                route["internal_notify_group_id"] = route_internal_group_id
-            if route_template:
-                route["template"] = route_template
-            if route_internal_tpl:
-                route["internal_lead_template"] = route_internal_tpl
-            route["route_origin"] = "site_codi_id"
-            route["site_codi_id"] = cid
-            route["route_target_type"] = "meta"
-            route["template_channel"] = "site_lead"
-            return route
-    return None
+    return _build_route_from_site_lead_target(target, cid)
 
 
 def _resolve_route_with_context(page_id: str, codi_id: str) -> Tuple[Optional[Dict[str, Any]], str, str, str]:
@@ -1050,6 +1160,17 @@ def _base_message_fields(body: Dict[str, Any], route: Optional[Dict[str, Any]] =
     )
 
     received_ts = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    traffic_source, traffic_origin_url = _infer_traffic_source_and_url(
+        body,
+        data,
+        mappable,
+        page_path,
+        utm_source,
+        utm_medium,
+        utm_campaign,
+        utm_term,
+        utm_content,
+    )
     return {
         "nome": nome or "(nao informado)",
         "email": email or "(nao informado)",
@@ -1062,6 +1183,8 @@ def _base_message_fields(body: Dict[str, Any], route: Optional[Dict[str, Any]] =
         "utm_campaign": utm_campaign,
         "utm_term": utm_term,
         "utm_content": utm_content,
+        "traffic_source": traffic_source,
+        "traffic_origin_url": traffic_origin_url,
         "respostas": respostas_bundle["filtered_text"],
         "respostas_filtradas": respostas_bundle["filtered_text"],
         "respostas_raw": respostas_bundle["raw_text"],
@@ -1303,33 +1426,38 @@ def _format_lead_message(
     custom_content = get_template_content(template_channel, template_id)
     if custom_content:
         base = _base_message_fields(body, route=route)
+        render_ctx: Dict[str, str] = {
+            "client_name": client_name,
+            "page_id": page_id,
+            "template_id": template_id,
+            "nome": base["nome"],
+            "email": base["email"],
+            "whatsapp": base["whatsapp"],
+            "telefone_digitos": base["telefone_digitos"],
+            "form_name": base["form_name"],
+            "page_path": base["page_path"],
+            "utm_source": base["utm_source"],
+            "utm_medium": base["utm_medium"],
+            "utm_campaign": base["utm_campaign"],
+            "utm_term": base["utm_term"],
+            "utm_content": base["utm_content"],
+            "traffic_source": base.get("traffic_source", "unknown"),
+            "traffic_origin_url": base.get("traffic_origin_url", ""),
+            "origem_anuncio": str((route or {}).get("origem_anuncio", "")).strip(),
+            "cliente_origem": str((route or {}).get("cliente_origem", "")).strip(),
+            "respostas": base["respostas"],
+            "respostas_filtradas": base["respostas_filtradas"],
+            "respostas_raw": base["respostas_raw"],
+            "respostas_omitidas": base["respostas_omitidas"],
+            "respostas_count": base["respostas_count"],
+            "respostas_raw_count": base["respostas_raw_count"],
+            "respostas_omitidas_count": base["respostas_omitidas_count"],
+            "received_at": base["received_at"],
+            "chegada_em": base["chegada_em"],
+        }
         rendered = render_template_text(
             custom_content,
-            {
-                "client_name": client_name,
-                "page_id": page_id,
-                "template_id": template_id,
-                "nome": base["nome"],
-                "email": base["email"],
-                "whatsapp": base["whatsapp"],
-                "telefone_digitos": base["telefone_digitos"],
-                "form_name": base["form_name"],
-                "page_path": base["page_path"],
-                "utm_source": base["utm_source"],
-                "utm_medium": base["utm_medium"],
-                "utm_campaign": base["utm_campaign"],
-                "utm_term": base["utm_term"],
-                "utm_content": base["utm_content"],
-                "respostas": base["respostas"],
-                "respostas_filtradas": base["respostas_filtradas"],
-                "respostas_raw": base["respostas_raw"],
-                "respostas_omitidas": base["respostas_omitidas"],
-                "respostas_count": base["respostas_count"],
-                "respostas_raw_count": base["respostas_raw_count"],
-                "respostas_omitidas_count": base["respostas_omitidas_count"],
-                "received_at": base["received_at"],
-                "chegada_em": base["chegada_em"],
-            },
+            render_ctx,
         )
         return _truncate_message(rendered)
     formatter = TEMPLATE_FORMATTERS.get(template_id, TEMPLATE_FORMATTERS["default"])
@@ -1632,6 +1760,16 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
                     "whatsapp": base_fields["whatsapp"],
                     "telefone_digitos": base_fields["telefone_digitos"],
                     "form_name": base_fields["form_name"],
+                    "page_path": base_fields.get("page_path", ""),
+                    "utm_source": base_fields.get("utm_source", ""),
+                    "utm_medium": base_fields.get("utm_medium", ""),
+                    "utm_campaign": base_fields.get("utm_campaign", ""),
+                    "utm_term": base_fields.get("utm_term", ""),
+                    "utm_content": base_fields.get("utm_content", ""),
+                    "traffic_source": base_fields.get("traffic_source", "unknown"),
+                    "traffic_origin_url": base_fields.get("traffic_origin_url", ""),
+                    "origem_anuncio": str((route or {}).get("origem_anuncio", "")).strip(),
+                    "cliente_origem": str((route or {}).get("cliente_origem", "")).strip(),
                     "respostas": base_fields["respostas"],
                     "respostas_filtradas": base_fields["respostas_filtradas"],
                     "respostas_raw": base_fields["respostas_raw"],
