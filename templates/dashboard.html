@@ -117,7 +117,7 @@
               </div>
             </section>
             <section class="new-client-section" aria-labelledby="newMetaSectionTemplates">
-              <h3 id="newMetaSectionTemplates" class="new-client-section-title">Templates — lead e relatório P12</h3>
+              <h3 id="newMetaSectionTemplates" class="new-client-section-title">Template — mensagem ao cliente</h3>
               <div class="new-client-fields" aria-label="Templates de envio">
                 <label class="new-client-field-template">
                   Template lead
@@ -125,6 +125,11 @@
                     <option value="">Nenhum</option>
                   </select>
                 </label>
+              </div>
+            </section>
+            <section class="new-client-section" aria-labelledby="newMetaSectionInterno">
+              <h3 id="newMetaSectionInterno" class="new-client-section-title">Notificações internas</h3>
+              <div class="new-client-fields" aria-label="Avisos à equipe P12">
                 <label>
                   Grupo P12 relatório
                   <select name="p12_report_group_id" class="field-select catalog-group-select" data-catalog-optional="1">
@@ -143,11 +148,6 @@
                     <option value="">Nenhum</option>
                   </select>
                 </label>
-              </div>
-            </section>
-            <section class="new-client-section" aria-labelledby="newMetaSectionInterno">
-              <h3 id="newMetaSectionInterno" class="new-client-section-title">Notificações internas</h3>
-              <div class="new-client-fields" aria-label="Avisos à equipe P12">
                 <label>
                   Grupo mensagem interna
                   <select name="internal_notify_group_id" class="field-select catalog-group-select" data-catalog-optional="0">
@@ -300,10 +300,6 @@
                   </select>
                 </label>
                 <label>
-                  Template Google (cliente)
-                  <input name="google_template" value="default" placeholder="default / personalizado" />
-                </label>
-                <label>
                   Telefone cliente
                   <input name="lead_phone_number" inputmode="tel" placeholder="Ex.: 5511999999999" />
                 </label>
@@ -318,8 +314,17 @@
               </div>
             </section>
             <section class="new-client-section" aria-labelledby="newGoogleSectionTemplates">
-              <h3 id="newGoogleSectionTemplates" class="new-client-section-title">Templates — relatório P12</h3>
-              <div class="new-client-fields" aria-label="Relatório semanal e dados">
+              <h3 id="newGoogleSectionTemplates" class="new-client-section-title">Template — mensagem ao cliente</h3>
+              <div class="new-client-fields" aria-label="Template de mensagem ao cliente">
+                <label>
+                  Template Google (cliente)
+                  <input name="google_template" value="default" placeholder="default / personalizado" />
+                </label>
+              </div>
+            </section>
+            <section class="new-client-section" aria-labelledby="newGoogleSectionInterno">
+              <h3 id="newGoogleSectionInterno" class="new-client-section-title">Notificações internas</h3>
+              <div class="new-client-fields" aria-label="Avisos internos após relatório">
                 <label>
                   Grupo P12 relatório
                   <select name="p12_report_group_id" class="field-select catalog-group-select" data-catalog-optional="1">
@@ -338,11 +343,6 @@
                     <option value="">Nenhum</option>
                   </select>
                 </label>
-              </div>
-            </section>
-            <section class="new-client-section" aria-labelledby="newGoogleSectionInterno">
-              <h3 id="newGoogleSectionInterno" class="new-client-section-title">Notificações internas</h3>
-              <div class="new-client-fields" aria-label="Avisos internos após relatório">
                 <label>
                   Grupo mensagem interna
                   <select name="internal_notify_group_id" class="field-select catalog-group-select" data-catalog-optional="0">

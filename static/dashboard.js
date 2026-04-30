@@ -351,15 +351,15 @@ const MESSAGES_SECTION_HELP = {
     <dt>Meta page id</dt><dd>Página ligada aos leads · páginas da API mais páginas já cadastradas.</dd>
     <dt>Telefone cliente</dt><dd>Número para fluxos com envio extra, quando aplicável.</dd>
   </dl>
-  <h4>Templates — lead e relatório P12</h4>
+  <h4>Template — mensagem ao cliente</h4>
   <dl class="cadastro-help-defs">
     <dt>Template lead</dt><dd>Mensagem para o grupo do cliente · integrados ou templates da aba Templates (<code>meta_lead</code>).</dd>
-    <dt>Grupo P12 relatório</dt><dd>Onde vai o relatório semanal Meta (resumo + dados) para a equipe P12.</dd>
-    <dt>Template P12 relatório</dt><dd>Canal <code>meta_report</code> · em vazio usa <code>default</code>.</dd>
-    <dt>Template relatório de dados</dt><dd>Segunda mensagem de dados ao grupo P12, canal <code>meta_report</code>.</dd>
   </dl>
   <h4>Notificações internas</h4>
   <dl class="cadastro-help-defs">
+    <dt>Grupo P12 relatório</dt><dd>Onde vai o relatório semanal Meta (resumo + dados) para a equipe P12.</dd>
+    <dt>Template P12 relatório</dt><dd>Canal <code>meta_report</code> · em vazio usa <code>default</code>.</dd>
+    <dt>Template relatório de dados</dt><dd>Segunda mensagem de dados ao grupo P12, canal <code>meta_report</code>.</dd>
     <dt>Grupo mensagem interna</dt><dd>Cópia opcional para a equipe · texto definido nos templates <code>internal_lead</code> e <code>internal_report</code>.</dd>
     <dt>Template interno (novo lead)</dt><dd>Aba Templates, canal <code>internal_lead</code> — mesmas variáveis do lead.</dd>
     <dt>Template interno (após relatório semanal)</dt><dd>Canal <code>internal_report</code>, após o envio P12 Meta.</dd>
@@ -376,19 +376,19 @@ const MESSAGES_SECTION_HELP = {
     <dt>Nome do cliente</dt><dd>Identificação no painel.</dd>
     <dt>Google customer id</dt><dd>ID da conta Google Ads.</dd>
     <dt>Grupo WhatsApp</dt><dd>Lista da aba Grupos WhatsApp.</dd>
-    <dt>Template Google (cliente)</dt><dd>Identificador do template ligado aos envios Google para o cliente (ex.: <code>default</code>).</dd>
     <dt>Telefone cliente</dt><dd>Fluxos com envio extra, quando aplicável.</dd>
     <dt>Conversões primárias</dt><dd>Lista CSV útil para relatórios (ex.: formulário, WhatsApp).</dd>
     <dt>Observações</dt><dd>Notas internas opcionais.</dd>
   </dl>
-  <h4>Templates — relatório P12</h4>
+  <h4>Template — mensagem ao cliente</h4>
+  <dl class="cadastro-help-defs">
+    <dt>Template Google (cliente)</dt><dd>Identificador do template ligado aos envios Google para o cliente (ex.: <code>default</code>).</dd>
+  </dl>
+  <h4>Notificações internas</h4>
   <dl class="cadastro-help-defs">
     <dt>Grupo P12 relatório</dt><dd>Destino dos relatórios semanais da equipe P12.</dd>
     <dt>Template P12 relatório</dt><dd>Canal <code>google_report</code> · ex.: <code>p12_resumo</code> · vazio usa <code>default</code>.</dd>
     <dt>Template relatório de dados</dt><dd>Segunda mensagem aos P12 (ex.: <code>p12_dados</code>).</dd>
-  </dl>
-  <h4>Notificações internas</h4>
-  <dl class="cadastro-help-defs">
     <dt>Grupo mensagem interna</dt><dd>Aviso após envio do relatório · conteúdo no canal <code>internal_report</code>.</dd>
     <dt>Template interno (após relatório semanal)</dt><dd>Templates da aba <code>internal_report</code> · variáveis Google.</dd>
   </dl>
