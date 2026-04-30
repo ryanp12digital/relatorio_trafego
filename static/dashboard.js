@@ -338,6 +338,87 @@ const MESSAGES_SECTION_HELP = {
     body:
       "Mostra todos os templates salvos agrupados por canal. Clique em um item para carregar no formulário de edição e atualizar rapidamente conteúdo, nome ou descrição.",
   },
+  cadastro_meta_client: {
+    title: "Ajuda: Novo cliente Meta",
+    bodyHtml: `
+<div class="cadastro-help-body">
+  <p>O cadastro vai para <code>data/clients.json</code>. O catálogo de contas e páginas usa a Business API onde configurado.</p>
+  <h4>Cliente</h4>
+  <dl class="cadastro-help-defs">
+    <dt>Nome do cliente</dt><dd>Identificação no painel.</dd>
+    <dt>Conta Meta</dt><dd>Contas do Business (API) mais contas já guardadas neste projeto.</dd>
+    <dt>Grupo relatório</dt><dd>Grupo WhatsApp do cliente (lista na aba Grupos WhatsApp · webhook Evolution).</dd>
+    <dt>Meta page id</dt><dd>Página ligada aos leads · páginas da API mais páginas já cadastradas.</dd>
+    <dt>Telefone cliente</dt><dd>Número para fluxos com envio extra, quando aplicável.</dd>
+  </dl>
+  <h4>Templates — lead e relatório P12</h4>
+  <dl class="cadastro-help-defs">
+    <dt>Template lead</dt><dd>Mensagem para o grupo do cliente · integrados ou templates da aba Templates (<code>meta_lead</code>).</dd>
+    <dt>Grupo P12 relatório</dt><dd>Onde vai o relatório semanal Meta (resumo + dados) para a equipe P12.</dd>
+    <dt>Template P12 relatório</dt><dd>Canal <code>meta_report</code> · em vazio usa <code>default</code>.</dd>
+    <dt>Template relatório de dados</dt><dd>Segunda mensagem de dados ao grupo P12, canal <code>meta_report</code>.</dd>
+  </dl>
+  <h4>Notificações internas</h4>
+  <dl class="cadastro-help-defs">
+    <dt>Grupo mensagem interna</dt><dd>Cópia opcional para a equipe · texto definido nos templates <code>internal_lead</code> e <code>internal_report</code>.</dd>
+    <dt>Template interno (novo lead)</dt><dd>Aba Templates, canal <code>internal_lead</code> — mesmas variáveis do lead.</dd>
+    <dt>Template interno (após relatório semanal)</dt><dd>Canal <code>internal_report</code>, após o envio P12 Meta.</dd>
+  </dl>
+</div>`,
+  },
+  cadastro_google_client: {
+    title: "Ajuda: Novo cliente Google Ads",
+    bodyHtml: `
+<div class="cadastro-help-body">
+  <p>Cadastro em <code>data/google_clients.json</code>.</p>
+  <h4>Cliente</h4>
+  <dl class="cadastro-help-defs">
+    <dt>Nome do cliente</dt><dd>Identificação no painel.</dd>
+    <dt>Google customer id</dt><dd>ID da conta Google Ads.</dd>
+    <dt>Grupo WhatsApp</dt><dd>Lista da aba Grupos WhatsApp.</dd>
+    <dt>Template Google (cliente)</dt><dd>Identificador do template ligado aos envios Google para o cliente (ex.: <code>default</code>).</dd>
+    <dt>Telefone cliente</dt><dd>Fluxos com envio extra, quando aplicável.</dd>
+    <dt>Conversões primárias</dt><dd>Lista CSV útil para relatórios (ex.: formulário, WhatsApp).</dd>
+    <dt>Observações</dt><dd>Notas internas opcionais.</dd>
+  </dl>
+  <h4>Templates — relatório P12</h4>
+  <dl class="cadastro-help-defs">
+    <dt>Grupo P12 relatório</dt><dd>Destino dos relatórios semanais da equipe P12.</dd>
+    <dt>Template P12 relatório</dt><dd>Canal <code>google_report</code> · ex.: <code>p12_resumo</code> · vazio usa <code>default</code>.</dd>
+    <dt>Template relatório de dados</dt><dd>Segunda mensagem aos P12 (ex.: <code>p12_dados</code>).</dd>
+  </dl>
+  <h4>Notificações internas</h4>
+  <dl class="cadastro-help-defs">
+    <dt>Grupo mensagem interna</dt><dd>Aviso após envio do relatório · conteúdo no canal <code>internal_report</code>.</dd>
+    <dt>Template interno (após relatório semanal)</dt><dd>Templates da aba <code>internal_report</code> · variáveis Google.</dd>
+  </dl>
+</div>`,
+  },
+  cadastro_site_lead: {
+    title: "Ajuda: Leads Site",
+    bodyHtml: `
+<div class="cadastro-help-body">
+  <p>Roteamento por <code>codi_id</code> · origem Meta/Google pode aparecer em <code>{{traffic_source}}</code> na mensagem.</p>
+  <h4>Cliente e roteamento</h4>
+  <dl class="cadastro-help-defs">
+    <dt>CODI ID</dt><dd>Obrigatório: 28 a 36 dígitos · identifica o formulário/rota no site.</dd>
+    <dt>Rótulo identificação / campanha</dt><dd>Não roteia envio · painel e variáveis <code>{{cliente_origem}}</code> / relacionadas.</dd>
+    <dt>Rótulo origem do anúncio</dt><dd>Opcional · qual anúncio ou canal associa a este <code>codi_id</code>.</dd>
+    <dt>Grupo cliente</dt><dd>WhatsApp que recebe o novo lead do site.</dd>
+    <dt>Telefone cliente</dt><dd>Envio extra quando aplicável.</dd>
+    <dt>Observações</dt><dd>Notas opcionais.</dd>
+  </dl>
+  <h4>Template — mensagem ao cliente</h4>
+  <dl class="cadastro-help-defs">
+    <dt>Template de mensagem</dt><dd>Canal <code>site_lead</code> na aba Templates.</dd>
+  </dl>
+  <h4>Notificações internas</h4>
+  <dl class="cadastro-help-defs">
+    <dt>Grupo mensagem interna</dt><dd>Cópia ao time quando chega um lead.</dd>
+    <dt>Template de mensagem interno</dt><dd>Canal <code>internal_lead</code> na aba Templates.</dd>
+  </dl>
+</div>`,
+  },
 };
 
 function bindMessagesSectionHelpModal() {
@@ -380,7 +461,10 @@ function bindMessagesSectionHelpModal() {
   function open(helpKey) {
     const content = MESSAGES_SECTION_HELP[helpKey] || MESSAGES_SECTION_HELP.templates_form;
     if (titleEl) titleEl.textContent = content.title;
-    if (bodyEl) bodyEl.textContent = content.body;
+    if (bodyEl) {
+      if (content.bodyHtml) bodyEl.innerHTML = content.bodyHtml;
+      else bodyEl.textContent = content.body || "";
+    }
     lastFocus = document.activeElement;
     dlg.hidden = false;
     dlg.setAttribute("aria-hidden", "false");

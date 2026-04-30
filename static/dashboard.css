@@ -633,11 +633,36 @@ h1 {
   justify-content: flex-end;
 }
 
+.new-client-form-head.filters-panel-head {
+  margin-bottom: 6px;
+}
+
 .new-client-form {
   margin-top: 14px;
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.new-client-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.new-client-section + .new-client-section {
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.new-client-section-title {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: rgba(180, 192, 220, 0.95);
+  font-family: var(--font-ui, inherit);
 }
 
 .new-client-fields {
@@ -2700,6 +2725,53 @@ textarea {
   font-family: var(--font-mono);
   font-size: 12px;
   color: #b8e8ff;
+}
+
+.cadastro-help-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cadastro-help-body > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.cadastro-help-body h4 {
+  margin: 12px 0 0;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.cadastro-help-body h4:first-of-type {
+  margin-top: 0;
+}
+
+.cadastro-help-defs {
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.cadastro-help-defs dt {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.cadastro-help-defs dd {
+  margin: 4px 0 0;
+  padding: 0 0 0 0.08rem;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .filters-help-list {

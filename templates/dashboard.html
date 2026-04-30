@@ -66,97 +66,114 @@
 
       <section id="tab-meta" class="tab-panel is-active">
         <section class="panel panel-form">
-          <div class="panel-title-wrap">
-            <h2>Novo cliente Meta</h2>
-            <p>Cadastro direto em <code>data/clients.json</code>.</p>
+          <div class="filters-panel-head new-client-form-head">
+            <div class="panel-title-wrap">
+              <h2>Novo cliente Meta</h2>
+              <p>Cadastro direto em <code>data/clients.json</code>.</p>
+            </div>
+            <button
+              type="button"
+              class="filters-help-btn"
+              data-open="messages-section-help"
+              data-help-key="cadastro_meta_client"
+              aria-haspopup="dialog"
+              aria-controls="messagesSectionHelpDialog"
+              aria-label="Ajuda: campos do novo cliente Meta"
+              title="Ajuda sobre estes campos"
+            >
+              ?
+            </button>
           </div>
           <form id="newClientForm" class="new-client-form">
-            <div class="new-client-fields" aria-label="Dados do cliente">
-              <label>
-                Nome do cliente
-                <input name="client_name" placeholder="Ex.: Lorena Carvalho" />
-              </label>
-              <label>
-                Conta Meta
-                <select name="ad_account_id" class="field-select meta-catalog-account-select">
-                  <option value="">Carregando catálogo…</option>
-                </select>
-                <span class="field-hint">Contas do Business (API) + contas já cadastradas.</span>
-              </label>
-              <label>
-                Grupo relatório
-                <select name="group_id" class="field-select catalog-group-select" data-catalog-optional="0">
-                  <option value="">Nenhum</option>
-                </select>
-                <span class="field-hint">Lista da aba Grupos WhatsApp (webhook Evolution).</span>
-              </label>
-              <label>
-                Meta page id
-                <select name="meta_page_id" class="field-select meta-catalog-page-select">
-                  <option value="">Nenhum</option>
-                </select>
-                <span class="field-hint">Páginas do Business (API) + páginas já cadastradas.</span>
-              </label>
-              <label>
-                Telefone cliente
-                <input name="lead_phone_number" inputmode="tel" placeholder="Ex.: 5511999999999" />
-                <span class="field-hint">Número do cliente para fluxos com envio extra, quando aplicável.</span>
-              </label>
-              <label>
-                Grupo P12 relatório
-                <select name="p12_report_group_id" class="field-select catalog-group-select" data-catalog-optional="1">
-                  <option value="">Nenhum</option>
-                </select>
-                <span class="field-hint">Relatório semanal Meta (resumo + dados) para a equipe P12.</span>
-              </label>
-              <label>
-                Template P12 relatório
-                <select name="p12_report_template" class="field-select meta-report-template-select">
-                  <option value="">Nenhum</option>
-                </select>
-                <span class="field-hint">Canal <code>meta_report</code> na aba Templates. Em vazio, o envio usa o template <code>default</code>.</span>
-              </label>
-              <label>
-                Template relatório de dados
-                <select name="p12_data_report_template" class="field-select meta-report-data-template-select">
-                  <option value="">Nenhum</option>
-                </select>
-              </label>
-              <label>
-                Grupo mensagem interna
-                <select name="internal_notify_group_id" class="field-select catalog-group-select" data-catalog-optional="0">
-                  <option value="">Nenhum</option>
-                </select>
-                <span class="field-hint">Cópia opcional; o texto vem dos templates do canal <code>internal_lead</code> / <code>internal_report</code>.</span>
-              </label>
-              <label>
-                Template interno (novo lead)
-                <select
-                  name="internal_lead_template"
-                  class="field-select internal-lead-template-select"
-                >
-                  <option value="">Nenhum</option>
-                </select>
-                <span class="field-hint">Aba Templates, canal <code>internal_lead</code> (mesmas variáveis do lead).</span>
-              </label>
-              <label>
-                Template interno (após relatório semanal)
-                <select
-                  name="internal_weekly_template"
-                  class="field-select internal-weekly-template-select"
-                >
-                  <option value="">Nenhum</option>
-                </select>
-                <span class="field-hint">Aba Templates, canal <code>internal_report</code> (após envio P12 Meta).</span>
-              </label>
-              <label class="new-client-field-template">
-                Template lead
-                <select name="lead_template" id="newClientLeadTemplate" class="field-select lead-template-select">
-                  <option value="">Nenhum</option>
-                </select>
-                <span class="field-hint">Integrados ou templates criados na aba Templates.</span>
-              </label>
-            </div>
+            <section class="new-client-section" aria-labelledby="newMetaSectionCliente">
+              <h3 id="newMetaSectionCliente" class="new-client-section-title">Cliente</h3>
+              <div class="new-client-fields" aria-label="Dados do cliente">
+                <label>
+                  Nome do cliente
+                  <input name="client_name" placeholder="Ex.: Lorena Carvalho" />
+                </label>
+                <label>
+                  Conta Meta
+                  <select name="ad_account_id" class="field-select meta-catalog-account-select">
+                    <option value="">Carregando catálogo…</option>
+                  </select>
+                </label>
+                <label>
+                  Grupo relatório
+                  <select name="group_id" class="field-select catalog-group-select" data-catalog-optional="0">
+                    <option value="">Nenhum</option>
+                  </select>
+                </label>
+                <label>
+                  Meta page id
+                  <select name="meta_page_id" class="field-select meta-catalog-page-select">
+                    <option value="">Nenhum</option>
+                  </select>
+                </label>
+                <label>
+                  Telefone cliente
+                  <input name="lead_phone_number" inputmode="tel" placeholder="Ex.: 5511999999999" />
+                </label>
+              </div>
+            </section>
+            <section class="new-client-section" aria-labelledby="newMetaSectionTemplates">
+              <h3 id="newMetaSectionTemplates" class="new-client-section-title">Templates — lead e relatório P12</h3>
+              <div class="new-client-fields" aria-label="Templates de envio">
+                <label class="new-client-field-template">
+                  Template lead
+                  <select name="lead_template" id="newClientLeadTemplate" class="field-select lead-template-select">
+                    <option value="">Nenhum</option>
+                  </select>
+                </label>
+                <label>
+                  Grupo P12 relatório
+                  <select name="p12_report_group_id" class="field-select catalog-group-select" data-catalog-optional="1">
+                    <option value="">Nenhum</option>
+                  </select>
+                </label>
+                <label>
+                  Template P12 relatório
+                  <select name="p12_report_template" class="field-select meta-report-template-select">
+                    <option value="">Nenhum</option>
+                  </select>
+                </label>
+                <label>
+                  Template relatório de dados
+                  <select name="p12_data_report_template" class="field-select meta-report-data-template-select">
+                    <option value="">Nenhum</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+            <section class="new-client-section" aria-labelledby="newMetaSectionInterno">
+              <h3 id="newMetaSectionInterno" class="new-client-section-title">Notificações internas</h3>
+              <div class="new-client-fields" aria-label="Avisos à equipe P12">
+                <label>
+                  Grupo mensagem interna
+                  <select name="internal_notify_group_id" class="field-select catalog-group-select" data-catalog-optional="0">
+                    <option value="">Nenhum</option>
+                  </select>
+                </label>
+                <label>
+                  Template interno (novo lead)
+                  <select
+                    name="internal_lead_template"
+                    class="field-select internal-lead-template-select"
+                  >
+                    <option value="">Nenhum</option>
+                  </select>
+                </label>
+                <label>
+                  Template interno (após relatório semanal)
+                  <select
+                    name="internal_weekly_template"
+                    class="field-select internal-weekly-template-select"
+                  >
+                    <option value="">Nenhum</option>
+                  </select>
+                </label>
+              </div>
+            </section>
             <p id="metaCatalogHint" class="meta-catalog-hint" aria-live="polite"></p>
             <div class="new-client-filters">
               <div class="filters-block-head">
@@ -246,81 +263,103 @@
 
       <section id="tab-google" class="tab-panel">
         <section class="panel panel-form">
-          <div class="panel-title-wrap">
-            <h2>Novo cliente Google Ads</h2>
-            <p>Cadastro direto em <code>data/google_clients.json</code>.</p>
+          <div class="filters-panel-head new-client-form-head">
+            <div class="panel-title-wrap">
+              <h2>Novo cliente Google Ads</h2>
+              <p>Cadastro direto em <code>data/google_clients.json</code>.</p>
+            </div>
+            <button
+              type="button"
+              class="filters-help-btn"
+              data-open="messages-section-help"
+              data-help-key="cadastro_google_client"
+              aria-haspopup="dialog"
+              aria-controls="messagesSectionHelpDialog"
+              aria-label="Ajuda: campos do novo cliente Google"
+              title="Ajuda sobre estes campos"
+            >
+              ?
+            </button>
           </div>
           <form id="newGoogleClientForm" class="new-client-form">
-            <div class="new-client-fields" aria-label="Dados do cliente Google">
-              <label>
-                Nome do cliente
-                <input name="client_name" placeholder="Ex.: Practical Life Jardim Prudencia" />
-              </label>
-              <label>
-                Google customer id
-                <input name="google_customer_id" placeholder="253-906-3374" />
-              </label>
-              <label>
-                Grupo WhatsApp
-                <select name="group_id" class="field-select catalog-group-select" data-catalog-optional="0">
-                  <option value="">Nenhum</option>
-                </select>
-                <span class="field-hint">Lista da aba Grupos WhatsApp.</span>
-              </label>
-              <label>
-                Template Google (cliente)
-                <input name="google_template" value="default" placeholder="default / personalizado" />
-              </label>
-              <label>
-                Telefone cliente
-                <input name="lead_phone_number" inputmode="tel" placeholder="Ex.: 5511999999999" />
-              </label>
-              <label>
-                Grupo P12 relatório
-                <select name="p12_report_group_id" class="field-select catalog-group-select" data-catalog-optional="1">
-                  <option value="">Nenhum</option>
-                </select>
-              </label>
-              <label>
-                Template P12 relatório
-                <select name="p12_report_template" class="field-select google-p12-template-select">
-                  <option value="">Nenhum</option>
-                </select>
-                <span class="field-hint">Canal <code>google_report</code> — ex.: p12_resumo. Em vazio, usa <code>default</code> no envio.</span>
-              </label>
-              <label>
-                Template relatório de dados
-                <select name="p12_data_report_template" class="field-select google-p12-data-template-select">
-                  <option value="">Nenhum</option>
-                </select>
-                <span class="field-hint">Segunda mensagem ao P12 — ex.: p12_dados</span>
-              </label>
-              <label>
-                Grupo mensagem interna
-                <select name="internal_notify_group_id" class="field-select catalog-group-select" data-catalog-optional="0">
-                  <option value="">Nenhum</option>
-                </select>
-                <span class="field-hint">Aviso após envio do relatório; conteúdo no template <code>internal_report</code>.</span>
-              </label>
-              <label>
-                Template interno (após relatório semanal)
-                <select
-                  name="internal_weekly_template"
-                  class="field-select internal-weekly-template-select"
-                >
-                  <option value="">Nenhum</option>
-                </select>
-                <span class="field-hint">Canal <code>internal_report</code> — variáveis Google (ver aba Templates).</span>
-              </label>
-              <label>
-                Conversões primárias (CSV)
-                <input name="primary_conversions" placeholder="Formulário, WhatsApp, Ligação" />
-              </label>
-              <label>
-                Observações
-                <input name="notes" placeholder="Opcional" />
-              </label>
-            </div>
+            <section class="new-client-section" aria-labelledby="newGoogleSectionCliente">
+              <h3 id="newGoogleSectionCliente" class="new-client-section-title">Cliente</h3>
+              <div class="new-client-fields" aria-label="Dados do cliente Google">
+                <label>
+                  Nome do cliente
+                  <input name="client_name" placeholder="Ex.: Practical Life Jardim Prudencia" />
+                </label>
+                <label>
+                  Google customer id
+                  <input name="google_customer_id" placeholder="253-906-3374" />
+                </label>
+                <label>
+                  Grupo WhatsApp
+                  <select name="group_id" class="field-select catalog-group-select" data-catalog-optional="0">
+                    <option value="">Nenhum</option>
+                  </select>
+                </label>
+                <label>
+                  Template Google (cliente)
+                  <input name="google_template" value="default" placeholder="default / personalizado" />
+                </label>
+                <label>
+                  Telefone cliente
+                  <input name="lead_phone_number" inputmode="tel" placeholder="Ex.: 5511999999999" />
+                </label>
+                <label>
+                  Conversões primárias (CSV)
+                  <input name="primary_conversions" placeholder="Formulário, WhatsApp, Ligação" />
+                </label>
+                <label>
+                  Observações
+                  <input name="notes" placeholder="Opcional" />
+                </label>
+              </div>
+            </section>
+            <section class="new-client-section" aria-labelledby="newGoogleSectionTemplates">
+              <h3 id="newGoogleSectionTemplates" class="new-client-section-title">Templates — relatório P12</h3>
+              <div class="new-client-fields" aria-label="Relatório semanal e dados">
+                <label>
+                  Grupo P12 relatório
+                  <select name="p12_report_group_id" class="field-select catalog-group-select" data-catalog-optional="1">
+                    <option value="">Nenhum</option>
+                  </select>
+                </label>
+                <label>
+                  Template P12 relatório
+                  <select name="p12_report_template" class="field-select google-p12-template-select">
+                    <option value="">Nenhum</option>
+                  </select>
+                </label>
+                <label>
+                  Template relatório de dados
+                  <select name="p12_data_report_template" class="field-select google-p12-data-template-select">
+                    <option value="">Nenhum</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+            <section class="new-client-section" aria-labelledby="newGoogleSectionInterno">
+              <h3 id="newGoogleSectionInterno" class="new-client-section-title">Notificações internas</h3>
+              <div class="new-client-fields" aria-label="Avisos internos após relatório">
+                <label>
+                  Grupo mensagem interna
+                  <select name="internal_notify_group_id" class="field-select catalog-group-select" data-catalog-optional="0">
+                    <option value="">Nenhum</option>
+                  </select>
+                </label>
+                <label>
+                  Template interno (após relatório semanal)
+                  <select
+                    name="internal_weekly_template"
+                    class="field-select internal-weekly-template-select"
+                  >
+                    <option value="">Nenhum</option>
+                  </select>
+                </label>
+              </div>
+            </section>
             <div class="new-client-actions">
               <label class="check">
                 <input type="checkbox" name="enabled" checked />
@@ -716,73 +755,92 @@
 
       <section id="tab-site-leads" class="tab-panel">
         <section class="panel panel-form">
-          <div class="panel-title-wrap">
-            <h2>Leads Site</h2>
-            <p>Cadastre envio e rótulos internos por <code>codi_id</code> (o roteamento usa só o codi_id; origem Meta/Google na mensagem vem de <code>{{traffic_source}}</code>).</p>
+          <div class="filters-panel-head new-client-form-head">
+            <div class="panel-title-wrap">
+              <h2>Leads Site</h2>
+              <p>Cadastre envio e rótulos internos por <code>codi_id</code> (o roteamento usa só o codi_id; origem Meta/Google na mensagem vem de <code>{{traffic_source}}</code>).</p>
+            </div>
+            <button
+              type="button"
+              class="filters-help-btn"
+              data-open="messages-section-help"
+              data-help-key="cadastro_site_lead"
+              aria-haspopup="dialog"
+              aria-controls="messagesSectionHelpDialog"
+              aria-label="Ajuda: campos Leads Site"
+              title="Ajuda sobre estes campos"
+            >
+              ?
+            </button>
           </div>
           <form id="siteLeadRouteForm" class="new-client-form">
-            <div class="new-client-fields" aria-label="Cadastro de cliente leads site por codi_id">
-              <label>
-                CODI ID
-                <input
-                  name="codi_id"
-                  required
-                  inputmode="numeric"
-                  pattern="[0-9]{28,36}"
-                  minlength="28"
-                  maxlength="36"
-                  placeholder="Ex.: 12345678901234567890123456789012"
-                />
-                <span class="field-hint">Obrigatório: 28 a 36 dígitos numéricos (codi_id do site).</span>
-              </label>
-              <label>
-                Rótulo interno — identificação / campanha
-                <input name="cliente_origem" type="text" placeholder="Ex.: Tainã · Vila Mariana / campanha Meta Q2" />
-                <span class="field-hint">Não roteia envio; só identifica no painel e nas variáveis <code>{{cliente_origem}}</code> / <code>{{origem_anuncio}}</code>.</span>
-              </label>
-              <label>
-                Rótulo interno — origem do anúncio
-                <input name="origem_anuncio" type="text" placeholder="Ex.: Google PMax / Formulário modal" />
-                <span class="field-hint">Opcional. Uso interno (qual anúncio/canal você associa a este <code>codi_id</code>).</span>
-              </label>
-              <label>
-                Grupo cliente
-                <select name="group_id" class="field-select catalog-group-select" data-catalog-optional="0">
-                  <option value="">Nenhum</option>
-                </select>
-                <span class="field-hint">Grupo do cliente que vai receber a mensagem de novo lead do site.</span>
-              </label>
-              <label>
-                Telefone cliente
-                <input name="lead_phone_number" inputmode="tel" placeholder="Ex.: 5511999999999" />
-                <span class="field-hint">Telefone do cliente para fluxos com envio extra, quando aplicável.</span>
-              </label>
-              <label>
-                Grupo mensagem interna
-                <select name="internal_notify_group_id" class="field-select catalog-group-select" data-catalog-optional="0">
-                  <option value="">Nenhum</option>
-                </select>
-                <span class="field-hint">Cópia para time interno no recebimento de lead.</span>
-              </label>
-              <label>
-                Template de mensagem
-                <select name="lead_template" class="field-select lead-template-select">
-                  <option value="">Nenhum</option>
-                </select>
-                <span class="field-hint">Canal <code>site_lead</code> da aba Templates.</span>
-              </label>
-              <label>
-                Template de mensagem interno
-                <select name="internal_lead_template" class="field-select internal-lead-template-select">
-                  <option value="">Nenhum</option>
-                </select>
-                <span class="field-hint">Canal <code>internal_lead</code> da aba Templates.</span>
-              </label>
-              <label>
-                Observações
-                <input name="notes" placeholder="Opcional" />
-              </label>
-            </div>
+            <section class="new-client-section" aria-labelledby="newSiteSectionCliente">
+              <h3 id="newSiteSectionCliente" class="new-client-section-title">Cliente e roteamento</h3>
+              <div class="new-client-fields" aria-label="Cadastro leads site por codi_id">
+                <label>
+                  CODI ID
+                  <input
+                    name="codi_id"
+                    required
+                    inputmode="numeric"
+                    pattern="[0-9]{28,36}"
+                    minlength="28"
+                    maxlength="36"
+                    placeholder="Ex.: 12345678901234567890123456789012"
+                  />
+                </label>
+                <label>
+                  Rótulo interno — identificação / campanha
+                  <input name="cliente_origem" type="text" placeholder="Ex.: Tainã · Vila Mariana / campanha Meta Q2" />
+                </label>
+                <label>
+                  Rótulo interno — origem do anúncio
+                  <input name="origem_anuncio" type="text" placeholder="Ex.: Google PMax / Formulário modal" />
+                </label>
+                <label>
+                  Grupo cliente
+                  <select name="group_id" class="field-select catalog-group-select" data-catalog-optional="0">
+                    <option value="">Nenhum</option>
+                  </select>
+                </label>
+                <label>
+                  Telefone cliente
+                  <input name="lead_phone_number" inputmode="tel" placeholder="Ex.: 5511999999999" />
+                </label>
+                <label>
+                  Observações
+                  <input name="notes" placeholder="Opcional" />
+                </label>
+              </div>
+            </section>
+            <section class="new-client-section" aria-labelledby="newSiteSectionTemplates">
+              <h3 id="newSiteSectionTemplates" class="new-client-section-title">Template — mensagem ao cliente</h3>
+              <div class="new-client-fields" aria-label="Template de lead site">
+                <label>
+                  Template de mensagem
+                  <select name="lead_template" class="field-select lead-template-select">
+                    <option value="">Nenhum</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+            <section class="new-client-section" aria-labelledby="newSiteSectionInterno">
+              <h3 id="newSiteSectionInterno" class="new-client-section-title">Notificações internas</h3>
+              <div class="new-client-fields" aria-label="Cópia interna de lead">
+                <label>
+                  Grupo mensagem interna
+                  <select name="internal_notify_group_id" class="field-select catalog-group-select" data-catalog-optional="0">
+                    <option value="">Nenhum</option>
+                  </select>
+                </label>
+                <label>
+                  Template de mensagem interno
+                  <select name="internal_lead_template" class="field-select internal-lead-template-select">
+                    <option value="">Nenhum</option>
+                  </select>
+                </label>
+              </div>
+            </section>
             <div class="new-client-filters">
               <div class="filters-block-head">
                 <div class="filters-block-head-text">
@@ -929,6 +987,7 @@
       role="dialog"
       aria-modal="true"
       aria-labelledby="messagesSectionHelpTitle"
+      aria-describedby="messagesSectionHelpBody"
       aria-hidden="true"
     >
       <div class="filters-help-backdrop" data-messages-help-dismiss tabindex="-1" aria-hidden="true"></div>
@@ -940,7 +999,7 @@
           </button>
         </header>
         <div class="filters-help-body">
-          <p id="messagesSectionHelpBody" class="filters-help-lede"></p>
+          <div id="messagesSectionHelpBody" class="filters-help-lede"></div>
         </div>
         <footer class="filters-help-footer">
           <button type="button" class="primary filters-help-close-btn" data-messages-help-dismiss>Fechar</button>
