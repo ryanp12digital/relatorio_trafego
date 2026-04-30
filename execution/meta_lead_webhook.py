@@ -130,6 +130,10 @@ _META_TOKENS = (
 _LEAD_BODY_SIGNAL_KEYS = frozenset(
     {"email", "nome_completo", "telefone", "nome", "full_name", "name", "phone_number", "phone", "mobile", "celular"}
 )
+# Envelope típico Evolution/Make quando o POST errado chega ao /meta-new-lead (event, instance, data…).
+_EVOLUTION_ENVELOPE_MARKERS = frozenset(
+    ("event", "instance", "server_url", "sender", "apikey", "destination", "date_time")
+)
 _WHATSAPP_MSG_MAX = 4000
 _META_GRAPH_BASE_URL = "https://graph.facebook.com/v18.0"
 _FORM_NAME_CACHE: Dict[str, str] = {}
@@ -453,9 +457,30 @@ def _is_meta_lead_body(d: Dict[str, Any]) -> bool:
         return True
     if isinstance(d.get("mappable_field_data"), list):
         return True
-    if any(k in data for k in _LEAD_BODY_SIGNAL_KEYS):
+    data_keys_lower = {str(k).strip().lower() for k in data.keys()}
+    if any(sig in data_keys_lower for sig in _LEAD_BODY_SIGNAL_KEYS):
         return True
+    # Lead site: codi / form id dentro de `data`
+    for ck in _CODI_ID_PAYLOAD_KEYS:
+        if str(ck).strip().lower() in data_keys_lower:
+            return True
     return False
+
+
+def _unwrap_evolution_style_envelope(d: Dict[str, Any]) -> Optional[Any]:
+    """
+    Quando o Make/n8n envia o envelope da Evolution (apikey, event, instance, data…)
+    mas o lead real está em `data` (objeto ou string JSON), extrai o interior.
+    Evita PAYLOAD_SEM_LEAD_RECONHECIDO quando só falta desembrulhar.
+    """
+    if "data" not in d:
+        return None
+    keys_l = {str(k).strip().lower() for k in d.keys()}
+    if len(keys_l & _EVOLUTION_ENVELOPE_MARKERS) < 2:
+        return None
+    inner = d.get("data")
+    inner = _unwrap_json_strings(inner) if isinstance(inner, str) else inner
+    return inner
 
 
 def _coerce_inner_body(val: Any) -> Optional[Dict[str, Any]]:
@@ -609,6 +634,11 @@ def normalize_lead_events(raw: Any) -> List[Dict[str, Any]]:
     raw = _unwrap_json_strings(raw)
 
     if isinstance(raw, dict):
+        unwrapped = _unwrap_evolution_style_envelope(raw)
+        if unwrapped is not None:
+            nested = normalize_lead_events(unwrapped)
+            if nested:
+                return nested
         for wrap_key in ("items", "results", "records", "bundles"):
             inner = raw.get(wrap_key)
             if isinstance(inner, list):
