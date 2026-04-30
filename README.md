@@ -149,21 +149,28 @@ No **Easypanel** (ou similar):
   - **`.tmp/webhook_meta_leads.log`** — cópia do stdout do webhook (o mesmo fluxo também vai para o **stdout do container** via `tee`, visível nos logs do Easypanel).
   - **Filtro de eventos do webhook:** busque por **`P12_META_LEAD_WEBHOOK`** — cada hit do Make gera linhas como `RECEBIDO`, `PAYLOAD_OK`, `WHATSAPP_ENVIADO_OK` / `CONCLUIDO_OK`.
 
-### Webhook lead Meta (Make) — endpoint padrão multi-cliente
+### Webhooks de lead (Make) — endpoints dedicados
 
 O container sobe um servidor HTTP em background (porta **`WEBHOOK_PORT`**, padrão **8080**) com:
 
-- **Rota padrão:** `POST /meta-new-lead`
+- **Lead Meta/Ads (por `page_id`):** `POST /meta-new-lead`
+- **Lead Site (por `codi_id`):** `POST /site-new-lead`
 - **Alias legado (compatibilidade):** `POST /lorena-new-lead`
 - **URL pública padrão (após mapear a porta no Easypanel):** `https://<domínio-do-app>/meta-new-lead`
+- **URL pública de site:** `https://<domínio-do-app>/site-new-lead`
 - **Compatibilidade antiga:** no alias legado, se o payload vier sem `page_id`, o sistema tenta rotear para o cliente Lorena.
 
 **Variáveis de ambiente:** ver `ENV_TEMPLATE.txt` (`META_LEAD_WEBHOOK_SECRET`, `META_LEAD_FALLBACK_WHATSAPP`, `WEBHOOK_PORT`). Há fallback para variáveis legadas `LORENA_*`.
 
-**Roteamento por página:** o webhook separa cada cliente por `page_id` do payload e lê o mapeamento em `data/clients.json` (ou na tabela com `DATABASE_URL`):
+**Roteamento Meta (endpoint `/meta-new-lead`):** separa cliente por `page_id` e lê em `data/clients.json` (ou tabela com `DATABASE_URL`):
 - `meta_page_id`: ID da página Meta (ex.: `102086421781424`)
 - `lead_group_id`: grupo WhatsApp do lead (fallback para `group_id`)
 - `lead_template`: template da mensagem (ex.: `default`, `lorena`, `pratical_life`)
+
+**Roteamento Site (endpoint `/site-new-lead`):**
+- exige `codi_id` válido (28–36 dígitos numéricos)
+- ignora `page_id` para roteamento
+- usa cadastros da aba **Leads Site** (`site_lead_routes`)
 
 **Payload:** o Make pode enviar o JSON no formato envelope (array de objetos com `body`, contendo `data` e `mappable_field_data`, como no lead Meta). O servidor monta a mensagem WhatsApp (nome, link `wa.me` a partir de `telefone`, e-mail, bloco de respostas).
 

@@ -3,6 +3,7 @@ Webhook HTTP: leads do Make/Meta -> mensagem formatada no grupo WhatsApp.
 
 Rotas:
 - POST /meta-new-lead      (rota padrao multi-cliente)
+- POST /site-new-lead      (rota dedicada para lead de site por codi_id)
 - POST /lorena-new-lead    (alias legado para compatibilidade)
 """
 
@@ -1123,6 +1124,33 @@ def _resolve_route_with_context(page_id: str, codi_id: str) -> Tuple[Optional[Di
     return None, "unknown", "ROUTING_KEY_MISSING", "Envie page_id (Meta/Ads) ou codi_id (Lead Site)"
 
 
+def _resolve_route_with_mode(
+    route_mode: str, page_id: str, codi_id: str
+) -> Tuple[Optional[Dict[str, Any]], str, str, str]:
+    """
+    route_mode:
+      - auto: comportamento atual (site por codi_id, senão native_ads por page_id)
+      - site_only: exige codi_id válido e ignora page_id
+    """
+    mode = str(route_mode or "auto").strip().lower()
+    if mode == "site_only":
+        cid = (codi_id or "").strip()
+        if not cid:
+            return None, "site", "CODI_ID_OBRIGATORIO", "Envie codi_id (28–36 dígitos) para roteamento de lead site"
+        if not is_valid_site_codi_id(cid):
+            return (
+                None,
+                "site",
+                "CODI_ID_INVALID_FORMAT",
+                f"codi_id_recebido={cid} (esperado: 28–36 dígitos numéricos)",
+            )
+        route = _resolve_site_lead_route(cid)
+        if route:
+            return route, "site", "", ""
+        return None, "site", "CODI_ID_ROUTE_NOT_FOUND", f"codi_id_recebido={cid}"
+    return _resolve_route_with_context(page_id, codi_id)
+
+
 def _resolve_legacy_lorena_route() -> Optional[Dict[str, Any]]:
     """
     Compatibilidade do endpoint legado:
@@ -1555,11 +1583,16 @@ def _format_lead_message(
     return formatter(body, client_name, route)
 
 
-def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: bool = False) -> Tuple[Any, int]:
+def _handle_meta_new_lead(
+    endpoint_label: str,
+    allow_legacy_lorena_fallback: bool = False,
+    route_mode: str = "auto",
+    channel_label: str = "leads_meta",
+) -> Tuple[Any, int]:
     denied = _check_webhook_secret()
     if denied:
         _wh_log(
-            f"POST {endpoint_label} | ERRO_AUTH | canal=leads_meta | cod=WEBHOOK_SECRET_META_NEGADO | "
+            f"POST {endpoint_label} | ERRO_AUTH | canal={channel_label} | cod=WEBHOOK_SECRET_META_NEGADO | "
             f"ip={_client_ip()} | content_length={request.content_length}",
             level=logging.WARNING,
         )
@@ -1572,7 +1605,7 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
         return denied
 
     _wh_log(
-        f"POST {endpoint_label} | RECEBIDO | canal=leads_meta | "
+        f"POST {endpoint_label} | RECEBIDO | canal={channel_label} | "
         f"ip={_client_ip()} | content_type={request.content_type!r} | content_length={request.content_length}"
     )
     _emit_runtime_event(
@@ -1590,7 +1623,7 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
     raw, parse_err = parse_incoming_payload()
     if raw is None:
         _wh_log(
-            f"POST {endpoint_label} | ERRO_JSON | canal=leads_meta | cod=PAYLOAD_NAO_E_JSON | "
+            f"POST {endpoint_label} | ERRO_JSON | canal={channel_label} | cod=PAYLOAD_NAO_E_JSON | "
             f"ip={_client_ip()} | motivo={parse_err}",
             level=logging.WARNING,
         )
@@ -1620,7 +1653,7 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
             if uw is not None:
                 if _looks_like_evolution_whatsapp_event(uw):
                     _wh_log(
-                        f"POST {endpoint_label} | IGNORADO | canal=leads_meta | cod=EVOLUTION_EVENTO_NAO_E_LEAD | "
+                        f"POST {endpoint_label} | IGNORADO | canal={channel_label} | cod=EVOLUTION_EVENTO_NAO_E_LEAD | "
                         f"envelope Evolution com evento WhatsApp/grupo em data (nao e lead Meta). "
                         f"Catalogo Evolution: POST /evolution-webhook",
                         level=logging.INFO,
@@ -1652,12 +1685,12 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
                     else type(uw).__name__
                 )
                 _wh_log(
-                    f"POST {endpoint_label} | AVISO | canal=leads_meta | cod=ENVELOPE_SEM_LEAD_RECONHECIDO | "
+                    f"POST {endpoint_label} | AVISO | canal={channel_label} | cod=ENVELOPE_SEM_LEAD_RECONHECIDO | "
                     f"inner_tipo={type(uw).__name__} inner_keys_sample={u_sample!r}",
                     level=logging.WARNING,
                 )
         _wh_log(
-            f"POST {endpoint_label} | ERRO_LEAD | canal=leads_meta | cod=PAYLOAD_SEM_LEAD_RECONHECIDO | "
+            f"POST {endpoint_label} | ERRO_LEAD | canal={channel_label} | cod=PAYLOAD_SEM_LEAD_RECONHECIDO | "
             f"{_payload_shape_hint_lead(raw)} | "
             f"dica=body.data/mappable_field_data ou field_data (Graph) ou envelope Make com json",
             level=logging.WARNING,
@@ -1683,7 +1716,7 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
             400,
         )
 
-    _wh_log(f"POST {endpoint_label} | PAYLOAD_OK | canal=leads_meta | cod=LEAD_NORMALIZADO | leads={len(events)}")
+    _wh_log(f"POST {endpoint_label} | PAYLOAD_OK | canal={channel_label} | cod=LEAD_NORMALIZADO | leads={len(events)}")
     _emit_runtime_event(
         stage="PAYLOAD_OK",
         status="ok",
@@ -1701,7 +1734,20 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
         page_id = str(event.get("page_id", "")).strip()
         codi_id = _extract_codi_id_from_body(body)
         native_form_id = _extract_native_form_id_from_body(body)
-        route, route_context, route_error_code, route_error_hint = _resolve_route_with_context(page_id, codi_id)
+        # Guard rail: alguns payloads Meta trazem form_id (15-16 dígitos) e isso não é codi_id de site.
+        # Se codi_id == form_id nativo e está fora do padrão de site, roteia por page_id.
+        if (
+            codi_id
+            and native_form_id
+            and codi_id == native_form_id
+            and not is_valid_site_codi_id(codi_id)
+        ):
+            _wh_log(
+                f"LEAD_{idx} | AVISO_ROTA | canal={channel_label} | cod=IGNORA_CODI_ID_EQ_FORM_ID_META | "
+                f"form_id={native_form_id} | page_id={page_id or 'vazio'} | acao=usar_page_id"
+            )
+            codi_id = ""
+        route, route_context, route_error_code, route_error_hint = _resolve_route_with_mode(route_mode, page_id, codi_id)
         route_error_detail = (
             "Lead ignorado por page_id não mapeado"
             if route_error_code == "PAGE_ID_SEM_CLIENTE_NA_PULSEBOARD"
@@ -1711,16 +1757,22 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
                 else (
                     "Lead de site ignorado por codi_id sem rota cadastrada"
                     if route_error_code == "CODI_ID_ROUTE_NOT_FOUND"
-                    else "Lead ignorado sem page_id e sem codi_id"
+                    else (
+                        "Lead de site sem codi_id (endpoint site dedicado)"
+                        if route_error_code == "CODI_ID_OBRIGATORIO"
+                        else "Lead ignorado sem page_id e sem codi_id"
+                    )
                 )
             )
         )
         if route and route_context == "site":
             _wh_log(
-                f"LEAD_{idx} | ROTA_CODI_ID_OK | canal=leads_site | cod=CODI_ID_ROUTE_MATCH | "
+                f"LEAD_{idx} | ROTA_CODI_ID_OK | canal={channel_label} | cod=CODI_ID_ROUTE_MATCH | "
                 f"codi_id={codi_id} | cliente={route.get('client_name','')}"
             )
         should_try_legacy_no_page = (
+            route_mode == "auto"
+            and
             not page_id
             and not codi_id
             and (
@@ -1735,7 +1787,7 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
             route = _resolve_legacy_lorena_route()
             if route:
                 _wh_log(
-                    f"LEAD_{idx} | AVISO_ROTA | canal=leads_meta | cod=FALLBACK_LEGADO_LORENA | "
+                f"LEAD_{idx} | AVISO_ROTA | canal={channel_label} | cod=FALLBACK_LEGADO_LORENA | "
                     f"endpoint={endpoint_label} | cliente={route['client_name']}"
                 )
                 _emit_runtime_event(
@@ -1752,7 +1804,7 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
                 f"lead_index_{idx}: rota_nao_mapeada (page_id={page_id or 'vazio'}; codi_id={codi_id or 'vazio'})"
             )
             _wh_log(
-                f"LEAD_{idx} | ERRO_ROTA_CLIENTE | canal=leads_meta | cod={route_error_code} | "
+                f"LEAD_{idx} | ERRO_ROTA_CLIENTE | canal={channel_label} | cod={route_error_code} | "
                 f"page_id_recebido={page_id or 'vazio'} | codi_id_recebido={codi_id or 'vazio'} | "
                 f"native_form_id={native_form_id or 'vazio'} | contexto={route_context} | "
                 f"cliente_mapeado=(nenhum) | {route_error_hint}",
@@ -1796,7 +1848,7 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
         if not group_id:
             skipped.append(f"lead_index_{idx}: group_id_ausente ({route['client_name']})")
             _wh_log(
-                f"LEAD_{idx} | ERRO_CONFIG_CLIENTE | canal=leads_meta | cod=LEAD_GROUP_ID_VAZIO | "
+                f"LEAD_{idx} | ERRO_CONFIG_CLIENTE | canal={channel_label} | cod=LEAD_GROUP_ID_VAZIO | "
                 f"cliente={route['client_name']} | page_id={page_id}",
                 level=logging.WARNING,
             )
@@ -1829,7 +1881,7 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
             )
             if dry:
                 _wh_log(
-                    f"LEAD_{idx} | OK_SIMULADO | canal=leads_meta | cod=DRY_RUN_SEM_ENVIO | "
+                    f"LEAD_{idx} | OK_SIMULADO | canal={channel_label} | cod=DRY_RUN_SEM_ENVIO | "
                     f"cliente={route['client_name']} | page_id={page_id} | preview_len={len(message)}"
                 )
                 sent += 1
@@ -1848,7 +1900,7 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
             if not client.send_text_message(group_id, message):
                 errors.append(f"lead_index_{idx}: send returned false")
                 _wh_log(
-                    f"LEAD_{idx} | ERRO_WHATSAPP | canal=leads_meta | cod=EVOLUTION_SEND_TEXT_FALHOU | "
+                    f"LEAD_{idx} | ERRO_WHATSAPP | canal={channel_label} | cod=EVOLUTION_SEND_TEXT_FALHOU | "
                     f"cliente={route['client_name']} | page_id={page_id} | group_id={group_id} | "
                     f"evolution_instance={_evolution_instance_label()}",
                     level=logging.ERROR,
@@ -1865,7 +1917,7 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
                 continue
 
             _wh_log(
-                f"LEAD_{idx} | OK_WHATSAPP | canal=leads_meta | cod=MENSAGEM_ENVIADA_EVOLUTION | "
+                f"LEAD_{idx} | OK_WHATSAPP | canal={channel_label} | cod=MENSAGEM_ENVIADA_EVOLUTION | "
                 f"cliente={route['client_name']} | page_id={page_id} | group_id={group_id} | "
                 f"evolution_instance={_evolution_instance_label()}"
             )
@@ -1925,14 +1977,14 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
             if route.get("template") == "pratical_life" and extra_phone:
                 if client.send_text_message(extra_phone, message):
                     _wh_log(
-                        f"LEAD_{idx} | OK_WHATSAPP_EXTRA | canal=leads_meta | cod=MENSAGEM_ENVIADA_TELEFONE | "
+                        f"LEAD_{idx} | OK_WHATSAPP_EXTRA | canal={channel_label} | cod=MENSAGEM_ENVIADA_TELEFONE | "
                         f"cliente={route['client_name']} | numero={extra_phone} | "
                         f"evolution_instance={_evolution_instance_label()}"
                     )
                 else:
                     errors.append(f"lead_index_{idx}: phone send returned false")
                     _wh_log(
-                        f"LEAD_{idx} | ERRO_WHATSAPP_EXTRA | canal=leads_meta | cod=EVOLUTION_SEND_TELEFONE_FALHOU | "
+                        f"LEAD_{idx} | ERRO_WHATSAPP_EXTRA | canal={channel_label} | cod=EVOLUTION_SEND_TELEFONE_FALHOU | "
                         f"cliente={route['client_name']} | numero={extra_phone} | "
                         f"evolution_instance={_evolution_instance_label()}",
                         level=logging.ERROR,
@@ -1948,7 +2000,7 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
         except Exception as e:
             errors.append(f"lead_index_{idx}: {e!s}")
             _wh_log(
-                f"LEAD_{idx} | ERRO_EXCECAO | canal=leads_meta | cod=EXCECAO_ENVIO_WHATSAPP | "
+                f"LEAD_{idx} | ERRO_EXCECAO | canal={channel_label} | cod=EXCECAO_ENVIO_WHATSAPP | "
                 f"cliente={route.get('client_name', '')} | page_id={page_id} | group_id={group_id} | "
                 f"evolution_instance={_evolution_instance_label()} | err={e!s}",
                 level=logging.ERROR,
@@ -1966,7 +2018,7 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
 
     if errors:
         _wh_log(
-            f"POST {endpoint_label} | ERRO_RESPOSTA | canal=leads_meta | cod=WEBHOOK_HTTP_500 | "
+            f"POST {endpoint_label} | ERRO_RESPOSTA | canal={channel_label} | cod=WEBHOOK_HTTP_500 | "
             f"sent={sent} | erros={len(errors)} | resumo_erros={_skipped_leads_summary(errors)}",
             level=logging.ERROR,
         )
@@ -1979,7 +2031,7 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
         return jsonify({"ok": False, "sent": sent, "skipped": skipped, "errors": errors}), 500
 
     _wh_log(
-        f"POST {endpoint_label} | CONCLUIDO_OK | canal=leads_meta | cod=WEBHOOK_LEADS_FINALIZADO | "
+        f"POST {endpoint_label} | CONCLUIDO_OK | canal={channel_label} | cod=WEBHOOK_LEADS_FINALIZADO | "
         f"sent={sent} | skipped={len(skipped)} | resumo_skipped={_skipped_leads_summary(skipped)}"
     )
     _emit_runtime_event(
@@ -1994,6 +2046,21 @@ def _handle_meta_new_lead(endpoint_label: str, allow_legacy_lorena_fallback: boo
 @app.route("/meta-new-lead", methods=["POST"])
 def meta_new_lead():
     response, status = _handle_meta_new_lead("/meta-new-lead")
+    return response, status
+
+
+@app.route("/site-new-lead", methods=["POST"])
+def site_new_lead():
+    """
+    Endpoint dedicado para leads do site:
+    - exige codi_id válido (28–36 dígitos)
+    - ignora page_id para roteamento
+    """
+    response, status = _handle_meta_new_lead(
+        "/site-new-lead",
+        route_mode="site_only",
+        channel_label="leads_site",
+    )
     return response, status
 
 
@@ -2216,7 +2283,7 @@ def main() -> None:
     port = int(os.getenv("WEBHOOK_PORT", "8080"))
     _wh_log(
         "SERVICO_INICIADO | "
-        f"escutando 0.0.0.0:{port} | GET /health | POST /meta-new-lead | dashboard /dash | "
+        f"escutando 0.0.0.0:{port} | GET /health | POST /meta-new-lead | POST /site-new-lead | dashboard /dash | "
         f"catalogo grupos POST /evolution-webhook"
     )
     serve_flask_app(app, port=port)
