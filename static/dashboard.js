@@ -121,6 +121,13 @@ function stringifyCsv(values) {
   return uniqueKeepOrder(values).join(", ");
 }
 
+function compactListText(values, fallback = "—") {
+  const arr = Array.isArray(values)
+    ? values.map((v) => String(v || "").trim()).filter(Boolean)
+    : [];
+  return arr.length ? arr.join(", ") : fallback;
+}
+
 /** Regex inválidas nos chips (mesmo critério case-insensitive do backend). */
 function invalidRegexPatterns(hiddenInput) {
   const vals = parseCsvValue(hiddenInput?.value || "");
@@ -1151,11 +1158,29 @@ function renderMetaClients() {
     card.querySelector(".f-meta_page_id").textContent = client.meta_page_id || "(vazio)";
     const fPhone = card.querySelector(".f-lead_phone_number");
     if (fPhone) fPhone.textContent = client.lead_phone_number || "—";
+    const fLeadGroup = card.querySelector(".f-lead_group_id");
+    if (fLeadGroup) fLeadGroup.textContent = client.lead_group_id || "—";
     const fP12 = card.querySelector(".f-p12_report_group_id");
     if (fP12) fP12.textContent = client.p12_report_group_id || "—";
+    const fP12Tpl = card.querySelector(".f-p12_report_template");
+    if (fP12Tpl) fP12Tpl.textContent = client.p12_report_template || "—";
+    const fP12DataTpl = card.querySelector(".f-p12_data_report_template");
+    if (fP12DataTpl) fP12DataTpl.textContent = client.p12_data_report_template || "—";
+    const fIntGroup = card.querySelector(".f-internal_notify_group_id");
+    if (fIntGroup) fIntGroup.textContent = client.internal_notify_group_id || "—";
     const fInt = card.querySelector(".f-internal_short");
     if (fInt) fInt.textContent = client.internal_notify_group_id ? "configurado" : "—";
     card.querySelector(".f-lead_template").textContent = client.lead_template || "default";
+    const fIntLeadTpl = card.querySelector(".f-internal_lead_template");
+    if (fIntLeadTpl) fIntLeadTpl.textContent = client.internal_lead_template || "—";
+    const fIntWeeklyTpl = card.querySelector(".f-internal_weekly_template");
+    if (fIntWeeklyTpl) fIntWeeklyTpl.textContent = client.internal_weekly_template || "—";
+    const fExFields = card.querySelector(".f-lead_exclude_fields");
+    if (fExFields) fExFields.textContent = compactListText(client.lead_exclude_fields);
+    const fExContains = card.querySelector(".f-lead_exclude_contains");
+    if (fExContains) fExContains.textContent = compactListText(client.lead_exclude_contains);
+    const fExRegex = card.querySelector(".f-lead_exclude_regex");
+    if (fExRegex) fExRegex.textContent = compactListText(client.lead_exclude_regex);
     card.querySelector(".f-enabled").textContent = client.enabled ? "true" : "false";
 
     const checks = card.querySelector(".checks");
@@ -1265,8 +1290,18 @@ function renderGoogleClients() {
     pill.textContent = statusLabel;
     card.querySelector(".g-google_customer_id").textContent = client.google_customer_id || "-";
     card.querySelector(".g-group_id").textContent = client.group_id || "-";
+    const gPhone = card.querySelector(".g-lead_phone_number");
+    if (gPhone) gPhone.textContent = client.lead_phone_number || "—";
     const gp12 = card.querySelector(".g-p12_report_group_id");
     if (gp12) gp12.textContent = client.p12_report_group_id || "—";
+    const gp12Tpl = card.querySelector(".g-p12_report_template");
+    if (gp12Tpl) gp12Tpl.textContent = client.p12_report_template || "—";
+    const gp12DataTpl = card.querySelector(".g-p12_data_report_template");
+    if (gp12DataTpl) gp12DataTpl.textContent = client.p12_data_report_template || "—";
+    const gIntGroup = card.querySelector(".g-internal_notify_group_id");
+    if (gIntGroup) gIntGroup.textContent = client.internal_notify_group_id || "—";
+    const gIntWeeklyTpl = card.querySelector(".g-internal_weekly_template");
+    if (gIntWeeklyTpl) gIntWeeklyTpl.textContent = client.internal_weekly_template || "—";
     card.querySelector(".g-google_template").textContent = client.google_template || "default";
     card.querySelector(".g-enabled").textContent = client.enabled ? "true" : "false";
     card.querySelector(".g-primary_conversions").textContent = (client.primary_conversions || []).join(", ") || "(vazio)";
@@ -2271,6 +2306,11 @@ function renderSiteLeadRoutes() {
       const leadTemplate = escHtml(r.lead_template || "default");
       const internalLeadTemplate = escHtml(r.internal_lead_template || "");
       const notes = escHtml(r.notes || "");
+      const targetType = escHtml((r.target_type || "").toString().trim() || "site");
+      const sourceType = escHtml((r.source_type || "").toString().trim());
+      const exFields = escHtml(((r.lead_exclude_fields || []).map((x) => String(x).trim()).filter(Boolean)).join(", "));
+      const exContains = escHtml(((r.lead_exclude_contains || []).map((x) => String(x).trim()).filter(Boolean)).join(", "));
+      const exRegex = escHtml(((r.lead_exclude_regex || []).map((x) => String(x).trim()).filter(Boolean)).join(", "));
       const enabled = !!r.enabled;
       const checks = siteRouteChecks(r);
       const statusLabel =
@@ -2310,6 +2350,11 @@ function renderSiteLeadRoutes() {
             <div><dt>Grupo msg interna</dt><dd>${internalNotifyGroup || "—"}</dd></div>
             <div><dt>Template site</dt><dd>${leadTemplate}</dd></div>
             <div><dt>Template interno</dt><dd>${internalLeadTemplate || "Nenhum"}</dd></div>
+            <div><dt>Tipo de rota</dt><dd>${targetType}</dd></div>
+            <div><dt>Tipo de origem</dt><dd>${sourceType || "—"}</dd></div>
+            <div><dt>Excluir perguntas (exato)</dt><dd>${exFields || "—"}</dd></div>
+            <div><dt>Excluir se contiver</dt><dd>${exContains || "—"}</dd></div>
+            <div><dt>Excluir por regex</dt><dd>${exRegex || "—"}</dd></div>
             <div><dt>Observações</dt><dd>${notes || "—"}</dd></div>
             <div><dt>Enabled</dt><dd>${enabled ? "true" : "false"}</dd></div>
           </dl>
@@ -3051,8 +3096,25 @@ function syncCatalogGroupSelects() {
       const cid = String(card.dataset.clientId);
       const metaClient = state.metaClients.find((x) => String(x.id) === cid);
       const googleClient = state.googleClients.find((x) => String(x.id) === cid);
-      if (metaClient && fieldName === "group_id") prev = String(metaClient.group_id || "").trim();
-      if (googleClient && fieldName === "group_id") prev = String(googleClient.group_id || "").trim();
+      if (metaClient) {
+        if (fieldName === "group_id") prev = String(metaClient.group_id || "").trim();
+        else if (fieldName === "p12_report_group_id") prev = String(metaClient.p12_report_group_id || "").trim();
+        else if (fieldName === "internal_notify_group_id") prev = String(metaClient.internal_notify_group_id || "").trim();
+      }
+      if (googleClient) {
+        if (fieldName === "group_id") prev = String(googleClient.group_id || "").trim();
+        else if (fieldName === "p12_report_group_id") prev = String(googleClient.p12_report_group_id || "").trim();
+        else if (fieldName === "internal_notify_group_id") prev = String(googleClient.internal_notify_group_id || "").trim();
+      }
+    }
+    const siteCard = sel.closest(".site-client-card");
+    if (siteCard?.dataset?.routeId) {
+      const rid = Number(siteCard.dataset.routeId || 0);
+      const route = state.siteLeadRoutes.find((x) => Number(x.id) === rid);
+      if (route) {
+        if (fieldName === "group_id") prev = String(route.group_id || "").trim();
+        else if (fieldName === "internal_notify_group_id") prev = String(route.internal_notify_group_id || "").trim();
+      }
     }
     const known = new Set([""]);
     sel.replaceChildren();

@@ -329,11 +329,30 @@ def _csv_list(value: Any) -> List[str]:
 
 # JID de grupo: 120363…@g.us ou 5511…-1621…@g.us (hífen = formato que a Evolution/Baileys expõe em alguns grupos).
 _GROUP_JID_PATTERN = re.compile(r"^[0-9]+(?:-[0-9]+)?@g\.us$")
+_DEFAULT_INTERNAL_NOTIFY_GROUP_ID = "120363409290291539@g.us"
 
 
 def _whatsapp_group_jid_ok(value: str) -> bool:
     v = (value or "").strip()
     return bool(v and _GROUP_JID_PATTERN.fullmatch(v))
+
+
+def _default_internal_notify_group_id() -> str:
+    """
+    Grupo padrão de notificações internas de lead.
+    Pode ser sobrescrito por env para evitar hardcode no deploy.
+    """
+    env = str(os.getenv("DEFAULT_INTERNAL_NOTIFY_GROUP_ID", "")).strip()
+    if env and _whatsapp_group_jid_ok(env):
+        return env
+    return _DEFAULT_INTERNAL_NOTIFY_GROUP_ID
+
+
+def _normalize_internal_notify_group_id(value: Any) -> str:
+    v = str(value or "").strip()
+    if v:
+        return v
+    return _default_internal_notify_group_id()
 
 
 def _validate_client(client: Dict[str, Any]) -> Dict[str, Any]:
@@ -428,7 +447,7 @@ def _public_google_client_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
         "p12_report_group_id": str(raw.get("p12_report_group_id", "")).strip(),
         "p12_report_template": str(raw.get("p12_report_template", "")).strip(),
         "p12_data_report_template": str(raw.get("p12_data_report_template", "")).strip(),
-        "internal_notify_group_id": str(raw.get("internal_notify_group_id", "")).strip(),
+        "internal_notify_group_id": _normalize_internal_notify_group_id(raw.get("internal_notify_group_id", "")),
         "internal_lead_template": str(raw.get("internal_lead_template", "")).strip(),
         "internal_weekly_template": str(raw.get("internal_weekly_template", "")).strip(),
     }
@@ -464,7 +483,7 @@ def _public_client_payload(raw: Dict[str, Any], events_map: Dict[str, List[Dict[
         "p12_report_group_id": str(raw.get("p12_report_group_id", "")).strip(),
         "p12_report_template": str(raw.get("p12_report_template", "")).strip(),
         "p12_data_report_template": str(raw.get("p12_data_report_template", "")).strip(),
-        "internal_notify_group_id": str(raw.get("internal_notify_group_id", "")).strip(),
+        "internal_notify_group_id": _normalize_internal_notify_group_id(raw.get("internal_notify_group_id", "")),
         "internal_lead_template": str(raw.get("internal_lead_template", "")).strip(),
         "internal_weekly_template": str(raw.get("internal_weekly_template", "")).strip(),
     }
@@ -510,7 +529,7 @@ def _public_site_lead_route_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
         "group_id": str(raw.get("group_id", "")).strip(),
         "lead_group_id": str(raw.get("lead_group_id", "")).strip(),
         "lead_phone_number": str(raw.get("lead_phone_number", "")).strip(),
-        "internal_notify_group_id": str(raw.get("internal_notify_group_id", "")).strip(),
+        "internal_notify_group_id": _normalize_internal_notify_group_id(raw.get("internal_notify_group_id", "")),
         "source_type": str(raw.get("source_type", "")).strip().lower(),
         "origem_anuncio": str(raw.get("origem_anuncio", "")).strip(),
         "cliente_origem": str(raw.get("cliente_origem", "")).strip(),
@@ -1067,7 +1086,7 @@ def api_add_client() -> Any:
         "p12_report_group_id": str(payload.get("p12_report_group_id", "")).strip(),
         "p12_report_template": str(payload.get("p12_report_template", "")).strip(),
         "p12_data_report_template": str(payload.get("p12_data_report_template", "")).strip(),
-        "internal_notify_group_id": str(payload.get("internal_notify_group_id", "")).strip(),
+        "internal_notify_group_id": _normalize_internal_notify_group_id(payload.get("internal_notify_group_id", "")),
         "internal_lead_template": str(payload.get("internal_lead_template", "")).strip(),
         "internal_weekly_template": str(payload.get("internal_weekly_template", "")).strip(),
         "internal_notify_message": "",
@@ -1145,6 +1164,7 @@ def api_update_client(client_id: int) -> Any:
             current[key] = str(payload[key]).strip()
     current["lead_group_id"] = str(current.get("group_id", "")).strip()
     current["lead_template"] = str(current.get("lead_template", "") or "default").strip() or "default"
+    current["internal_notify_group_id"] = _normalize_internal_notify_group_id(current.get("internal_notify_group_id", ""))
 
     if persistence.db_enabled():
         persistence.update_meta_client(client_id, current)
@@ -1203,7 +1223,7 @@ def api_add_google_client() -> Any:
         "p12_report_group_id": str(payload.get("p12_report_group_id", "")).strip(),
         "p12_report_template": str(payload.get("p12_report_template", "")).strip(),
         "p12_data_report_template": str(payload.get("p12_data_report_template", "")).strip(),
-        "internal_notify_group_id": str(payload.get("internal_notify_group_id", "")).strip(),
+        "internal_notify_group_id": _normalize_internal_notify_group_id(payload.get("internal_notify_group_id", "")),
         "internal_lead_template": "",
         "internal_weekly_template": str(payload.get("internal_weekly_template", "")).strip(),
         "internal_notify_message": "",
@@ -1282,6 +1302,7 @@ def api_update_google_client(client_id: int) -> Any:
                 current[key] = []
         else:
             current[key] = str(payload[key]).strip()
+    current["internal_notify_group_id"] = _normalize_internal_notify_group_id(current.get("internal_notify_group_id", ""))
 
     if persistence.db_enabled():
         persistence.update_google_client(client_id, current)
@@ -1319,7 +1340,7 @@ def api_add_site_lead_route() -> Any:
         "group_id": str(payload.get("group_id", "")).strip(),
         "lead_group_id": str(payload.get("group_id", "")).strip(),
         "lead_phone_number": str(payload.get("lead_phone_number", "")).strip(),
-        "internal_notify_group_id": str(payload.get("internal_notify_group_id", "")).strip(),
+        "internal_notify_group_id": _normalize_internal_notify_group_id(payload.get("internal_notify_group_id", "")),
         "source_type": str(payload.get("source_type", "")).strip().lower(),
         "origem_anuncio": str(payload.get("origem_anuncio", "")).strip(),
         "cliente_origem": str(payload.get("cliente_origem", "")).strip(),
@@ -1419,6 +1440,7 @@ def api_update_site_lead_route(route_id: int) -> Any:
     if str(current.get("target_type", "")).strip() not in {"meta", "google", "site"}:
         return jsonify({"ok": False, "error": "target_type_invalido"}), 400
     current["lead_group_id"] = str(current.get("group_id", "")).strip()
+    current["internal_notify_group_id"] = _normalize_internal_notify_group_id(current.get("internal_notify_group_id", ""))
     try:
         if persistence.db_enabled():
             persistence.update_site_lead_route(route_id, current)
