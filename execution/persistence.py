@@ -85,12 +85,23 @@ def _psycopg_connect_kwargs() -> Dict[str, Any]:
     - prepared statement "... does not exist"
     """
     kwargs: Dict[str, Any] = {"row_factory": dict_row}
-    raw = (os.environ.get("PSYCOPG_PREPARE_THRESHOLD") or "0").strip()
+    raw = (os.environ.get("PSYCOPG_PREPARE_THRESHOLD") or "0").strip().lower()
+    # psycopg3: prepare_threshold=0 => prepara sempre (piora em pooler transaction).
+    # Para desativar prepared statements automáticos, use None.
+    if raw in ("", "none", "null", "off", "disable", "disabled"):
+        kwargs["prepare_threshold"] = None
+        return kwargs
     try:
-        kwargs["prepare_threshold"] = int(raw)
+        n = int(raw)
     except ValueError:
-        kwargs["prepare_threshold"] = 0
+        kwargs["prepare_threshold"] = None
+        return kwargs
+    kwargs["prepare_threshold"] = None if n <= 0 else n
     return kwargs
+
+
+def _configure_pool_conn(conn: Any) -> None:
+    conn.prepare_threshold = None
 
 
 def _connection_pool() -> Any:
@@ -105,6 +116,7 @@ def _connection_pool() -> Any:
                 min_size=mn,
                 max_size=mx,
                 kwargs=_psycopg_connect_kwargs(),
+                configure=_configure_pool_conn,
             )
             logger.info("Postgres: pool iniciado (min=%s max=%s).", mn, mx)
         return _PG_POOL
