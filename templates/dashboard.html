@@ -464,11 +464,10 @@
             <div class="panel-title-wrap">
               <h2>Origem dos campos (webhook)</h2>
               <p>
-                As variáveis <code>&#123;&#123;&hellip;&#125;&#125;</code> dos templates de lead aparecem abaixo com as
-                etiquetas <strong>Meta</strong>, <strong>Site</strong> e <strong>Interno</strong> (P12) onde aplicam.
-                Há dois mapeamentos de chaves JSON: <strong>Meta + interno</strong> (partilhado) e <strong>Site</strong>.
-                Campos adicionais podem ser criados para um ou para ambos. <code>form_name</code> e outros campos padrão
-                mostram a ordem de chaves usada por omissão e podem ser sobrescritos abaixo.
+                Grelha com todas as variáveis <code>&#123;&#123;&hellip;&#125;&#125;</code> dos templates de lead
+                (etiquetas <strong>Meta</strong>, <strong>Site</strong>, <strong>Interno</strong>). Clique num cartão
+                para definir as chaves JSON (Meta/interno partilham um armazenamento; Site é outro). Use
+                <strong>Salvar chaves de origem</strong> para gravar no servidor.
               </p>
             </div>
             <button
@@ -485,11 +484,10 @@
             </button>
           </div>
           <div id="varResolutionPills" class="var-origin-pills-wrap" aria-label="Variáveis nos templates de lead"></div>
-          <p id="varResolutionPillsHint" class="field-micro var-origin-pills-hint" hidden>
-            Clique numa variável para copiar <code>&#123;&#123;nome&#125;&#125;</code> para a área de transferência.
-          </p>
-          <div id="varResolutionGrid" class="var-resolution-grid" aria-live="polite"></div>
-          <div class="new-client-actions">
+          <p id="varResolutionPillsHint" class="field-micro var-origin-pills-hint" hidden></p>
+          <p id="varResolutionEmpty" class="field-micro var-origin-empty" hidden></p>
+          <div class="var-origin-toolbar">
+            <button type="button" class="ghost" id="varResAddVarBtn">Adicionar variável de origem</button>
             <button type="button" class="primary" id="varResSaveBtn">Salvar chaves de origem</button>
           </div>
           <p id="varResFeedback" class="feedback"></p>
@@ -500,7 +498,7 @@
             <div class="panel-title-wrap">
               <h2>Variáveis personalizadas</h2>
               <p>
-                <strong>Passo 1:</strong> &quot;Origem dos campos&quot; (acima) define
+                <strong>Passo 1:</strong> a grelha &quot;Origem dos campos&quot; (acima) define
                 <code>nome</code>, <code>page_path</code>, UTM, etc. <strong>Passo 2:</strong> aqui
                 cria <code>chaves</code> próprias, escolhendo a fonte — chaves do JSON de payload ou
                 variáveis já resolvidas (contexto) — e aplica mapa, normalização e ordem
@@ -1015,6 +1013,62 @@
         </div>
         <footer class="filters-help-footer">
           <button type="button" class="primary filters-help-close-btn" data-messages-help-dismiss>Fechar</button>
+        </footer>
+      </div>
+    </div>
+
+    <div
+      id="varResolutionEditDialog"
+      class="filters-help-overlay vr-resolution-edit-overlay"
+      hidden
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="varResEditTitle"
+      aria-hidden="true"
+    >
+      <div class="filters-help-backdrop" data-vr-edit-dismiss tabindex="-1" aria-hidden="true"></div>
+      <div class="filters-help-card vr-resolution-edit-card">
+        <header class="filters-help-header">
+          <h2 id="varResEditTitle" class="filters-help-title">Variável</h2>
+          <button type="button" class="filters-help-close-x" data-vr-edit-dismiss aria-label="Fechar">×</button>
+        </header>
+        <div class="filters-help-body vr-resolution-edit-body">
+          <p id="varResEditSubtitle" class="field-micro vr-resolution-edit-sub"></p>
+          <div id="varResEditReadonly" class="vr-resolution-readonly" hidden></div>
+          <div id="varResEditForm">
+            <div id="varResEditNewRow" class="vr-resolution-new-row" hidden>
+              <label class="vr-resolution-edit-label">
+                <span class="field-micro">Nome da variável</span>
+                <input type="text" id="varResEditNewName" class="vr-resolution-edit-input" autocomplete="off" placeholder="ex.: referencia" />
+              </label>
+              <label class="vr-resolution-edit-label">
+                <span class="field-micro">Chaves no JSON (CSV, ordem de tentativa)</span>
+                <input type="text" id="varResEditNewKeys" class="vr-resolution-edit-input" autocomplete="off" placeholder="ex.: ref, referencia" />
+              </label>
+              <div class="vr-resolution-new-chk">
+                <label class="var-resolution-add-chk"><input type="checkbox" id="varResEditNewMeta" checked /> Meta / interno (P12)</label>
+                <label class="var-resolution-add-chk"><input type="checkbox" id="varResEditNewSite" checked /> Site</label>
+              </div>
+            </div>
+            <div id="varResEditDualKeys" class="vr-resolution-dual-keys">
+              <label class="vr-resolution-edit-label">
+                <span class="field-micro">Chaves — Meta e interno (P12)</span>
+                <input type="text" id="varResEditMetaKeys" class="vr-resolution-edit-input" autocomplete="off" placeholder="Deixe vazio para usar o padrão do sistema" />
+              </label>
+              <p id="varResEditDefaultsMeta" class="field-micro vr-resolution-default-hint"></p>
+              <label class="vr-resolution-edit-label">
+                <span class="field-micro">Chaves — Site</span>
+                <input type="text" id="varResEditSiteKeys" class="vr-resolution-edit-input" autocomplete="off" placeholder="Deixe vazio para usar o padrão do sistema" />
+              </label>
+              <p id="varResEditDefaultsSite" class="field-micro vr-resolution-default-hint"></p>
+            </div>
+          </div>
+        </div>
+        <footer class="filters-help-footer vr-resolution-edit-footer">
+          <button type="button" class="ghost" data-vr-edit-dismiss>Cancelar</button>
+          <button type="button" class="ghost" id="varResModalCopyBtn">Copiar placeholder</button>
+          <button type="button" class="ghost" id="varResModalRemoveBtn" hidden>Remover variável extra</button>
+          <button type="button" class="primary" id="varResModalApplyBtn">Aplicar ao rascunho</button>
         </footer>
       </div>
     </div>

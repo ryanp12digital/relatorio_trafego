@@ -11,6 +11,9 @@ const state = {
     variable_resolution: {},
     custom_variables: {},
     lead_source_key_defaults: {},
+    /** Rascunho local de origem (CSV por slot) antes de «Salvar chaves de origem». */
+    vrDraftMeta: {},
+    vrDraftSite: {},
   },
   activeFilterChannels: [],
   eventsByClient: new Map(),
@@ -322,7 +325,7 @@ const MESSAGES_SECTION_HELP = {
   variable_resolution: {
     title: "Origem dos campos (webhook)",
     body:
-      "Há dois conjuntos de chaves: Meta + notificação interna (partilhados) e Site. As variáveis {{...}} são as mesmas nos templates; ao adicionar campo extra pode escolher em qual(is) conjunto(s) entra. Campos vazios voltam aos padrões do sistema.",
+      "Clique numa variável para abrir o editor: chaves JSON em ordem de tentativa, separadas por vírgula, para Meta/interno (partilhado) e para Site. Campos vazios usam o padrão do sistema. Variáveis só de contexto (ex.: nome do cliente no cadastro) aparecem só para consulta.",
   },
   custom_variables: {
     title: "Variáveis personalizadas",
@@ -1551,26 +1554,275 @@ function copyTextToClipboard(text) {
   }
 }
 
-function renderVariableOriginPills() {
-  const wrap = document.getElementById("varResolutionPills");
-  const hint = document.getElementById("varResolutionPillsHint");
-  if (!wrap) return;
-  wrap.innerHTML = "";
-  if (hint) {
-    hint.hidden = true;
-  }
-  const chans = listLeadOriginChannels();
-  if (!chans.length) return;
+function hydrateVrDraftFromTemplates() {
+  state.vrDraftMeta = {};
+  state.vrDraftSite = {};
+  const mergeBucket = (b) => {
+    const out = {};
+    if (!b || typeof b !== "object") return out;
+    for (const [k, meta] of Object.entries(b)) {
+      const sk = meta?.source_keys;
+      if (Array.isArray(sk) && sk.length) {
+        out[k] = sk.join(", ");
+      }
+    }
+    return out;
+  };
+  Object.assign(state.vrDraftMeta, mergeBucket(state.templates.variable_resolution?.meta_lead));
+  Object.assign(state.vrDraftSite, mergeBucket(state.templates.variable_resolution?.site_lead));
+}
+
+function allLeadOriginVariableKeys() {
   const keys = new Set();
-  chans.forEach((ch) => {
+  listLeadOriginChannels().forEach((ch) => {
     const v = state.templates.variables?.[ch];
     if (v && typeof v === "object") Object.keys(v).forEach((k) => keys.add(k));
   });
-  const sorted = Array.from(keys).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  Object.keys(state.vrDraftMeta || {}).forEach((k) => keys.add(k));
+  Object.keys(state.vrDraftSite || {}).forEach((k) => keys.add(k));
+  return Array.from(keys).sort((a, b) => a.localeCompare(b, "pt-BR"));
+}
+
+function isVrConfigurableSlot(key) {
+  if (LEAD_RESOLVABLE_SLOTS.includes(key)) return true;
+  if (VR_EXT_FORBIDDEN.has(key)) return false;
+  return _VR_NAME_RE.test(key);
+}
+
+let vrModalSlot = "";
+let vrModalIsNew = false;
+
+function closeVrEditDialog() {
+  const dlg = document.getElementById("varResolutionEditDialog");
+  if (!dlg) return;
+  dlg.hidden = true;
+  dlg.setAttribute("aria-hidden", "true");
+}
+
+function openVrEditDialog(slotKey, isNew = false) {
+  vrModalSlot = String(slotKey || "").trim();
+  vrModalIsNew = !!isNew;
+  const dlg = document.getElementById("varResolutionEditDialog");
+  if (!dlg) return;
+  const titleEl = document.getElementById("varResEditTitle");
+  const subEl = document.getElementById("varResEditSubtitle");
+  const readOnly = document.getElementById("varResEditReadonly");
+  const editForm = document.getElementById("varResEditForm");
+  const newRow = document.getElementById("varResEditNewRow");
+  const metaInp = document.getElementById("varResEditMetaKeys");
+  const siteInp = document.getElementById("varResEditSiteKeys");
+  const newKeysInp = document.getElementById("varResEditNewKeys");
+  const nameInp = document.getElementById("varResEditNewName");
+  const defMeta = document.getElementById("varResEditDefaultsMeta");
+  const defSite = document.getElementById("varResEditDefaultsSite");
+  const applyBtn = document.getElementById("varResModalApplyBtn");
+  const rmBtn = document.getElementById("varResModalRemoveBtn");
+
+  const dualKeys = document.getElementById("varResEditDualKeys");
+  if (isNew) {
+    if (titleEl) titleEl.textContent = "Nova variável de origem";
+    if (subEl) subEl.textContent = "Crie um nome e as chaves JSON; escolha em que armazenamentos entra (Meta/interno e/ou Site).";
+    if (readOnly) readOnly.hidden = true;
+    if (editForm) editForm.hidden = false;
+    if (newRow) newRow.hidden = false;
+    if (dualKeys) dualKeys.hidden = true;
+    if (nameInp) nameInp.value = "";
+    if (metaInp) metaInp.value = "";
+    if (siteInp) siteInp.value = "";
+    if (newKeysInp) newKeysInp.value = "";
+    const nm = document.getElementById("varResEditNewMeta");
+    const ns = document.getElementById("varResEditNewSite");
+    if (nm) nm.checked = true;
+    if (ns) ns.checked = true;
+    if (defMeta) defMeta.textContent = "";
+    if (defSite) defSite.textContent = "";
+    if (rmBtn) rmBtn.hidden = true;
+    if (applyBtn) applyBtn.hidden = false;
+  } else {
+    const key = vrModalSlot;
+    if (titleEl) titleEl.textContent = `{{${key}}}`;
+    const desc =
+      state.templates.variables?.meta_lead?.[key] ||
+      state.templates.variables?.site_lead?.[key] ||
+      state.templates.variables?.internal_lead?.[key] ||
+      "";
+    if (subEl) subEl.textContent = desc || "Variável de lead";
+    const conf = isVrConfigurableSlot(key);
+    if (readOnly) {
+      readOnly.hidden = conf;
+      if (!conf) {
+        readOnly.innerHTML =
+          "<p class=\"field-micro\">Esta variável não é mapeada aqui por lista de chaves no JSON (ex.: dados do cadastro do cliente, blocos montados ou API). Use «Copiar» se precisar do placeholder noutro sítio.</p>";
+      }
+    }
+    if (editForm) editForm.hidden = !conf;
+    if (newRow) newRow.hidden = true;
+    if (dualKeys) dualKeys.hidden = !conf;
+    if (conf) {
+      if (metaInp) metaInp.value = state.vrDraftMeta[key] || "";
+      if (siteInp) siteInp.value = state.vrDraftSite[key] || "";
+      const dm = state.templates.lead_source_key_defaults?.[key];
+      const defLine =
+        Array.isArray(dm) && dm.length ? `Padrão do sistema (se o campo acima estiver vazio): ${dm.join(", ")}` : "";
+      if (defMeta) defMeta.textContent = defLine;
+      if (defSite) defSite.textContent = defLine;
+    }
+    const isExtra = !LEAD_RESOLVABLE_SLOTS.includes(key);
+    if (rmBtn) rmBtn.hidden = !conf || !isExtra;
+    if (applyBtn) applyBtn.hidden = !conf;
+  }
+  dlg.hidden = false;
+  dlg.setAttribute("aria-hidden", "false");
+  if (isNew && nameInp) nameInp.focus();
+  else if (metaInp && !editForm?.hidden) metaInp.focus();
+}
+
+function applyVrEditDialog() {
+  const fb = document.getElementById("varResFeedback");
+  const metaInp = document.getElementById("varResEditMetaKeys");
+  const siteInp = document.getElementById("varResEditSiteKeys");
+
+  if (vrModalIsNew) {
+    const name = (document.getElementById("varResEditNewName")?.value || "").trim();
+    const raw = (document.getElementById("varResEditNewKeys")?.value || "").trim();
+    const useMeta = document.getElementById("varResEditNewMeta")?.checked;
+    const useSite = document.getElementById("varResEditNewSite")?.checked;
+    if (!useMeta && !useSite) {
+      if (fb) fb.textContent = "Marque pelo menos um destino: Meta/interno ou Site.";
+      return;
+    }
+    if (!name || !raw) {
+      if (fb) fb.textContent = "Preencha o nome da variável e as chaves do JSON.";
+      return;
+    }
+    if (!_VR_NAME_RE.test(name)) {
+      if (fb) fb.textContent = "Nome de variável inválido: use a-z, 0-9 e _ (começando com letra).";
+      return;
+    }
+    if (LEAD_RESOLVABLE_SLOTS.includes(name)) {
+      if (fb) fb.textContent = "Esse nome é um campo padrão — abra o cartão dessa variável na grelha.";
+      return;
+    }
+    if (VR_EXT_FORBIDDEN.has(name)) {
+      if (fb) fb.textContent = `O nome «${name}» é reservado ao sistema.`;
+      return;
+    }
+    const keys = raw
+      .split(/[,;]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!keys.length) {
+      if (fb) fb.textContent = "Indique pelo menos uma chave de JSON.";
+      return;
+    }
+    const joined = keys.join(", ");
+    if (useMeta && (state.vrDraftMeta[name] || "").trim()) {
+      if (fb) fb.textContent = `Já existe rascunho para «${name}» em Meta/interno. Abra o cartão para editar.`;
+      return;
+    }
+    if (useSite && (state.vrDraftSite[name] || "").trim()) {
+      if (fb) fb.textContent = `Já existe rascunho para «${name}» em Site. Abra o cartão para editar.`;
+      return;
+    }
+    if (useMeta) state.vrDraftMeta[name] = joined;
+    if (useSite) state.vrDraftSite[name] = joined;
+    closeVrEditDialog();
+    renderVariableResolutionPanel();
+    if (fb) fb.textContent = `«${name}» adicionado ao rascunho. Clique em «Salvar chaves de origem» para gravar no servidor.`;
+    return;
+  }
+
+  const key = vrModalSlot;
+  if (!isVrConfigurableSlot(key)) {
+    closeVrEditDialog();
+    return;
+  }
+  const m = (metaInp?.value || "").trim();
+  const s = (siteInp?.value || "").trim();
+  if (m) state.vrDraftMeta[key] = m;
+  else delete state.vrDraftMeta[key];
+  if (s) state.vrDraftSite[key] = s;
+  else delete state.vrDraftSite[key];
+  closeVrEditDialog();
+  renderVariableResolutionPanel();
+  if (fb) fb.textContent = "Alteração aplicada ao rascunho. Clique em «Salvar chaves de origem» para gravar.";
+}
+
+function removeVrExtraFromDraft() {
+  const key = vrModalSlot;
+  if (!key || LEAD_RESOLVABLE_SLOTS.includes(key)) return;
+  delete state.vrDraftMeta[key];
+  delete state.vrDraftSite[key];
+  closeVrEditDialog();
+  renderVariableResolutionPanel();
+  const fb = document.getElementById("varResFeedback");
+  if (fb) fb.textContent = `«${key}» removido do rascunho. Salve para persistir no servidor.`;
+}
+
+let vrEditDialogBound = false;
+
+function setupVarResolutionEditDialog() {
+  if (vrEditDialogBound) return;
+  vrEditDialogBound = true;
+  const dlg = document.getElementById("varResolutionEditDialog");
+  if (!dlg) return;
+  dlg.querySelectorAll("[data-vr-edit-dismiss]").forEach((el) => {
+    el.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      closeVrEditDialog();
+    });
+  });
+  document.getElementById("varResModalApplyBtn")?.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    applyVrEditDialog();
+  });
+  document.getElementById("varResModalRemoveBtn")?.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    removeVrExtraFromDraft();
+  });
+  document.getElementById("varResModalCopyBtn")?.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    const ph = vrModalIsNew ? "" : `{{${vrModalSlot}}}`;
+    if (!ph) return;
+    copyTextToClipboard(ph).then((ok) => {
+      const fb = document.getElementById("varResFeedback");
+      if (ok && fb) fb.textContent = `Copiado: ${ph}`;
+    });
+  });
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Escape") return;
+    if (dlg.hidden) return;
+    closeVrEditDialog();
+  });
+}
+
+function renderVariableOriginPills() {
+  const wrap = document.getElementById("varResolutionPills");
+  const hint = document.getElementById("varResolutionPillsHint");
+  const empty = document.getElementById("varResolutionEmpty");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+  if (hint) {
+    hint.hidden = false;
+    hint.textContent = "Clique numa variável para abrir o editor de chaves JSON (Meta/interno e Site).";
+  }
+  const chans = listLeadOriginChannels();
+  if (!chans.length) {
+    if (empty) {
+      empty.hidden = false;
+      empty.textContent =
+        "Nenhum canal de lead no catálogo. A origem de campos aplica-se a Meta, Site e interno (P12).";
+    }
+    return;
+  }
+  if (empty) empty.hidden = true;
+
+  const sorted = allLeadOriginVariableKeys();
   sorted.forEach((key) => {
     const pill = document.createElement("button");
     pill.type = "button";
     pill.className = "var-origin-pill";
+    if (!isVrConfigurableSlot(key)) pill.classList.add("var-origin-pill--readonly");
     const code = document.createElement("code");
     code.textContent = `{{${key}}}`;
     const badges = document.createElement("div");
@@ -1587,293 +1839,18 @@ function renderVariableOriginPills() {
       state.templates.variables?.site_lead?.[key] ||
       state.templates.variables?.internal_lead?.[key] ||
       "";
-    pill.title = tip ? `${tip} — clique para copiar` : "Clique para copiar";
+    const conf = isVrConfigurableSlot(key);
+    pill.title = conf
+      ? (tip ? `${tip} — clique para editar origem` : "Clique para editar chaves de origem")
+      : (tip ? `${tip} — só consulta (não editável aqui)` : "Só consulta");
     pill.append(code, badges);
-    pill.addEventListener("click", () => {
-      copyTextToClipboard(`{{${key}}}`).then((ok) => {
-        if (ok && hint) {
-          hint.hidden = false;
-          hint.textContent = `Copiado: {{${key}}}`;
-        }
-      });
-    });
+    pill.addEventListener("click", () => openVrEditDialog(key, false));
     wrap.appendChild(pill);
-  });
-  if (sorted.length && hint) {
-    hint.hidden = false;
-    hint.textContent =
-      "Clique numa variável para copiar {{nome}} para a área de transferência.";
-  }
-}
-
-function appendVrExtRow(listEl, slotName, keysJoined) {
-  const row = document.createElement("div");
-  row.className = "var-resolution-row var-resolution-row-ext";
-  const nameWrap = document.createElement("label");
-  nameWrap.className = "var-resolution-name-wrap";
-  const nameIn = document.createElement("input");
-  nameIn.type = "text";
-  nameIn.className = "vr-ext-name";
-  nameIn.value = slotName;
-  nameIn.autocomplete = "off";
-  nameIn.placeholder = "minha_variavel";
-  const wrap = document.createElement("label");
-  wrap.className = "var-resolution-input-wrap";
-  const span = document.createElement("span");
-  span.className = "field-micro";
-  span.textContent = "Chaves do JSON (ordem de tentativa)";
-  const inp = document.createElement("input");
-  inp.type = "text";
-  inp.className = "vr-ext-keys";
-  inp.autocomplete = "off";
-  inp.placeholder = "ex.: referencia, ref";
-  inp.value = keysJoined;
-  const rm = document.createElement("button");
-  rm.type = "button";
-  rm.className = "ghost small";
-  rm.textContent = "Remover";
-  rm.addEventListener("click", () => row.remove());
-  nameWrap.appendChild(document.createTextNode("Nome no template"));
-  nameWrap.appendChild(nameIn);
-  wrap.appendChild(span);
-  wrap.appendChild(inp);
-  row.appendChild(nameWrap);
-  row.appendChild(wrap);
-  row.appendChild(rm);
-  listEl.appendChild(row);
-}
-
-function renderVrSlotRows(container, vr, labelVars, storageKey) {
-  LEAD_RESOLVABLE_SLOTS.forEach((slot) => {
-    const row = document.createElement("div");
-    row.className = "var-resolution-row";
-    const lab = document.createElement("label");
-    lab.innerHTML = `<strong>${escHtml(slot)}</strong><br /><span class="field-micro">${escHtml(labelVars[slot] || "")}</span>`;
-    const defaultKeys = state.templates.lead_source_key_defaults?.[slot];
-    if (Array.isArray(defaultKeys) && defaultKeys.length) {
-      const defaults = document.createElement("p");
-      defaults.className = "field-micro vr-slot-default-keys";
-      defaults.textContent = `Padrão (se vazio): ${defaultKeys.join(", ")}`;
-      lab.appendChild(defaults);
-    }
-    const wrap = document.createElement("label");
-    wrap.className = "var-resolution-input-wrap";
-    const span = document.createElement("span");
-    span.className = "field-micro";
-    span.textContent = "Chaves (CSV, ordem de tentativa)";
-    const inp = document.createElement("input");
-    inp.type = "text";
-    inp.id = `vrSlot_${storageKey}_${slot}`;
-    inp.autocomplete = "off";
-    inp.placeholder = "ex.: nome_completo, nome, name";
-    const keys = vr[slot]?.source_keys;
-    inp.value = Array.isArray(keys) ? keys.join(", ") : "";
-    wrap.appendChild(span);
-    wrap.appendChild(inp);
-    row.appendChild(lab);
-    row.appendChild(wrap);
-    container.appendChild(row);
   });
 }
 
 function renderVariableResolutionPanel() {
   renderVariableOriginPills();
-  const grid = document.getElementById("varResolutionGrid");
-  if (!grid) return;
-  grid.innerHTML = "";
-  const channels = listLeadOriginChannels();
-  if (!channels.length) {
-    const p = document.createElement("p");
-    p.className = "field-micro";
-    p.textContent =
-      "Nenhum canal de lead no catálogo. A origem de campos aplica-se a Meta, Site e interno (P12).";
-    grid.appendChild(p);
-    return;
-  }
-
-  const vrMeta = state.templates.variable_resolution?.meta_lead || {};
-  const vrSite = state.templates.variable_resolution?.site_lead || {};
-  const labelsMeta = state.templates.variables?.meta_lead || {};
-  const labelsSite = state.templates.variables?.site_lead || {};
-
-  const makeBucket = (storageKey, vr, labels, title, description) => {
-    const fs = document.createElement("fieldset");
-    fs.className = "var-resolution-bucket";
-    const leg = document.createElement("legend");
-    leg.className = "var-resolution-bucket-legend";
-    leg.textContent = title;
-    const desc = document.createElement("p");
-    desc.className = "field-micro var-resolution-bucket-desc";
-    desc.textContent = description;
-    const innerGrid = document.createElement("div");
-    innerGrid.className = "var-resolution-inner-grid";
-    renderVrSlotRows(innerGrid, vr, labels, storageKey);
-    fs.append(leg, desc, innerGrid);
-
-    const extraHead = document.createElement("div");
-    extraHead.className = "var-resolution-extra-subhead";
-    const h4 = document.createElement("h4");
-    h4.className = "var-resolution-extra-subtitle";
-    h4.textContent = "Campos de origem adicionais (este armazenamento)";
-    const hint = document.createElement("p");
-    hint.className = "field-micro";
-    hint.textContent =
-      "Nomes só com letras, números e _ (ex.: referencia). Em baixo pode criar o mesmo nome nos dois armazenamentos com checkboxes.";
-    extraHead.append(h4, hint);
-
-    const listId = storageKey === "meta_lead" ? "varResolutionExtraList_meta" : "varResolutionExtraList_site";
-    const extraList = document.createElement("div");
-    extraList.className = "var-resolution-extra-list";
-    extraList.id = listId;
-
-    const extSlots = Object.keys(vr).filter((k) => !LEAD_RESOLVABLE_SLOTS.includes(k));
-    extSlots.forEach((s) => {
-      const keys = vr[s]?.source_keys;
-      const val = Array.isArray(keys) ? keys.join(", ") : "";
-      appendVrExtRow(extraList, s, val);
-    });
-
-    fs.append(extraHead, extraList);
-    return fs;
-  };
-
-  grid.appendChild(
-    makeBucket(
-      "meta_lead",
-      vrMeta,
-      labelsMeta,
-      "Meta e notificação interna (P12)",
-      "Leads da Meta e a cópia interna partilham estas chaves de JSON.",
-    ),
-  );
-  grid.appendChild(
-    makeBucket(
-      "site_lead",
-      vrSite,
-      labelsSite,
-      "Leads do site",
-      "Webhook de leads do site: pode usar nomes de campo diferentes; as variáveis {{...}} nos templates são as mesmas.",
-    ),
-  );
-
-  const addBar = document.createElement("div");
-  addBar.className = "var-resolution-add-bar";
-  const nameLab = document.createElement("label");
-  nameLab.className = "var-resolution-add-field";
-  const nameLabSpan = document.createElement("span");
-  nameLabSpan.className = "field-micro";
-  nameLabSpan.textContent = "Nome da variável";
-  const nameIn = document.createElement("input");
-  nameIn.type = "text";
-  nameIn.id = "varResNewExtName";
-  nameIn.autocomplete = "off";
-  nameIn.placeholder = "ex.: referencia";
-  nameLab.append(nameLabSpan, nameIn);
-
-  const keysLab = document.createElement("label");
-  keysLab.className = "var-resolution-add-field var-resolution-add-field--wide";
-  const keysLabSpan = document.createElement("span");
-  keysLabSpan.className = "field-micro";
-  keysLabSpan.textContent = "Chaves no JSON (CSV)";
-  const keysIn = document.createElement("input");
-  keysIn.type = "text";
-  keysIn.id = "varResNewExtKeys";
-  keysIn.autocomplete = "off";
-  keysIn.placeholder = "ex.: referencia, ref";
-  keysLab.append(keysLabSpan, keysIn);
-
-  const chWrap = document.createElement("div");
-  chWrap.className = "var-resolution-add-channels";
-  const mkChk = (id, label, checked) => {
-    const lb = document.createElement("label");
-    lb.className = "var-resolution-add-chk";
-    const inp = document.createElement("input");
-    inp.type = "checkbox";
-    inp.id = id;
-    if (checked) inp.checked = true;
-    lb.appendChild(inp);
-    lb.appendChild(document.createTextNode(` ${label}`));
-    return lb;
-  };
-  chWrap.appendChild(mkChk("varResNewExtMeta", "Meta / interno (P12)", true));
-  chWrap.appendChild(mkChk("varResNewExtSite", "Site", true));
-
-  const addBtn = document.createElement("button");
-  addBtn.type = "button";
-  addBtn.className = "ghost var-resolution-extra-add";
-  addBtn.id = "varResAddExtBtn";
-  addBtn.setAttribute("aria-label", "Adicionar campo de origem em Meta/interno e/ou Site");
-  addBtn.textContent = "Adicionar campo de origem";
-
-  addBtn.addEventListener("click", () => {
-    const fb = document.getElementById("varResFeedback");
-    const name = (nameIn.value || "").trim();
-    const raw = (keysIn.value || "").trim();
-    const useMeta = document.getElementById("varResNewExtMeta")?.checked;
-    const useSite = document.getElementById("varResNewExtSite")?.checked;
-    if (!useMeta && !useSite) {
-      if (fb) fb.textContent = "Marque pelo menos um destino: Meta/interno ou Site.";
-      return;
-    }
-    if (!name || !raw) {
-      if (fb) fb.textContent = "Preencha o nome da variável e as chaves do JSON.";
-      return;
-    }
-    if (!_VR_NAME_RE.test(name)) {
-      if (fb) fb.textContent = "Nome de variável inválido: use a-z, 0-9 e _ (começando com letra).";
-      return;
-    }
-    if (LEAD_RESOLVABLE_SLOTS.includes(name)) {
-      if (fb) fb.textContent = "Esse nome é um campo padrão — edite-o na lista acima, não como campo adicional.";
-      return;
-    }
-    if (VR_EXT_FORBIDDEN.has(name)) {
-      if (fb) fb.textContent = `O nome «${name}» é reservado ao sistema.`;
-      return;
-    }
-    const keys = raw
-      .split(/[,;]+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (!keys.length) {
-      if (fb) fb.textContent = "Indique pelo menos uma chave de JSON.";
-      return;
-    }
-    const listMeta = document.getElementById("varResolutionExtraList_meta");
-    const listSite = document.getElementById("varResolutionExtraList_site");
-    if (useMeta && listMeta) {
-      const dup = Array.from(listMeta.querySelectorAll(".vr-ext-name")).some(
-        (el) => (el.value || "").trim().toLowerCase() === name.toLowerCase(),
-      );
-      if (dup) {
-        if (fb) fb.textContent = `Já existe um campo extra com o nome «${name}» em Meta/interno.`;
-        return;
-      }
-    }
-    if (useSite && listSite) {
-      const dup = Array.from(listSite.querySelectorAll(".vr-ext-name")).some(
-        (el) => (el.value || "").trim().toLowerCase() === name.toLowerCase(),
-      );
-      if (dup) {
-        if (fb) fb.textContent = `Já existe um campo extra com o nome «${name}» em Site.`;
-        return;
-      }
-    }
-    const joined = keys.join(", ");
-    if (useMeta && listMeta) appendVrExtRow(listMeta, name, joined);
-    if (useSite && listSite) appendVrExtRow(listSite, name, joined);
-    nameIn.value = "";
-    keysIn.value = "";
-    if (fb) {
-      const parts = [];
-      if (useMeta) parts.push("Meta/interno");
-      if (useSite) parts.push("Site");
-      fb.textContent = `Campo «${name}» adicionado em: ${parts.join(" e ")}.`;
-    }
-  });
-
-  addBar.append(nameLab, keysLab, chWrap, addBtn);
-  grid.appendChild(addBar);
 }
 
 function renderCustomVariablesPanel() {
@@ -2255,59 +2232,28 @@ function appendEmptyCustomVarCard() {
 }
 
 function collectVariableResolutionPayload(storageKey) {
-  const label =
-    storageKey === "meta_lead"
-      ? "Meta/interno"
-      : "Site";
+  const label = storageKey === "meta_lead" ? "Meta/interno" : "Site";
+  const draft = storageKey === "meta_lead" ? state.vrDraftMeta : state.vrDraftSite;
   const payload = {};
-  const seen = new Set();
-  const listId = storageKey === "meta_lead" ? "varResolutionExtraList_meta" : "varResolutionExtraList_site";
 
-  LEAD_RESOLVABLE_SLOTS.forEach((slot) => {
-    const inp = document.getElementById(`vrSlot_${storageKey}_${slot}`);
-    const raw = (inp?.value || "").trim();
-    if (!raw) return;
+  for (const [name, csv] of Object.entries(draft || {})) {
+    const raw = String(csv || "").trim();
+    if (!raw) continue;
     const keys = raw
       .split(/[,;]+/)
       .map((s) => s.trim())
       .filter(Boolean);
-    if (keys.length) {
-      payload[slot] = { source_keys: keys };
-      seen.add(slot);
-    }
-  });
-
-  const listEl = document.getElementById(listId);
-  if (!listEl) {
-    return { error: `Lista de campos adicionais em falta (${label}).` };
-  }
-
-  for (const row of listEl.querySelectorAll(".var-resolution-row-ext")) {
-    const name = (row.querySelector(".vr-ext-name")?.value || "").trim();
-    const raw = (row.querySelector(".vr-ext-keys")?.value || "").trim();
-    if (!name && !raw) continue;
-    if ((name && !raw) || (!name && raw)) {
-      return {
-        error: `${label}: em cada linha de campo adicional, preencha o nome e as chaves do JSON.`,
-      };
-    }
+    if (!keys.length) continue;
     if (!_VR_NAME_RE.test(name)) {
-      return { error: "Nome de variável inválido: use a-z, 0-9 e _ (começando com letra)." };
+      return { error: `${label}: nome inválido «${name}».` };
     }
-    if (LEAD_RESOLVABLE_SLOTS.includes(name) || seen.has(name)) {
-      return { error: `${label}: nome em duplicado ou reservado aos blocos padrão.` };
+    if (LEAD_RESOLVABLE_SLOTS.includes(name)) {
+      payload[name] = { source_keys: keys };
+      continue;
     }
     if (VR_EXT_FORBIDDEN.has(name)) {
-      return { error: `O nome «${name}» é reservado ao sistema. Escolha outro.` };
+      return { error: `${label}: «${name}» é reservado ao sistema.` };
     }
-    const keys = raw
-      .split(/[,;]+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (!keys.length) {
-      return { error: `${label}: indique pelo menos uma chave de JSON em cada linha de campo adicional.` };
-    }
-    seen.add(name);
     payload[name] = { source_keys: keys };
   }
   return { payload };
@@ -3044,6 +2990,7 @@ async function fetchTemplates() {
     ...data,
     lead_source_key_defaults: data.lead_source_key_defaults || {},
   };
+  hydrateVrDraftFromTemplates();
   renderTemplateVariables(document.getElementById("tplChannel").value);
   renderTemplatesCatalog();
   renderFiltersForm();
@@ -3773,6 +3720,8 @@ function bindUI() {
   document.getElementById("varResSaveBtn")?.addEventListener("click", () =>
     saveVariableResolution().catch((e) => console.error(e)),
   );
+  document.getElementById("varResAddVarBtn")?.addEventListener("click", () => openVrEditDialog("", true));
+  setupVarResolutionEditDialog();
   document.getElementById("customVarsChannel")?.addEventListener("change", renderCustomVariablesPanel);
   document.getElementById("customVarsAddBtn")?.addEventListener("click", appendEmptyCustomVarCard);
   document.getElementById("customVarsSaveBtn")?.addEventListener("click", () =>
