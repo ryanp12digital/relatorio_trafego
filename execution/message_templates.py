@@ -137,20 +137,6 @@ DEFAULT_TEMPLATES: Dict[str, Dict[str, Dict[str, str]]] = {
                 "{{respostas}}"
             ),
         },
-        "lorena": {
-            "name": "Meta Lead - Lorena",
-            "description": "Template legado para Lorena (usa conteúdo padrão).",
-            "content": (
-                "Novo lead - {{client_name}}\n"
-                "Recebido em: {{chegada_em}}\n"
-                "Nome do Lead: {{nome}}\n"
-                "WhatsApp do Lead: {{whatsapp}}\n"
-                "E-mail do Lead: {{email}}\n\n"
-                "==========\n\n"
-                "Respostas do Lead:\n"
-                "{{respostas}}"
-            ),
-        },
     },
     "site_lead": {
         "default": {

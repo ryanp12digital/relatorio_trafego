@@ -15,6 +15,8 @@ TZ=America/Sao_Paulo
 DRY_RUN=false
 MAX_RETRIES=3
 RETRY_DELAY_SECONDS=300
+# Logs no terminal: campos ` | ` em linhas separadas (↳). Desativar: LOG_PIPE_MULTILINE=0
+# LOG_PIPE_MULTILINE=1
 
 # -----------------------------------------------------------------------------
 # Obrigatório para o serviço subir com webhook + relatório + dashboard
@@ -138,14 +140,6 @@ DEFAULT_REPORT_TIMEZONE=America/Sao_Paulo
 # Webhook leads — opcional
 # -----------------------------------------------------------------------------
 META_LEAD_FALLBACK_WHATSAPP=
-# Removido: fallback Lorena sem page_id em /meta-new-lead. POST /lorena-new-lead responde 410.
-# META_LEAD_ALLOW_DEFAULT_NO_PAGE_FALLBACK=
-
-# -----------------------------------------------------------------------------
-# Legado Lorena (variáveis já não usadas pelo webhook HTTP; mantidas só por compat. com scripts antigos)
-# -----------------------------------------------------------------------------
-LORENA_LEAD_WEBHOOK_SECRET=
-LORENA_FALLBACK_WHATSAPP=
 
 # -----------------------------------------------------------------------------
 # Erros / notificações

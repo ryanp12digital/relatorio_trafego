@@ -10,7 +10,7 @@ else
     # 2. Cria .env a partir de variáveis de ambiente (se disponíveis)
     # Formato correto: KEY=value (sem prefixos ou exports)
     # Inclui variáveis do relatório (REPORT_*, DEFAULT_REPORT_TIMEZONE, FORCE_WEEKLY_REPORT) e Meta (META_* já cobre atribuição).
-    printenv | grep -E '^(EVOLUTION_|META_|MAX_RETRIES|RETRY_DELAY_SECONDS|ERROR_WEBHOOK_|DRY_RUN|TZ|LORENA_|WEBHOOK_|REPORT_|DEFAULT_REPORT_TIMEZONE|FORCE_WEEKLY_REPORT|META_LEAD_|DASHBOARD_|ENABLE_DASHBOARD|GOOGLE_|DATABASE_URL|SUPABASE_DATABASE_URL|FLASK_SECRET_KEY|SUPABASE_)=' > /app/.env 2>/dev/null
+    printenv | grep -E '^(EVOLUTION_|META_|MAX_RETRIES|RETRY_DELAY_SECONDS|ERROR_WEBHOOK_|DRY_RUN|TZ|WEBHOOK_|REPORT_|DEFAULT_REPORT_TIMEZONE|FORCE_WEEKLY_REPORT|META_LEAD_|DASHBOARD_|ENABLE_DASHBOARD|GOOGLE_|DATABASE_URL|SUPABASE_DATABASE_URL|FLASK_SECRET_KEY|SUPABASE_)=' > /app/.env 2>/dev/null
     
     if [ -s /app/.env ]; then
         echo "P12 Relatorios: ✅ .env criado a partir das variáveis Easypanel"

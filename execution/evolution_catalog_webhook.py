@@ -14,6 +14,7 @@ import threading
 import unicodedata
 from typing import Any, Dict, List, Optional, Tuple
 
+from execution.pretty_logging import pipes_to_lines
 from execution.secret_strings import constant_time_str_equal
 
 logger = logging.getLogger(__name__)
@@ -52,8 +53,21 @@ def _evolution_instance_tag() -> str:
     return f"evolution_instance={inst}" if inst else "evolution_instance=(defina EVOLUTION_INSTANCE)"
 
 
+def _emoji_evo(message: str) -> str:
+    t = message.upper()
+    if "SECRET_OK" in t or "OK_CATALOGO" in t or t.startswith("COD=OK"):
+        return "✅"
+    if any(x in t for x in ("ERRO", "INVALIDO", "NEGADO", "FALHOU", "NAO_CONFIGURADO", "WEBHOOK_SECRET_CATALOGO")):
+        return "❌"
+    if "DEV" in t or "SEM_SECRET" in t or "WARN" in t:
+        return "⚠️"
+    return "📋"
+
+
 def _evo_log(message: str, level: int = logging.INFO) -> None:
-    logger.log(level, "%s %s | %s", LOG_PREFIX_EVOLUTION, _evolution_instance_tag(), message)
+    emoji = _emoji_evo(message)
+    body = pipes_to_lines(message)
+    logger.log(level, "%s %s · %s\n%s", LOG_PREFIX_EVOLUTION, emoji, _evolution_instance_tag(), body)
 
 
 def _payload_shape_evolution(raw: Any, max_keys: int = 16) -> str:

@@ -554,7 +554,7 @@ function bindFlowModal() {
 }
 
 /** IDs de template Meta Lead conhecidos no backend (integrados). */
-const META_LEAD_BUILTIN_IDS = ["default", "lorena", "pratical_life"];
+const META_LEAD_BUILTIN_IDS = ["default", "pratical_life"];
 const SITE_LEAD_BUILTIN_IDS = ["default"];
 const META_REPORT_BUILTIN_IDS = ["default", "p12_resumo", "p12_dados"];
 const GOOGLE_REPORT_BUILTIN_IDS = ["default", "p12_resumo", "p12_dados"];

@@ -8,8 +8,6 @@ Rotas públicas de lead (cada uma com segredo opcional próprio no .env):
 
 Outros POST no mesmo processo:
 - POST /evolution-webhook — catálogo de grupos Evolution (EVOLUTION_CATALOG_WEBHOOK_SECRET)
-
-Legado removido: POST /lorena-new-lead responde 410 com indicação dos endpoints acima.
 """
 
 from __future__ import annotations
@@ -47,17 +45,14 @@ from execution.message_templates import (
     render_template_text,
     resolution_channel_for_lead,
 )
+from execution.pretty_logging import configure_process_logging, pipes_to_lines
 from execution.project_paths import clients_json_path, google_clients_json_path
 from execution.secret_strings import constant_time_str_equal
 
 log_dir = os.path.join(os.path.dirname(__file__), "..", ".tmp")
 os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, "execution.log")
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler(log_file), logging.StreamHandler()],
-)
+configure_process_logging(log_file=log_file, level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(
@@ -203,25 +198,41 @@ def _emoji_for_log(message: str) -> str:
     text = message.upper()
     if "SERVICO_INICIADO" in text:
         return "🚀"
-    if "NEGADO_AUTH" in text:
+    if "NEGADO_AUTH" in text or "ERRO_AUTH" in text or "WEBHOOK_SECRET_NEGADO" in text:
         return "🔒"
+    if "ERRO_JSON" in text or "PAYLOAD_NAO_E_JSON" in text:
+        return "📛"
+    if "IGNORADO" in text:
+        return "⏭️"
     if "RECEBIDO" in text:
         return "📥"
     if "PAYLOAD_OK" in text:
         return "📦"
+    if "ROTA_RESOLVIDA" in text or "ROUTE_RESOLVED" in text:
+        return "🧭"
     if "DRY_RUN" in text:
         return "🧪"
-    if "WHATSAPP_ENVIADO_OK" in text:
+    if "WHATSAPP_ENVIADO_OK" in text or "OK_WHATSAPP" in text:
         return "📤"
+    if "ERRO_WHATSAPP" in text or "WHATSAPP_FALHA" in text or "EVOLUTION_SEND" in text and "FALHOU" in text:
+        return "📵"
+    if "ERRO_EXCECAO" in text or "EXCECAO_ENVIO" in text:
+        return "💥"
+    if "ERRO_RESPOSTA" in text:
+        return "🔴"
     if "CONCLUIDO_OK" in text:
         return "✅"
+    if text.startswith("LEAD_") or "| LEAD_" in text:
+        return "👤"
     if "ERRO" in text or "FALHA" in text or "EXCECAO" in text:
         return "❌"
     return "ℹ️"
 
 
 def _wh_log(message: str, level: int = logging.INFO) -> None:
-    logger.log(level, "%s %s %s", LOG_PREFIX, _emoji_for_log(message), message)
+    emoji = _emoji_for_log(message)
+    body = pipes_to_lines(message)
+    logger.log(level, "%s %s\n%s", LOG_PREFIX, emoji, body)
 
 
 def _emit_runtime_event(
@@ -268,11 +279,7 @@ def _digits_only(phone: Optional[str]) -> str:
 
 
 def _fallback_whatsapp_text() -> str:
-    # Prioriza variavel nova; fallback para variavel legada.
-    fallback = (os.getenv("META_LEAD_FALLBACK_WHATSAPP") or "").strip()
-    if fallback:
-        return fallback
-    return (os.getenv("LORENA_FALLBACK_WHATSAPP") or "").strip()
+    return (os.getenv("META_LEAD_FALLBACK_WHATSAPP") or "").strip()
 
 
 def _meta_access_token() -> str:
@@ -1681,7 +1688,6 @@ def _format_pratical_life_lead_message(
 
 TEMPLATE_FORMATTERS: Dict[str, Callable[[Dict[str, Any], str, Optional[Dict[str, Any]]], str]] = {
     "default": _format_default_lead_message,
-    "lorena": _format_default_lead_message,
     "pratical_life": _format_pratical_life_lead_message,
 }
 
@@ -2354,26 +2360,6 @@ def site_new_lead():
     return response, status
 
 
-@app.route("/lorena-new-lead", methods=["POST"])
-def lorena_new_lead_deprecated():
-    return (
-        jsonify(
-            {
-                "ok": False,
-                "error": "gone",
-                "code": "LORENA_ENDPOINT_DEPRECATED",
-                "message": "O endpoint /lorena-new-lead foi descontinuado. Use um dos endpoints dedicados.",
-                "use": {
-                    "meta": "POST /meta-new-lead (segredo: META_LEAD_WEBHOOK_SECRET; chave: page_id)",
-                    "google": "POST /google-new-lead (segredo: GOOGLE_LEAD_WEBHOOK_SECRET; chave: google_customer_id)",
-                    "site": "POST /site-new-lead (segredo: SITE_LEAD_WEBHOOK_SECRET ou META_LEAD_WEBHOOK_SECRET; chave: codi_id)",
-                },
-            }
-        ),
-        410,
-    )
-
-
 @app.get("/health")
 def meta_service_health() -> Any:
     """Health check HTTP (porta 8080) sem autenticacao — use no Easypanel em vez de POST /meta-new-lead."""
@@ -2585,7 +2571,7 @@ def main() -> None:
     _wh_log(
         "SERVICO_INICIADO | "
         f"escutando 0.0.0.0:{port} | GET /health | POST /meta-new-lead | POST /google-new-lead | POST /site-new-lead | "
-        f"dashboard /dash | catalogo grupos POST /evolution-webhook"
+        f"dashboard /dash | catalogo POST /evolution-webhook"
     )
     serve_flask_app(app, port=port)
 

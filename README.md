@@ -160,8 +160,6 @@ O mesmo processo HTTP (porta **`WEBHOOK_PORT`**, padrão **8080**) expõe **trê
 | `POST /site-new-lead` | `codi_id` (28–36 dígitos) | **Leads Site** (`site_lead_routes`) | `SITE_LEAD_WEBHOOK_SECRET` (se vazio: `META_LEAD_WEBHOOK_SECRET`) |
 
 - **Catálogo Evolution (outro fluxo):** `POST /evolution-webhook` com `EVOLUTION_CATALOG_WEBHOOK_SECRET` — só eventos de grupos/WhatsApp da Evolution, não é lead.
-- **Legado:** `POST /lorena-new-lead` responde **410 Gone** com JSON a indicar os três endpoints acima.
-
 **URLs públicas (Easypanel):** `https://<domínio>/meta-new-lead`, `…/google-new-lead`, `…/site-new-lead`.
 
 **Variáveis:** ver `ENV_TEMPLATE.txt` (`META_LEAD_WEBHOOK_SECRET`, `GOOGLE_LEAD_WEBHOOK_SECRET`, `SITE_LEAD_WEBHOOK_SECRET`, `META_LEAD_FALLBACK_WHATSAPP`, `WEBHOOK_PORT`).
