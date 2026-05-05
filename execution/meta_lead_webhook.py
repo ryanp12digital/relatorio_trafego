@@ -2065,71 +2065,80 @@ def _handle_meta_new_lead(
                 payload={"lead_index": idx},
             )
 
-            int_gid = (route.get("internal_notify_group_id") or "").strip()
-            if int_gid:
-                base_fields = _base_message_fields(body, route=route)
-                int_ctx = {
-                    "client_name": route["client_name"],
-                    "page_id": page_id,
-                    "template_id": route["template"],
-                    "nome": base_fields["nome"],
-                    "email": base_fields["email"],
-                    "whatsapp": base_fields["whatsapp"],
-                    "telefone_digitos": base_fields["telefone_digitos"],
-                    "form_name": base_fields["form_name"],
-                    "page_path": base_fields.get("page_path", ""),
-                    "utm_source": base_fields.get("utm_source", ""),
-                    "utm_medium": base_fields.get("utm_medium", ""),
-                    "utm_campaign": base_fields.get("utm_campaign", ""),
-                    "utm_term": base_fields.get("utm_term", ""),
-                    "utm_content": base_fields.get("utm_content", ""),
-                    "traffic_source": base_fields.get("traffic_source", "unknown"),
-                    "traffic_origin_url": base_fields.get("traffic_origin_url", ""),
-                    "origem_anuncio": str((route or {}).get("origem_anuncio", "")).strip(),
-                    "cliente_origem": str((route or {}).get("cliente_origem", "")).strip(),
-                    "respostas": base_fields["respostas"],
-                    "respostas_filtradas": base_fields["respostas_filtradas"],
-                    "respostas_raw": base_fields["respostas_raw"],
-                    "respostas_omitidas": base_fields["respostas_omitidas"],
-                    "respostas_count": base_fields["respostas_count"],
-                    "respostas_raw_count": base_fields["respostas_raw_count"],
-                    "respostas_omitidas_count": base_fields["respostas_omitidas_count"],
-                    "received_at": base_fields["received_at"],
-                    "chegada_em": base_fields["chegada_em"],
-                }
-                _inject_custom_variables_into_ctx(int_ctx, body, route)
-                int_body = render_internal_lead_notify(route, int_ctx)
-                if int_body.strip() and not client.send_text_message(int_gid, int_body):
-                    logger.warning(
-                        "Falha ao enviar copia interna da empresa | group=%s | cliente=%s",
-                        int_gid,
-                        route["client_name"],
-                    )
+            # Pós-envio é "best effort": não deve transformar envio já concluído em HTTP 500.
+            try:
+                int_gid = (route.get("internal_notify_group_id") or "").strip()
+                if int_gid:
+                    base_fields = _base_message_fields(body, route=route)
+                    int_ctx = {
+                        "client_name": route["client_name"],
+                        "page_id": page_id,
+                        "template_id": route["template"],
+                        "nome": base_fields["nome"],
+                        "email": base_fields["email"],
+                        "whatsapp": base_fields["whatsapp"],
+                        "telefone_digitos": base_fields["telefone_digitos"],
+                        "form_name": base_fields["form_name"],
+                        "page_path": base_fields.get("page_path", ""),
+                        "utm_source": base_fields.get("utm_source", ""),
+                        "utm_medium": base_fields.get("utm_medium", ""),
+                        "utm_campaign": base_fields.get("utm_campaign", ""),
+                        "utm_term": base_fields.get("utm_term", ""),
+                        "utm_content": base_fields.get("utm_content", ""),
+                        "traffic_source": base_fields.get("traffic_source", "unknown"),
+                        "traffic_origin_url": base_fields.get("traffic_origin_url", ""),
+                        "origem_anuncio": str((route or {}).get("origem_anuncio", "")).strip(),
+                        "cliente_origem": str((route or {}).get("cliente_origem", "")).strip(),
+                        "respostas": base_fields["respostas"],
+                        "respostas_filtradas": base_fields["respostas_filtradas"],
+                        "respostas_raw": base_fields["respostas_raw"],
+                        "respostas_omitidas": base_fields["respostas_omitidas"],
+                        "respostas_count": base_fields["respostas_count"],
+                        "respostas_raw_count": base_fields["respostas_raw_count"],
+                        "respostas_omitidas_count": base_fields["respostas_omitidas_count"],
+                        "received_at": base_fields["received_at"],
+                        "chegada_em": base_fields["chegada_em"],
+                    }
+                    _inject_custom_variables_into_ctx(int_ctx, body, route)
+                    int_body = render_internal_lead_notify(route, int_ctx)
+                    if int_body.strip() and not client.send_text_message(int_gid, int_body):
+                        logger.warning(
+                            "Falha ao enviar copia interna da empresa | group=%s | cliente=%s",
+                            int_gid,
+                            route["client_name"],
+                        )
 
-            extra_phone = _digits_only(route.get("phone_number"))
-            if route.get("template") == "pratical_life" and extra_phone:
-                if client.send_text_message(extra_phone, message):
-                    _wh_log(
-                        f"LEAD_{idx} | OK_WHATSAPP_EXTRA | canal={channel_label} | cod=MENSAGEM_ENVIADA_TELEFONE | "
-                        f"cliente={route['client_name']} | numero={extra_phone} | "
-                        f"evolution_instance={_evolution_instance_label()}"
-                    )
-                else:
-                    errors.append(f"lead_index_{idx}: phone send returned false")
-                    _wh_log(
-                        f"LEAD_{idx} | ERRO_WHATSAPP_EXTRA | canal={channel_label} | cod=EVOLUTION_SEND_TELEFONE_FALHOU | "
-                        f"cliente={route['client_name']} | numero={extra_phone} | "
-                        f"evolution_instance={_evolution_instance_label()}",
-                        level=logging.ERROR,
-                    )
-                    _emit_runtime_event(
-                        stage="WHATSAPP_TELEFONE_FALHA",
-                        status="error",
-                        detail="Falha no envio extra para telefone direto",
-                        client_name=route["client_name"],
-                        page_id=page_id,
-                        payload={"lead_index": idx, "numero": extra_phone},
-                    )
+                extra_phone = _digits_only(route.get("phone_number"))
+                if route.get("template") == "pratical_life" and extra_phone:
+                    if client.send_text_message(extra_phone, message):
+                        _wh_log(
+                            f"LEAD_{idx} | OK_WHATSAPP_EXTRA | canal={channel_label} | cod=MENSAGEM_ENVIADA_TELEFONE | "
+                            f"cliente={route['client_name']} | numero={extra_phone} | "
+                            f"evolution_instance={_evolution_instance_label()}"
+                        )
+                    else:
+                        _wh_log(
+                            f"LEAD_{idx} | ERRO_WHATSAPP_EXTRA | canal={channel_label} | cod=EVOLUTION_SEND_TELEFONE_FALHOU | "
+                            f"cliente={route['client_name']} | numero={extra_phone} | "
+                            f"evolution_instance={_evolution_instance_label()}",
+                            level=logging.WARNING,
+                        )
+                        _emit_runtime_event(
+                            stage="WHATSAPP_TELEFONE_FALHA",
+                            status="warning",
+                            detail="Falha no envio extra para telefone direto",
+                            client_name=route["client_name"],
+                            page_id=page_id,
+                            payload={"lead_index": idx, "numero": extra_phone},
+                        )
+            except Exception as e_post:
+                # Mantém webhook de sucesso quando o envio principal já foi confirmado.
+                _wh_log(
+                    f"LEAD_{idx} | POS_ENVIO_AVISO | canal={channel_label} | cod=EXCECAO_POS_ENVIO | "
+                    f"cliente={route.get('client_name', '')} | group_id={group_id} | err={e_post!s}",
+                    level=logging.WARNING,
+                )
+                logger.warning("Falha em passo pós-envio (lead %s): %s", idx, e_post)
         except Exception as e:
             errors.append(f"lead_index_{idx}: {e!s}")
             _wh_log(

@@ -75,6 +75,24 @@ def _pool_bounds() -> Tuple[int, int]:
     return mn, mx
 
 
+def _psycopg_connect_kwargs() -> Dict[str, Any]:
+    """
+    kwargs de conexão compatíveis com poolers (ex.: Supabase PgBouncer).
+
+    Por padrão, desativa prepared statements automáticos do psycopg (`prepare_threshold=0`),
+    evitando erros como:
+    - prepared statement "... already exists"
+    - prepared statement "... does not exist"
+    """
+    kwargs: Dict[str, Any] = {"row_factory": dict_row}
+    raw = (os.environ.get("PSYCOPG_PREPARE_THRESHOLD") or "0").strip()
+    try:
+        kwargs["prepare_threshold"] = int(raw)
+    except ValueError:
+        kwargs["prepare_threshold"] = 0
+    return kwargs
+
+
 def _connection_pool() -> Any:
     global _PG_POOL
     if ConnectionPool is None:
@@ -86,7 +104,7 @@ def _connection_pool() -> Any:
                 conninfo=database_url(),
                 min_size=mn,
                 max_size=mx,
-                kwargs={"row_factory": dict_row},
+                kwargs=_psycopg_connect_kwargs(),
             )
             logger.info("Postgres: pool iniciado (min=%s max=%s).", mn, mx)
         return _PG_POOL
@@ -106,7 +124,7 @@ def _connect():
                 conn.rollback()
                 raise
         return
-    conn = psycopg.connect(database_url(), row_factory=dict_row)
+    conn = psycopg.connect(database_url(), **_psycopg_connect_kwargs())
     try:
         yield conn
         conn.commit()
