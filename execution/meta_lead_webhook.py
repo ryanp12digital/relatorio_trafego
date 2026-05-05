@@ -48,6 +48,7 @@ from execution.message_templates import (
     resolution_channel_for_lead,
 )
 from execution.project_paths import clients_json_path, google_clients_json_path
+from execution.secret_strings import constant_time_str_equal
 
 log_dir = os.path.join(os.path.dirname(__file__), "..", ".tmp")
 os.makedirs(log_dir, exist_ok=True)
@@ -71,6 +72,12 @@ app.secret_key = (
 )
 
 LOG_PREFIX = "[P12_META_LEAD_WEBHOOK]"
+if not (os.environ.get("DASHBOARD_SESSION_SECRET") or os.environ.get("FLASK_SECRET_KEY")):
+    logger.warning(
+        "%s DASHBOARD_SESSION_SECRET/FLASK_SECRET_KEY ausentes: cookie de sessão muda a cada arranque. "
+        "Defina em produção.",
+        LOG_PREFIX,
+    )
 _LEAD_WEBHOOK_PATHS = frozenset({"/meta-new-lead", "/google-new-lead", "/site-new-lead"})
 # Campos promovidos ao cabeçalho ({{nome}}, {{whatsapp}}, etc.) — não repetir no bloco "Respostas".
 _EXCLUDE_RESPOSTAS = frozenset(
@@ -1289,11 +1296,15 @@ def _human_route_error_detail(route_error_code: str) -> str:
 
 def _lead_webhook_expected_secret(endpoint_label: str) -> str:
     """
-    Segredo HTTP por endpoint: uma variável .env por URL (Meta / Google / Site independentes).
+    Segredo HTTP por endpoint (Meta / Google / Site).
+    /site-new-lead: SITE_LEAD_WEBHOOK_SECRET; se vazio, usa META_LEAD_WEBHOOK_SECRET (mesmo segredo dos landings que já usam Meta).
     Vazio = esse POST não exige segredo.
     """
     if endpoint_label == "/site-new-lead":
-        return (os.getenv("SITE_LEAD_WEBHOOK_SECRET") or "").strip()
+        site = (os.getenv("SITE_LEAD_WEBHOOK_SECRET") or "").strip()
+        if site:
+            return site
+        return (os.getenv("META_LEAD_WEBHOOK_SECRET") or "").strip()
     if endpoint_label == "/google-new-lead":
         return (os.getenv("GOOGLE_LEAD_WEBHOOK_SECRET") or "").strip()
     if endpoint_label == "/meta-new-lead":
@@ -1324,7 +1335,11 @@ def _check_webhook_secret(endpoint_label: str) -> Optional[Tuple[Any, int]]:
     if auth.lower().startswith("bearer "):
         bearer = auth[7:].strip()
     qs = _lead_webhook_secret_from_query()
-    if hdr == secret or bearer == secret or qs == secret:
+    if (
+        constant_time_str_equal(hdr, secret)
+        or constant_time_str_equal(bearer, secret)
+        or constant_time_str_equal(qs, secret)
+    ):
         return None
     return jsonify({"ok": False, "error": "unauthorized"}), 401
 

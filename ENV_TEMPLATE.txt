@@ -38,7 +38,7 @@ USE_WAITRESS=1
 META_LEAD_WEBHOOK_SECRET=
 # Segredo só POST /google-new-lead (google_clients).
 # GOOGLE_LEAD_WEBHOOK_SECRET=
-# Segredo só POST /site-new-lead (landings).
+# Segredo só POST /site-new-lead (landings). Se vazio, o código usa META_LEAD_WEBHOOK_SECRET.
 # SITE_LEAD_WEBHOOK_SECRET=
 # Auth por URL (plataformas sem cabeçalhos), mesmo valor da variável do endpoint:
 #   …/meta-new-lead?secret=<META_LEAD_WEBHOOK_SECRET>
@@ -88,6 +88,8 @@ FLASK_SECRET_KEY=
 # DASHBOARD_AUTH_PASSWORD=
 DASHBOARD_AUTH_USERS=
 DASHBOARD_AUTH_PASSWORD=
+# Produção: obrigar credenciais (503 em /api e texto em / até configurar DASHBOARD_AUTH_*).
+# DASHBOARD_REQUIRE_AUTH=true
 
 # -----------------------------------------------------------------------------
 # Postgres / Supabase — dados persistentes (clientes, templates, filtros)
@@ -98,6 +100,12 @@ DASHBOARD_AUTH_PASSWORD=
 DATABASE_URL=
 # Alternativa aceite pelo código:
 # SUPABASE_DATABASE_URL=
+# Pool de conexões (opcional; requer psycopg-pool no requirements)
+# DATABASE_POOL_MIN=1
+# DATABASE_POOL_MAX=10
+
+# Stream de eventos da Pulseboard (.tmp/live_events.jsonl) — leitura pelo tail
+# LIVE_EVENTS_TAIL_MAX_BYTES=524288
 
 # -----------------------------------------------------------------------------
 # Supabase Auth (futuro / login com e-mail Supabase)

@@ -36,7 +36,7 @@ def main():
         print("LISTA DE CONTAS DE ANÚNCIOS - BUSINESS MANAGER")
         print("=" * 60)
         print(f"Business ID: {business_id}")
-        print(f"Token: {access_token[:20]}...")
+        print("Token META: (definido no .env — não exibido)")
         print()
         
         print("Conectando à Meta API...")

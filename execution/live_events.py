@@ -62,26 +62,63 @@ def publish_event(
     return event
 
 
+def _tail_lines_from_file(path: str, max_lines: int, max_bytes: int) -> List[str]:
+    """Lê só o final do ficheiro (evita carregar JSONL inteiro na memória)."""
+    try:
+        size = os.path.getsize(path)
+    except OSError:
+        return []
+    if size == 0:
+        return []
+    read_size = min(size, max_bytes)
+    with open(path, "rb") as f:
+        f.seek(size - read_size)
+        chunk = f.read().decode("utf-8", errors="replace")
+    lines = chunk.splitlines()
+    if read_size < size and lines:
+        lines = lines[1:]
+    return lines[-max_lines:] if len(lines) > max_lines else lines
+
+
 def read_recent_events(limit: int = 400) -> List[Dict[str, Any]]:
     """Lê os eventos mais recentes do arquivo."""
     _ensure_storage()
     if limit <= 0:
         return []
+    try:
+        max_bytes = int((os.environ.get("LIVE_EVENTS_TAIL_MAX_BYTES") or str(512 * 1024)).strip() or str(512 * 1024))
+    except ValueError:
+        max_bytes = 512 * 1024
+    max_bytes = max(4096, min(max_bytes, 8 * 1024 * 1024))
+
+    def _parse(lines_slice: List[str]) -> List[Dict[str, Any]]:
+        out: List[Dict[str, Any]] = []
+        for raw in lines_slice:
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                obj = json.loads(raw)
+                if isinstance(obj, dict):
+                    out.append(obj)
+            except json.JSONDecodeError:
+                continue
+        return out
+
+    multiplier = 1
+    lines: List[str] = []
     with _LOCK:
-        with open(_EVENTS_FILE, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-    out: List[Dict[str, Any]] = []
-    for raw in lines[-limit:]:
-        raw = raw.strip()
-        if not raw:
-            continue
         try:
-            obj = json.loads(raw)
-            if isinstance(obj, dict):
-                out.append(obj)
-        except json.JSONDecodeError:
-            continue
-    return out
+            file_size = os.path.getsize(_EVENTS_FILE)
+        except OSError:
+            return []
+        while multiplier <= 32:
+            lines = _tail_lines_from_file(_EVENTS_FILE, max(limit * 2, limit + 100), max_bytes * multiplier)
+            out = _parse(lines[-limit:])
+            if len(out) >= limit or max_bytes * multiplier >= file_size:
+                return out[-limit:]
+            multiplier *= 2
+    return _parse(lines[-limit:])[-limit:]
 
 
 def read_events_since(offset: int) -> Tuple[List[Dict[str, Any]], int]:

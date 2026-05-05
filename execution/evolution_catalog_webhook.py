@@ -14,6 +14,8 @@ import threading
 import unicodedata
 from typing import Any, Dict, List, Optional, Tuple
 
+from execution.secret_strings import constant_time_str_equal
+
 logger = logging.getLogger(__name__)
 
 LOG_PREFIX_EVOLUTION = "[P12_EVOLUTION_CATALOG]"
@@ -296,11 +298,11 @@ def verify_evolution_catalog_webhook_secret(
     hs = (header_secret or "").strip()
     ab = (auth_bearer or "").strip()
     qs = (query_secret or "").strip()
-    if hs and hs == expected:
+    if hs and constant_time_str_equal(hs, expected):
         return True
-    if ab and ab == expected:
+    if ab and constant_time_str_equal(ab, expected):
         return True
-    if qs and qs == expected:
+    if qs and constant_time_str_equal(qs, expected):
         return True
     _evo_log(
         "cod=WEBHOOK_SECRET_CATALOGO_INVALIDO | X-Webhook-Secret, Bearer ou query catalog_secret/secret incorreto",

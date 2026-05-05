@@ -139,7 +139,7 @@ No **Easypanel** (ou similar):
 2. Garanta **`META_BUSINESS_ID`** e **`META_ACCESS_TOKEN`** — sem Business ID o fluxo multi-client do cron aborta.
 3. Para números alinhados ao Ads Manager, defina em produção: **`META_ACTION_REPORT_TIME`**, **`META_ATTRIBUTION_WINDOWS`**, **`REPORT_RESULT_ACTION_TYPE`** (ver `ENV_TEMPLATE.txt`).
 4. Webhooks de lead: mapear **`WEBHOOK_PORT`** (ex. 8080) no HTTPS; segredos opcionais por canal — **`META_LEAD_WEBHOOK_SECRET`**, **`GOOGLE_LEAD_WEBHOOK_SECRET`**, **`SITE_LEAD_WEBHOOK_SECRET`** (ver secção Webhooks abaixo); **`META_LEAD_FALLBACK_WHATSAPP`** só se quiser texto fixo quando o lead não tiver telefone com dígitos.
-5. Dashboard viva: manter **`ENABLE_DASHBOARD=true`** e mapear um domínio/subdomínio separado para **`DASHBOARD_PORT`** (padrão `8091`), sem alterar o domínio do webhook em `8080`. Opcional: **`DASHBOARD_AUTH_PASSWORD`** + **`DASHBOARD_SESSION_SECRET`** (login na Pulseboard; ver `ENV_TEMPLATE.txt`).
+5. Dashboard viva: manter **`ENABLE_DASHBOARD=true`** e mapear um domínio/subdomínio separado para **`DASHBOARD_PORT`** (padrão `8091`), sem alterar o domínio do webhook em `8080`. Em produção use **`DASHBOARD_AUTH_PASSWORD`** ou **`DASHBOARD_AUTH_USERS`**, **`DASHBOARD_SESSION_SECRET`** estável, e opcionalmente **`DASHBOARD_REQUIRE_AUTH=true`** (bloqueia API/UI com **503** até existir credencial configurada). Ver `ENV_TEMPLATE.txt`.
 6. **Postgres (Supabase):** executar **`supabase/migrations/001_initial_pulseboard.sql`**; para **Grupos WhatsApp**, **`002_whatsapp_catalog_groups.sql`** e **`003_whatsapp_catalog_groups_supabase.sql`** (trigger e metadados no painel); depois definir **`DATABASE_URL`** (pooler Transaction). Com BD ativa, clientes/templates deixam de depender só dos JSON no deploy (ver [`supabase/README.md`](supabase/README.md)).
 7. Para **incluir cliente novo** sem BD: edite `data/clients.json`, faça commit/deploy **ou** monte volume em `/app/data/clients.json` (ou a pasta `/app/data`). Com **`DATABASE_URL`**, use a dashboard (dados na tabela).
 8. Logs no container:
@@ -157,7 +157,7 @@ O mesmo processo HTTP (porta **`WEBHOOK_PORT`**, padrão **8080**) expõe **trê
 |----------|----------------|-------------------------|----------------|
 | `POST /meta-new-lead` | `page_id` (página Meta) | Clientes Meta (`meta_page_id`, …) | `META_LEAD_WEBHOOK_SECRET` |
 | `POST /google-new-lead` | `google_customer_id` (conta Google Ads) | `google_clients` | `GOOGLE_LEAD_WEBHOOK_SECRET` |
-| `POST /site-new-lead` | `codi_id` (28–36 dígitos) | **Leads Site** (`site_lead_routes`) | `SITE_LEAD_WEBHOOK_SECRET` |
+| `POST /site-new-lead` | `codi_id` (28–36 dígitos) | **Leads Site** (`site_lead_routes`) | `SITE_LEAD_WEBHOOK_SECRET` (se vazio: `META_LEAD_WEBHOOK_SECRET`) |
 
 - **Catálogo Evolution (outro fluxo):** `POST /evolution-webhook` com `EVOLUTION_CATALOG_WEBHOOK_SECRET` — só eventos de grupos/WhatsApp da Evolution, não é lead.
 - **Legado:** `POST /lorena-new-lead` responde **410 Gone** com JSON a indicar os três endpoints acima.

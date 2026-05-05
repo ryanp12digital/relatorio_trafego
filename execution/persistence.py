@@ -15,7 +15,7 @@ import threading
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from copy import deepcopy
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from execution.project_paths import (
     catalog_groups_json_path,
@@ -29,6 +29,8 @@ from execution.project_paths import (
 
 logger = logging.getLogger(__name__)
 _DB_BOOTSTRAPPED = False
+_PG_POOL: Any = None
+_PG_POOL_LOCK = threading.Lock()
 _CATALOG_JSON_LOCK = threading.RLock()
 _LISTENER_JSON_LOCK = threading.RLock()
 _SITE_ROUTES_JSON_LOCK = threading.RLock()
@@ -43,6 +45,11 @@ except ImportError:  # pragma: no cover
     dict_row = None  # type: ignore
     Json = None  # type: ignore
 
+try:
+    from psycopg_pool import ConnectionPool
+except ImportError:  # pragma: no cover
+    ConnectionPool = None  # type: ignore[misc, assignment]
+
 
 def database_url() -> str:
     return (os.environ.get("DATABASE_URL") or os.environ.get("SUPABASE_DATABASE_URL") or "").strip()
@@ -52,10 +59,53 @@ def db_enabled() -> bool:
     return bool(database_url()) and psycopg is not None and Json is not None
 
 
+def _pool_bounds() -> Tuple[int, int]:
+    try:
+        mx = int((os.environ.get("DATABASE_POOL_MAX") or "10").strip() or "10")
+    except ValueError:
+        mx = 10
+    try:
+        mn = int((os.environ.get("DATABASE_POOL_MIN") or "1").strip() or "1")
+    except ValueError:
+        mn = 1
+    mn = max(1, min(mn, 50))
+    mx = max(1, min(mx, 50))
+    if mx < mn:
+        mx = mn
+    return mn, mx
+
+
+def _connection_pool() -> Any:
+    global _PG_POOL
+    if ConnectionPool is None:
+        return None
+    with _PG_POOL_LOCK:
+        if _PG_POOL is None:
+            mn, mx = _pool_bounds()
+            _PG_POOL = ConnectionPool(
+                conninfo=database_url(),
+                min_size=mn,
+                max_size=mx,
+                kwargs={"row_factory": dict_row},
+            )
+            logger.info("Postgres: pool iniciado (min=%s max=%s).", mn, mx)
+        return _PG_POOL
+
+
 @contextmanager
 def _connect():
     if not db_enabled():
         raise RuntimeError("database_not_configured")
+    pool = _connection_pool()
+    if pool is not None:
+        with pool.connection() as conn:
+            try:
+                yield conn
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+        return
     conn = psycopg.connect(database_url(), row_factory=dict_row)
     try:
         yield conn
@@ -476,6 +526,7 @@ def _migrate_db_schema() -> None:
         "ALTER TABLE site_lead_routes ADD COLUMN IF NOT EXISTS origem_anuncio text NOT NULL DEFAULT ''",
         "ALTER TABLE site_lead_routes ADD COLUMN IF NOT EXISTS cliente_origem text NOT NULL DEFAULT ''",
         "ALTER TABLE site_lead_routes ADD COLUMN IF NOT EXISTS cors_allowed_origins jsonb NOT NULL DEFAULT '[]'::jsonb",
+        "ALTER TABLE site_lead_routes ENABLE ROW LEVEL SECURITY",
     ]
     with _connect() as conn:
         with conn.cursor() as cur:

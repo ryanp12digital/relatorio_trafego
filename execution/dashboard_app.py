@@ -76,8 +76,11 @@ app.secret_key = (
     or os.environ.get("FLASK_SECRET_KEY")
     or secrets.token_hex(32)
 )
-
 logger = logging.getLogger(__name__)
+if not (os.environ.get("DASHBOARD_SESSION_SECRET") or os.environ.get("FLASK_SECRET_KEY")):
+    logger.warning(
+        "DASHBOARD_SESSION_SECRET/FLASK_SECRET_KEY ausentes: cookie de sessão muda a cada arranque. Defina em produção."
+    )
 
 
 @app.errorhandler(HTTPException)
@@ -106,7 +109,16 @@ def _unhandled_exception_for_api(e: Exception) -> Any:
     if not (path.startswith("/api/") or path.startswith("/dash/api/")):
         raise e
     logger.exception("Erro não tratado na API da dashboard")
-    return jsonify({"ok": False, "error": "internal_error", "message": str(e)}), 500
+    return (
+        jsonify(
+            {
+                "ok": False,
+                "error": "internal_error",
+                "message": "Falha interna. O detalhe foi registado no servidor.",
+            }
+        ),
+        500,
+    )
 
 
 _CLIENTS_LOCK = threading.Lock()
@@ -655,6 +667,11 @@ def dashboard_auth_configured() -> bool:
     return bool(_dashboard_auth_password()) or bool(_dashboard_auth_users())
 
 
+def _dashboard_require_auth_env() -> bool:
+    """Se true, a Pulseboard recusa tráfego até haver DASHBOARD_AUTH_* configurado (produção)."""
+    return (os.getenv("DASHBOARD_REQUIRE_AUTH") or "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def verify_dashboard_password(sent: str) -> bool:
     pwd = _dashboard_auth_password()
     return bool(pwd) and hmac.compare_digest(sent or "", pwd)
@@ -706,8 +723,6 @@ def dashboard_auth_gate_response() -> Optional[Any]:
     Retorno None = seguir request. Usado pelo Flask da dashboard (porta 8091)
     e pelo webhook em rotas /dash/* (mesmo DASHBOARD_SESSION_SECRET para o cookie).
     """
-    if not dashboard_auth_configured():
-        return None
     raw = request.path or ""
     if raw.startswith("/static/"):
         return None
@@ -717,6 +732,27 @@ def dashboard_auth_gate_response() -> Optional[Any]:
         return None
     base = raw.rstrip("/") or "/"
     if base in ("/login", "/dash/login", "/logout", "/dash/logout"):
+        return None
+
+    if _dashboard_require_auth_env() and not dashboard_auth_configured():
+        msg = (
+            "DASHBOARD_REQUIRE_AUTH está ativo mas nenhuma credencial foi configurada. "
+            "Defina DASHBOARD_AUTH_PASSWORD ou DASHBOARD_AUTH_USERS."
+        )
+        if raw.startswith("/api/") or raw.startswith("/dash/api/"):
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": "dashboard_auth_not_configured",
+                        "message": msg,
+                    }
+                ),
+                503,
+            )
+        return Response(msg, status=503, mimetype="text/plain; charset=utf-8")
+
+    if not dashboard_auth_configured():
         return None
     if session.get("dashboard_ok"):
         return None
