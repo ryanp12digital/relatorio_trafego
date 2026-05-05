@@ -2630,6 +2630,12 @@ textarea {
   font-size: 10px;
 }
 
+.vr-slot-default-keys {
+  margin: 4px 0 0;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
 .meta-catalog-hint {
   margin: 0 0 10px;
   font-size: 12px;

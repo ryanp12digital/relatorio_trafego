@@ -1421,7 +1421,15 @@ def _base_message_fields(body: Dict[str, Any], route: Optional[Dict[str, Any]] =
         "email": email or "(nao informado)",
         "whatsapp": wa_link,
         "telefone_digitos": telefone_digitos or "(nao informado)",
-        "form_name": _extract_form_name(body, allow_meta_graph=not (site_routed or google_routed)),
+        "form_name": (
+            (
+                _first_field_from_data_and_mappable(
+                    tuple(get_effective_source_keys(fc, "form_name")), data, mappable
+                )
+                or ""
+            ).strip()
+            or _extract_form_name(body, allow_meta_graph=not (site_routed or google_routed))
+        ),
         "page_path": page_path,
         "utm_source": utm_source,
         "utm_medium": utm_medium,

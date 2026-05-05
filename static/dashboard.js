@@ -10,6 +10,7 @@ const state = {
     filters: {},
     variable_resolution: {},
     custom_variables: {},
+    lead_source_key_defaults: {},
   },
   activeFilterChannels: [],
   eventsByClient: new Map(),
@@ -1471,6 +1472,7 @@ function renderGoogleClients() {
 const LEAD_RESOLVABLE_SLOTS = [
   "nome",
   "email",
+  "form_name",
   "whatsapp",
   "telefone_digitos",
   "page_path",
@@ -1484,7 +1486,7 @@ const LEAD_RESOLVABLE_SLOTS = [
 const _VR_NAME_RE = /^[a-zA-Z][a-zA-Z0-9_]*$/;
 /** Alineado ao backend: reservados de sistema, não reutilizáveis como origem adicional. */
 const VR_EXT_FORBIDDEN = new Set(
-  "client_name page_id template_id form_name respostas respostas_filtradas respostas_raw respostas_omitidas respostas_count respostas_raw_count respostas_omitidas_count received_at chegada_em traffic_source traffic_origin_url origem_anuncio cliente_origem"
+  "client_name page_id template_id respostas respostas_filtradas respostas_raw respostas_omitidas respostas_count respostas_raw_count respostas_omitidas_count received_at chegada_em traffic_source traffic_origin_url origem_anuncio cliente_origem"
     .split(/\s+/),
 );
 
@@ -1647,6 +1649,13 @@ function renderVrSlotRows(container, vr, labelVars, storageKey) {
     row.className = "var-resolution-row";
     const lab = document.createElement("label");
     lab.innerHTML = `<strong>${escHtml(slot)}</strong><br /><span class="field-micro">${escHtml(labelVars[slot] || "")}</span>`;
+    const defaultKeys = state.templates.lead_source_key_defaults?.[slot];
+    if (Array.isArray(defaultKeys) && defaultKeys.length) {
+      const defaults = document.createElement("p");
+      defaults.className = "field-micro vr-slot-default-keys";
+      defaults.textContent = `Padrão (se vazio): ${defaultKeys.join(", ")}`;
+      lab.appendChild(defaults);
+    }
     const wrap = document.createElement("label");
     wrap.className = "var-resolution-input-wrap";
     const span = document.createElement("span");
@@ -3031,7 +3040,10 @@ async function fetchTemplates() {
   const r = await dashFetch(apiUrl("/api/message-templates"));
   if (!r.ok) throw new Error(await dashFetchErrorMessage(r, "/api/message-templates"));
   const data = await r.json();
-  state.templates = data;
+  state.templates = {
+    ...data,
+    lead_source_key_defaults: data.lead_source_key_defaults || {},
+  };
   renderTemplateVariables(document.getElementById("tplChannel").value);
   renderTemplatesCatalog();
   renderFiltersForm();

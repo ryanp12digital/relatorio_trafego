@@ -22,6 +22,7 @@ LEAD_RESOLVABLE_SLOTS = frozenset(
     {
         "nome",
         "email",
+        "form_name",
         "whatsapp",
         "telefone_digitos",
         "page_path",
@@ -37,6 +38,16 @@ LEAD_RESOLVABLE_SLOTS = frozenset(
 _DEFAULT_LEAD_SOURCE_KEYS: Dict[str, Tuple[str, ...]] = {
     "nome": ("nome_completo", "nome", "full_name", "name"),
     "email": ("email",),
+    "form_name": (
+        "form_id",
+        "form_name",
+        "formName",
+        "leadgen_form_name",
+        "instant_form_name",
+        "form_title",
+        "formTitle",
+        "codi_id",
+    ),
     "whatsapp": ("telefone", "phone_number", "phone", "mobile", "celular"),
     "telefone_digitos": ("telefone", "phone_number", "phone", "mobile", "celular"),
     "page_path": (
@@ -472,6 +483,7 @@ def list_templates_payload() -> Dict[str, Any]:
         "filters": filters,
         "variable_resolution": vr,
         "custom_variables": load_merged_custom_variables(),
+        "lead_source_key_defaults": {k: list(v) for k, v in _DEFAULT_LEAD_SOURCE_KEYS.items()},
     }
 
 
