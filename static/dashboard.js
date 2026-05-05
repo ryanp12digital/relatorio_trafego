@@ -321,7 +321,7 @@ const MESSAGES_SECTION_HELP = {
   variable_resolution: {
     title: "Origem dos campos (webhook)",
     body:
-      "Define a ordem de chaves que o sistema tenta ler no payload para preencher variáveis de lead como nome, email e whatsapp. Use quando o formulário de origem muda os nomes dos campos.",
+      "Há dois conjuntos de chaves: Meta + notificação interna (partilhados) e Site. As variáveis {{...}} são as mesmas nos templates; ao adicionar campo extra pode escolher em qual(is) conjunto(s) entra. Campos vazios voltam aos padrões do sistema.",
   },
   custom_variables: {
     title: "Variáveis personalizadas",
@@ -1481,6 +1481,13 @@ const LEAD_RESOLVABLE_SLOTS = [
   "utm_content",
 ];
 
+const _VR_NAME_RE = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+/** Alineado ao backend: reservados de sistema, não reutilizáveis como origem adicional. */
+const VR_EXT_FORBIDDEN = new Set(
+  "client_name page_id template_id form_name respostas respostas_filtradas respostas_raw respostas_omitidas respostas_count respostas_raw_count respostas_omitidas_count received_at chegada_em traffic_source traffic_origin_url origem_anuncio cliente_origem"
+    .split(/\s+/),
+);
+
 function renderTemplateVariables(channel) {
   const vars = state.templates.variables?.[channel] || {};
   const box = document.getElementById("tplVars");
@@ -1520,30 +1527,126 @@ function listLeadOriginChannels() {
   return listTemplateChannels().filter((c) => LEAD_ORIGIN_CHANNELS.has(c));
 }
 
-function renderVariableResolutionPanel() {
-  const channelSelect = document.getElementById("varResChannel");
-  const channels = listLeadOriginChannels();
-  ensureSelectOptions(channelSelect, channels, channelSelect?.value || "meta_lead");
-  const ch = channelSelect?.value || channels[0] || "meta_lead";
-  const grid = document.getElementById("varResolutionGrid");
-  if (!grid) return;
-  const storageKey = ch === "internal_lead" ? "meta_lead" : ch;
-  const vr = state.templates.variable_resolution?.[storageKey] || {};
-  const labels = state.templates.variables?.[ch] || {};
-  grid.innerHTML = "";
-  if (!channels.length) {
-    const p = document.createElement("p");
-    p.className = "field-micro";
-    p.textContent =
-      "Nenhum canal de lead no catálogo. A origem de campos aplica-se a Meta, Site e interno (P12).";
-    grid.appendChild(p);
-    return;
+function copyTextToClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text).then(
+      () => true,
+      () => false,
+    );
   }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return Promise.resolve(ok);
+  } catch {
+    return Promise.resolve(false);
+  }
+}
+
+function renderVariableOriginPills() {
+  const wrap = document.getElementById("varResolutionPills");
+  const hint = document.getElementById("varResolutionPillsHint");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+  if (hint) {
+    hint.hidden = true;
+  }
+  const chans = listLeadOriginChannels();
+  if (!chans.length) return;
+  const keys = new Set();
+  chans.forEach((ch) => {
+    const v = state.templates.variables?.[ch];
+    if (v && typeof v === "object") Object.keys(v).forEach((k) => keys.add(k));
+  });
+  const sorted = Array.from(keys).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  sorted.forEach((key) => {
+    const pill = document.createElement("button");
+    pill.type = "button";
+    pill.className = "var-origin-pill";
+    const code = document.createElement("code");
+    code.textContent = `{{${key}}}`;
+    const badges = document.createElement("div");
+    badges.className = "var-origin-badges";
+    chans.forEach((ch) => {
+      if (state.templates.variables?.[ch]?.[key] == null) return;
+      const sp = document.createElement("span");
+      sp.className = "var-origin-channel-tag";
+      sp.textContent = ch === "meta_lead" ? "Meta" : ch === "site_lead" ? "Site" : "Interno";
+      badges.appendChild(sp);
+    });
+    const tip =
+      state.templates.variables?.meta_lead?.[key] ||
+      state.templates.variables?.site_lead?.[key] ||
+      state.templates.variables?.internal_lead?.[key] ||
+      "";
+    pill.title = tip ? `${tip} — clique para copiar` : "Clique para copiar";
+    pill.append(code, badges);
+    pill.addEventListener("click", () => {
+      copyTextToClipboard(`{{${key}}}`).then((ok) => {
+        if (ok && hint) {
+          hint.hidden = false;
+          hint.textContent = `Copiado: {{${key}}}`;
+        }
+      });
+    });
+    wrap.appendChild(pill);
+  });
+  if (sorted.length && hint) {
+    hint.hidden = false;
+    hint.textContent =
+      "Clique numa variável para copiar {{nome}} para a área de transferência.";
+  }
+}
+
+function appendVrExtRow(listEl, slotName, keysJoined) {
+  const row = document.createElement("div");
+  row.className = "var-resolution-row var-resolution-row-ext";
+  const nameWrap = document.createElement("label");
+  nameWrap.className = "var-resolution-name-wrap";
+  const nameIn = document.createElement("input");
+  nameIn.type = "text";
+  nameIn.className = "vr-ext-name";
+  nameIn.value = slotName;
+  nameIn.autocomplete = "off";
+  nameIn.placeholder = "minha_variavel";
+  const wrap = document.createElement("label");
+  wrap.className = "var-resolution-input-wrap";
+  const span = document.createElement("span");
+  span.className = "field-micro";
+  span.textContent = "Chaves do JSON (ordem de tentativa)";
+  const inp = document.createElement("input");
+  inp.type = "text";
+  inp.className = "vr-ext-keys";
+  inp.autocomplete = "off";
+  inp.placeholder = "ex.: referencia, ref";
+  inp.value = keysJoined;
+  const rm = document.createElement("button");
+  rm.type = "button";
+  rm.className = "ghost small";
+  rm.textContent = "Remover";
+  rm.addEventListener("click", () => row.remove());
+  nameWrap.appendChild(document.createTextNode("Nome no template"));
+  nameWrap.appendChild(nameIn);
+  wrap.appendChild(span);
+  wrap.appendChild(inp);
+  row.appendChild(nameWrap);
+  row.appendChild(wrap);
+  row.appendChild(rm);
+  listEl.appendChild(row);
+}
+
+function renderVrSlotRows(container, vr, labelVars, storageKey) {
   LEAD_RESOLVABLE_SLOTS.forEach((slot) => {
     const row = document.createElement("div");
     row.className = "var-resolution-row";
     const lab = document.createElement("label");
-    lab.innerHTML = `<strong>${escHtml(slot)}</strong><br /><span class="field-micro">${escHtml(labels[slot] || "")}</span>`;
+    lab.innerHTML = `<strong>${escHtml(slot)}</strong><br /><span class="field-micro">${escHtml(labelVars[slot] || "")}</span>`;
     const wrap = document.createElement("label");
     wrap.className = "var-resolution-input-wrap";
     const span = document.createElement("span");
@@ -1551,7 +1654,7 @@ function renderVariableResolutionPanel() {
     span.textContent = "Chaves (CSV, ordem de tentativa)";
     const inp = document.createElement("input");
     inp.type = "text";
-    inp.id = `vrSlot_${slot}`;
+    inp.id = `vrSlot_${storageKey}_${slot}`;
     inp.autocomplete = "off";
     inp.placeholder = "ex.: nome_completo, nome, name";
     const keys = vr[slot]?.source_keys;
@@ -1560,90 +1663,208 @@ function renderVariableResolutionPanel() {
     wrap.appendChild(inp);
     row.appendChild(lab);
     row.appendChild(wrap);
-    grid.appendChild(row);
+    container.appendChild(row);
   });
-  const extra = document.createElement("div");
-  extra.className = "var-resolution-extra messages-vr-extra";
-  const extraHead = document.createElement("div");
-  extraHead.className = "var-resolution-extra-head";
-  const h2 = document.createElement("h3");
-  h2.className = "var-resolution-extra-title";
-  h2.textContent = "Campos de origem adicionais";
-  const hint = document.createElement("p");
-  hint.className = "field-micro";
-  hint.textContent =
-    "Crie nomes de variável (só letras, números e _; p.ex. referencia, bairro_cod). Ficam disponíveis em {{nome}} no template e nas variáveis personalizadas (fonte «contexto»).";
-  extraHead.append(h2, hint);
-  const extraList = document.createElement("div");
-  extraList.className = "var-resolution-extra-list";
-  extraList.id = "varResolutionExtraList";
-  const extSlots = Object.keys(vr).filter((k) => !LEAD_RESOLVABLE_SLOTS.includes(k));
-  const addRow = (slotName) => {
-    const row = document.createElement("div");
-    row.className = "var-resolution-row var-resolution-row-ext";
-    row.dataset.vrExtSlot = slotName;
-    const nameWrap = document.createElement("label");
-    nameWrap.className = "var-resolution-name-wrap";
-    const nameIn = document.createElement("input");
-    nameIn.type = "text";
-    nameIn.className = "vr-ext-name";
-    nameIn.value = slotName;
-    nameIn.autocomplete = "off";
-    nameIn.placeholder = "minha_variavel";
-    const keys = vr[slotName]?.source_keys;
-    const val = Array.isArray(keys) ? keys.join(", ") : "";
-    const wrap = document.createElement("label");
-    wrap.className = "var-resolution-input-wrap";
-    const span = document.createElement("span");
-    span.className = "field-micro";
-    span.textContent = "Chaves do JSON (ordem de tentativa)";
-    const inp = document.createElement("input");
-    inp.type = "text";
-    inp.className = "vr-ext-keys";
-    inp.autocomplete = "off";
-    inp.placeholder = "ex.: referencia, ref";
-    inp.value = val;
-    const rm = document.createElement("button");
-    rm.type = "button";
-    rm.className = "ghost small";
-    rm.textContent = "Remover";
-    rm.addEventListener("click", () => row.remove());
-    nameWrap.appendChild(document.createTextNode("Nome no template"));
-    nameWrap.appendChild(nameIn);
-    wrap.appendChild(span);
-    wrap.appendChild(inp);
-    row.appendChild(nameWrap);
-    row.appendChild(wrap);
-    row.appendChild(rm);
-    extraList.appendChild(row);
+}
+
+function renderVariableResolutionPanel() {
+  renderVariableOriginPills();
+  const grid = document.getElementById("varResolutionGrid");
+  if (!grid) return;
+  grid.innerHTML = "";
+  const channels = listLeadOriginChannels();
+  if (!channels.length) {
+    const p = document.createElement("p");
+    p.className = "field-micro";
+    p.textContent =
+      "Nenhum canal de lead no catálogo. A origem de campos aplica-se a Meta, Site e interno (P12).";
+    grid.appendChild(p);
+    return;
+  }
+
+  const vrMeta = state.templates.variable_resolution?.meta_lead || {};
+  const vrSite = state.templates.variable_resolution?.site_lead || {};
+  const labelsMeta = state.templates.variables?.meta_lead || {};
+  const labelsSite = state.templates.variables?.site_lead || {};
+
+  const makeBucket = (storageKey, vr, labels, title, description) => {
+    const fs = document.createElement("fieldset");
+    fs.className = "var-resolution-bucket";
+    const leg = document.createElement("legend");
+    leg.className = "var-resolution-bucket-legend";
+    leg.textContent = title;
+    const desc = document.createElement("p");
+    desc.className = "field-micro var-resolution-bucket-desc";
+    desc.textContent = description;
+    const innerGrid = document.createElement("div");
+    innerGrid.className = "var-resolution-inner-grid";
+    renderVrSlotRows(innerGrid, vr, labels, storageKey);
+    fs.append(leg, desc, innerGrid);
+
+    const extraHead = document.createElement("div");
+    extraHead.className = "var-resolution-extra-subhead";
+    const h4 = document.createElement("h4");
+    h4.className = "var-resolution-extra-subtitle";
+    h4.textContent = "Campos de origem adicionais (este armazenamento)";
+    const hint = document.createElement("p");
+    hint.className = "field-micro";
+    hint.textContent =
+      "Nomes só com letras, números e _ (ex.: referencia). Em baixo pode criar o mesmo nome nos dois armazenamentos com checkboxes.";
+    extraHead.append(h4, hint);
+
+    const listId = storageKey === "meta_lead" ? "varResolutionExtraList_meta" : "varResolutionExtraList_site";
+    const extraList = document.createElement("div");
+    extraList.className = "var-resolution-extra-list";
+    extraList.id = listId;
+
+    const extSlots = Object.keys(vr).filter((k) => !LEAD_RESOLVABLE_SLOTS.includes(k));
+    extSlots.forEach((s) => {
+      const keys = vr[s]?.source_keys;
+      const val = Array.isArray(keys) ? keys.join(", ") : "";
+      appendVrExtRow(extraList, s, val);
+    });
+
+    fs.append(extraHead, extraList);
+    return fs;
   };
-  extSlots.forEach((s) => addRow(s));
+
+  grid.appendChild(
+    makeBucket(
+      "meta_lead",
+      vrMeta,
+      labelsMeta,
+      "Meta e notificação interna (P12)",
+      "Leads da Meta e a cópia interna partilham estas chaves de JSON.",
+    ),
+  );
+  grid.appendChild(
+    makeBucket(
+      "site_lead",
+      vrSite,
+      labelsSite,
+      "Leads do site",
+      "Webhook de leads do site: pode usar nomes de campo diferentes; as variáveis {{...}} nos templates são as mesmas.",
+    ),
+  );
+
+  const addBar = document.createElement("div");
+  addBar.className = "var-resolution-add-bar";
+  const nameLab = document.createElement("label");
+  nameLab.className = "var-resolution-add-field";
+  const nameLabSpan = document.createElement("span");
+  nameLabSpan.className = "field-micro";
+  nameLabSpan.textContent = "Nome da variável";
+  const nameIn = document.createElement("input");
+  nameIn.type = "text";
+  nameIn.id = "varResNewExtName";
+  nameIn.autocomplete = "off";
+  nameIn.placeholder = "ex.: referencia";
+  nameLab.append(nameLabSpan, nameIn);
+
+  const keysLab = document.createElement("label");
+  keysLab.className = "var-resolution-add-field var-resolution-add-field--wide";
+  const keysLabSpan = document.createElement("span");
+  keysLabSpan.className = "field-micro";
+  keysLabSpan.textContent = "Chaves no JSON (CSV)";
+  const keysIn = document.createElement("input");
+  keysIn.type = "text";
+  keysIn.id = "varResNewExtKeys";
+  keysIn.autocomplete = "off";
+  keysIn.placeholder = "ex.: referencia, ref";
+  keysLab.append(keysLabSpan, keysIn);
+
+  const chWrap = document.createElement("div");
+  chWrap.className = "var-resolution-add-channels";
+  const mkChk = (id, label, checked) => {
+    const lb = document.createElement("label");
+    lb.className = "var-resolution-add-chk";
+    const inp = document.createElement("input");
+    inp.type = "checkbox";
+    inp.id = id;
+    if (checked) inp.checked = true;
+    lb.appendChild(inp);
+    lb.appendChild(document.createTextNode(` ${label}`));
+    return lb;
+  };
+  chWrap.appendChild(mkChk("varResNewExtMeta", "Meta / interno (P12)", true));
+  chWrap.appendChild(mkChk("varResNewExtSite", "Site", true));
+
   const addBtn = document.createElement("button");
   addBtn.type = "button";
   addBtn.className = "ghost var-resolution-extra-add";
   addBtn.id = "varResAddExtBtn";
-  addBtn.setAttribute("aria-label", "Adicionar mapeamento de nome de variável a chaves JSON do payload");
+  addBtn.setAttribute("aria-label", "Adicionar campo de origem em Meta/interno e/ou Site");
   addBtn.textContent = "Adicionar campo de origem";
+
   addBtn.addEventListener("click", () => {
-    const base = "campo_extra";
-    let n = document.querySelectorAll("#varResolutionExtraList .var-resolution-row-ext").length;
-    let name = base;
-    const used = new Set(
-      Array.from(document.querySelectorAll("#varResolutionExtraList .var-resolution-row-ext .vr-ext-name")).map(
-        (el) => (el.value || "").trim().toLowerCase(),
-      ),
-    );
-    while (used.has(name)) {
-      n += 1;
-      name = `${base}_${n}`;
+    const fb = document.getElementById("varResFeedback");
+    const name = (nameIn.value || "").trim();
+    const raw = (keysIn.value || "").trim();
+    const useMeta = document.getElementById("varResNewExtMeta")?.checked;
+    const useSite = document.getElementById("varResNewExtSite")?.checked;
+    if (!useMeta && !useSite) {
+      if (fb) fb.textContent = "Marque pelo menos um destino: Meta/interno ou Site.";
+      return;
     }
-    addRow(name);
+    if (!name || !raw) {
+      if (fb) fb.textContent = "Preencha o nome da variável e as chaves do JSON.";
+      return;
+    }
+    if (!_VR_NAME_RE.test(name)) {
+      if (fb) fb.textContent = "Nome de variável inválido: use a-z, 0-9 e _ (começando com letra).";
+      return;
+    }
+    if (LEAD_RESOLVABLE_SLOTS.includes(name)) {
+      if (fb) fb.textContent = "Esse nome é um campo padrão — edite-o na lista acima, não como campo adicional.";
+      return;
+    }
+    if (VR_EXT_FORBIDDEN.has(name)) {
+      if (fb) fb.textContent = `O nome «${name}» é reservado ao sistema.`;
+      return;
+    }
+    const keys = raw
+      .split(/[,;]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!keys.length) {
+      if (fb) fb.textContent = "Indique pelo menos uma chave de JSON.";
+      return;
+    }
+    const listMeta = document.getElementById("varResolutionExtraList_meta");
+    const listSite = document.getElementById("varResolutionExtraList_site");
+    if (useMeta && listMeta) {
+      const dup = Array.from(listMeta.querySelectorAll(".vr-ext-name")).some(
+        (el) => (el.value || "").trim().toLowerCase() === name.toLowerCase(),
+      );
+      if (dup) {
+        if (fb) fb.textContent = `Já existe um campo extra com o nome «${name}» em Meta/interno.`;
+        return;
+      }
+    }
+    if (useSite && listSite) {
+      const dup = Array.from(listSite.querySelectorAll(".vr-ext-name")).some(
+        (el) => (el.value || "").trim().toLowerCase() === name.toLowerCase(),
+      );
+      if (dup) {
+        if (fb) fb.textContent = `Já existe um campo extra com o nome «${name}» em Site.`;
+        return;
+      }
+    }
+    const joined = keys.join(", ");
+    if (useMeta && listMeta) appendVrExtRow(listMeta, name, joined);
+    if (useSite && listSite) appendVrExtRow(listSite, name, joined);
+    nameIn.value = "";
+    keysIn.value = "";
+    if (fb) {
+      const parts = [];
+      if (useMeta) parts.push("Meta/interno");
+      if (useSite) parts.push("Site");
+      fb.textContent = `Campo «${name}» adicionado em: ${parts.join(" e ")}.`;
+    }
   });
-  const extToolbar = document.createElement("div");
-  extToolbar.className = "var-resolution-extra-toolbar";
-  extToolbar.appendChild(addBtn);
-  extra.append(extraHead, extraList, extToolbar);
-  grid.appendChild(extra);
+
+  addBar.append(nameLab, keysLab, chWrap, addBtn);
+  grid.appendChild(addBar);
 }
 
 function renderCustomVariablesPanel() {
@@ -2024,82 +2245,107 @@ function appendEmptyCustomVarCard() {
   );
 }
 
-const _VR_NAME_RE = /^[a-zA-Z][a-zA-Z0-9_]*$/;
-/** Alineado ao backend: reservados de sistema, não reutilizáveis como origem adicional. */
-const VR_EXT_FORBIDDEN = new Set(
-  "client_name page_id template_id form_name respostas respostas_filtradas respostas_raw respostas_omitidas respostas_count respostas_raw_count respostas_omitidas_count received_at chegada_em traffic_source traffic_origin_url origem_anuncio cliente_origem"
-    .split(/\s+/),
-);
-
-async function saveVariableResolution() {
-  const fb = document.getElementById("varResFeedback");
-  const ch = document.getElementById("varResChannel")?.value || "meta_lead";
-  if (!fb) return;
-  if (!LEAD_ORIGIN_CHANNELS.has(ch)) {
-    fb.textContent = "Selecione um canal de lead (Meta, Site ou interno P12).";
-    return;
-  }
-  fb.textContent = "Salvando...";
+function collectVariableResolutionPayload(storageKey) {
+  const label =
+    storageKey === "meta_lead"
+      ? "Meta/interno"
+      : "Site";
   const payload = {};
+  const seen = new Set();
+  const listId = storageKey === "meta_lead" ? "varResolutionExtraList_meta" : "varResolutionExtraList_site";
+
   LEAD_RESOLVABLE_SLOTS.forEach((slot) => {
-    const inp = document.getElementById(`vrSlot_${slot}`);
+    const inp = document.getElementById(`vrSlot_${storageKey}_${slot}`);
     const raw = (inp?.value || "").trim();
     if (!raw) return;
     const keys = raw
       .split(/[,;]+/)
       .map((s) => s.trim())
       .filter(Boolean);
-    if (keys.length) payload[slot] = { source_keys: keys };
+    if (keys.length) {
+      payload[slot] = { source_keys: keys };
+      seen.add(slot);
+    }
   });
-  const seen = new Set(Object.keys(payload));
-  for (const row of document.querySelectorAll("#varResolutionExtraList .var-resolution-row-ext")) {
+
+  const listEl = document.getElementById(listId);
+  if (!listEl) {
+    return { error: `Lista de campos adicionais em falta (${label}).` };
+  }
+
+  for (const row of listEl.querySelectorAll(".var-resolution-row-ext")) {
     const name = (row.querySelector(".vr-ext-name")?.value || "").trim();
     const raw = (row.querySelector(".vr-ext-keys")?.value || "").trim();
     if (!name && !raw) continue;
     if ((name && !raw) || (!name && raw)) {
-      fb.textContent = "Em cada linha de campo adicional, preencha o nome e as chaves do JSON.";
-      return;
+      return {
+        error: `${label}: em cada linha de campo adicional, preencha o nome e as chaves do JSON.`,
+      };
     }
     if (!_VR_NAME_RE.test(name)) {
-      fb.textContent = "Nome de variável inválido: use a-z, 0-9 e _ (começando com letra).";
-      return;
+      return { error: "Nome de variável inválido: use a-z, 0-9 e _ (começando com letra)." };
     }
     if (LEAD_RESOLVABLE_SLOTS.includes(name) || seen.has(name)) {
-      fb.textContent = "Nome de campo em duplicado ou reservado aos blocos padrão.";
-      return;
+      return { error: `${label}: nome em duplicado ou reservado aos blocos padrão.` };
     }
     if (VR_EXT_FORBIDDEN.has(name)) {
-      fb.textContent = `O nome «${name}» é reservado ao sistema. Escolha outro.`;
-      return;
+      return { error: `O nome «${name}» é reservado ao sistema. Escolha outro.` };
     }
     const keys = raw
       .split(/[,;]+/)
       .map((s) => s.trim())
       .filter(Boolean);
     if (!keys.length) {
-      fb.textContent = "Indique pelo menos uma chave de JSON em cada linha de campo adicional.";
-      return;
+      return { error: `${label}: indique pelo menos uma chave de JSON em cada linha de campo adicional.` };
     }
     seen.add(name);
     payload[name] = { source_keys: keys };
   }
-  const r = await dashFetch(apiUrl(`/api/message-templates/variable-resolution/${encodeURIComponent(ch)}`), {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  let body = {};
-  try {
-    body = await r.json();
-  } catch {
-    fb.textContent = `Erro: resposta inválida (HTTP ${r.status}). A rota /dash/api/… existe no servidor?`;
+  return { payload };
+}
+
+async function saveVariableResolution() {
+  const fb = document.getElementById("varResFeedback");
+  if (!fb) return;
+  fb.textContent = "Salvando...";
+  const m = collectVariableResolutionPayload("meta_lead");
+  if (m.error) {
+    fb.textContent = m.error;
     return;
   }
-  if (!r.ok || !body.ok) {
-    fb.textContent = `Erro: ${body.error || "falha ao salvar"}`;
+  const s = collectVariableResolutionPayload("site_lead");
+  if (s.error) {
+    fb.textContent = s.error;
     return;
   }
-  fb.textContent = "Chaves de origem salvas.";
+
+  const targets = [
+    ["meta_lead", m.payload],
+    ["site_lead", s.payload],
+  ];
+  const errors = [];
+  for (const [ch, payload] of targets) {
+    const r = await dashFetch(apiUrl(`/api/message-templates/variable-resolution/${encodeURIComponent(ch)}`), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    let body = {};
+    try {
+      body = await r.json();
+    } catch {
+      errors.push(`${ch}: resposta inválida (HTTP ${r.status})`);
+      continue;
+    }
+    if (!r.ok || !body.ok) {
+      errors.push(`${ch}: ${body.error || "falha ao salvar"}`);
+    }
+  }
+  if (errors.length) {
+    fb.textContent = `Erro: ${errors.join(" · ")}`;
+    return;
+  }
+  fb.textContent = "Chaves de origem salvas (Meta/interno e Site).";
   await fetchTemplates();
 }
 
@@ -3512,7 +3758,6 @@ function bindUI() {
     "lead_exclude_contains",
     "lead_exclude_regex",
   ]);
-  document.getElementById("varResChannel")?.addEventListener("change", renderVariableResolutionPanel);
   document.getElementById("varResSaveBtn")?.addEventListener("click", () =>
     saveVariableResolution().catch((e) => console.error(e)),
   );

@@ -464,10 +464,10 @@
             <div class="panel-title-wrap">
               <h2>Origem dos campos (webhook)</h2>
               <p>
-                Para cada <strong>variável de lead</strong>, defina a ordem de chaves a ler no JSON do webhook.
-                Os campos padrão (nome, email, UTM&hellip;) e, em baixo, os
-                <strong>campos adicionais</strong> que cria (ex.: <code>referencia</code>) &mdash; ficam no modelo
-                <code>&#123;&#123;nome do campo&#125;&#125;</code> na mensagem.
+                As variáveis <code>&#123;&#123;&hellip;&#125;&#125;</code> dos templates de lead aparecem abaixo com as
+                etiquetas <strong>Meta</strong>, <strong>Site</strong> e <strong>Interno</strong> (P12) onde aplicam.
+                Há dois mapeamentos de chaves JSON: <strong>Meta + interno</strong> (partilhado) e <strong>Site</strong>.
+                Campos adicionais podem ser criados para um ou para ambos.
               </p>
             </div>
             <button
@@ -483,12 +483,10 @@
               ?
             </button>
           </div>
-          <div class="new-client-filters-grid" style="align-items: end">
-            <label>
-              Canal
-              <select id="varResChannel" class="field-select"></select>
-            </label>
-          </div>
+          <div id="varResolutionPills" class="var-origin-pills-wrap" aria-label="Variáveis nos templates de lead"></div>
+          <p id="varResolutionPillsHint" class="field-micro var-origin-pills-hint" hidden>
+            Clique numa variável para copiar <code>&#123;&#123;nome&#125;&#125;</code> para a área de transferência.
+          </p>
           <div id="varResolutionGrid" class="var-resolution-grid" aria-live="polite"></div>
           <div class="new-client-actions">
             <button type="button" class="primary" id="varResSaveBtn">Salvar chaves de origem</button>
