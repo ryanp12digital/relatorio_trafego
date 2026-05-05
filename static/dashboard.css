@@ -682,6 +682,10 @@ h1 {
   color: var(--muted);
 }
 
+.new-client-fields > label.new-client-field-full {
+  grid-column: 1 / -1;
+}
+
 .new-client-fields select,
 .new-client-fields input:not([type="checkbox"]),
 .new-client-fields textarea {
@@ -989,6 +993,13 @@ dd {
   margin: 2px 0 0;
   font-size: 14px;
   word-break: break-word;
+}
+
+.cors-origins-preview {
+  margin: 0;
+  font-size: 12px;
+  white-space: pre-wrap;
+  font-family: ui-monospace, monospace;
 }
 
 .checks {

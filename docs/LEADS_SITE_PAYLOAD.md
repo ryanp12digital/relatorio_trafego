@@ -1,11 +1,11 @@
 # Leads Site via n8n: contrato de payload
 
-Este webhook aceita leads de site no mesmo endpoint de lead (`/meta-new-lead`), com roteamento por `codi_id`.
+Use **sempre** `POST /site-new-lead` para leads de formulário por `codi_id`. O endpoint `/meta-new-lead` aceita **apenas** roteamento por `page_id` (Meta).
 
 ## Endpoint de produção
 
-- URL completa do webhook para os formulários:
-  `https://python-auto-relatorio-trafego.axmxa0.easypanel.host/meta-new-lead`
+- URL do webhook de **site** (substitui pelo teu domínio):
+  `https://<domínio-do-app>/site-new-lead`
 
 ## Campos mínimos
 
@@ -29,11 +29,11 @@ Este webhook aceita leads de site no mesmo endpoint de lead (`/meta-new-lead`), 
 }
 ```
 
-## Regras de decisão no webhook
+## Regras no `/site-new-lead`
 
-1. Se existir `codi_id` com formato válido (28–36 dígitos), o roteamento **Lead Site** tem prioridade: procura em `site_lead_routes` e monta o envio a partir do cadastro. Isto evita que um `page_id` do Facebook presente no mesmo payload (ex. n8n/Make) roube o roteamento.
-2. Se não houver `codi_id` utilizável (vazio) e existir `page_id`, segue o roteamento Meta/Ads nativo.
-3. `codi_id` com formato inválido ou sem rota cadastrada bloqueia o lead (sem enviar para outro cliente por `page_id`).
+1. O endpoint **só** usa `codi_id` (28–36 dígitos): procura em `site_lead_routes` e monta o envio. Um `page_id` no mesmo JSON **não** é usado para rota (evita confusão com payloads n8n/Make).
+2. `codi_id` inválido ou sem rota cadastrada → lead ignorado (resposta HTTP com lead em `skipped` / logs `CODI_ID_*`).
+3. Leads **Meta** (`page_id`) devem ir para `POST /meta-new-lead`. Leads **Google Ads** (`google_customer_id`) para `POST /google-new-lead`.
 
 ## Origem de tráfego (templates)
 
@@ -42,9 +42,9 @@ Este webhook aceita leads de site no mesmo endpoint de lead (`/meta-new-lead`), 
 
 ## Organização de contexto (roteamento)
 
-- **Contexto native_ads**: usa `page_id` como chave principal de roteamento (fluxo nativo Meta/Ads).
-- **Contexto site**: usa `codi_id` como chave principal para leads vindos de formulário de site.
-- `form_id` permanece disponível como chave nativa para futuras implementações, sem conflitar com `codi_id`.
+- **Lead site**: `codi_id` em `POST /site-new-lead`.
+- **Meta / Google**: endpoints dedicados (`/meta-new-lead`, `/google-new-lead`).
+- `form_id` no JSON do site pode existir por compatibilidade com integrações; não substitui `codi_id` para rota neste endpoint.
 
 ## Observações práticas (n8n)
 

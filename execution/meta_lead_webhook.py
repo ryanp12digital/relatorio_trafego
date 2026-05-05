@@ -1,10 +1,15 @@
 """
-Webhook HTTP: leads do Make/Meta -> mensagem formatada no grupo WhatsApp.
+Webhook HTTP: leads -> mensagem formatada no grupo WhatsApp.
 
-Rotas:
-- POST /meta-new-lead      (rota padrao multi-cliente)
-- POST /site-new-lead      (rota dedicada para lead de site por codi_id)
-- POST /lorena-new-lead    (alias legado para compatibilidade)
+Rotas públicas de lead (cada uma com segredo opcional próprio no .env):
+- POST /meta-new-lead   — só Meta (page_id → clientes Meta na Pulseboard)
+- POST /google-new-lead — só Google Ads (google_customer_id → google_clients)
+- POST /site-new-lead   — só site (codi_id → site_lead_routes)
+
+Outros POST no mesmo processo:
+- POST /evolution-webhook — catálogo de grupos Evolution (EVOLUTION_CATALOG_WEBHOOK_SECRET)
+
+Legado removido: POST /lorena-new-lead responde 410 com indicação dos endpoints acima.
 """
 
 from __future__ import annotations
@@ -66,6 +71,7 @@ app.secret_key = (
 )
 
 LOG_PREFIX = "[P12_META_LEAD_WEBHOOK]"
+_LEAD_WEBHOOK_PATHS = frozenset({"/meta-new-lead", "/google-new-lead", "/site-new-lead"})
 # Campos promovidos ao cabeçalho ({{nome}}, {{whatsapp}}, etc.) — não repetir no bloco "Respostas".
 _EXCLUDE_RESPOSTAS = frozenset(
     {
@@ -174,6 +180,16 @@ _CODI_ID_PAYLOAD_KEYS: Tuple[str, ...] = (
     "leadFormId",
 )
 _NATIVE_FORM_ID_KEYS: Tuple[str, ...] = ("form_id", "formid", "formId", "lead_form_id", "leadFormId")
+_GOOGLE_CUSTOMER_ID_KEYS: Tuple[str, ...] = (
+    "google_customer_id",
+    "googleCustomerId",
+    "customer_id",
+    "customerId",
+    "google_ads_customer_id",
+    "googleAdsCustomerId",
+    "gads_customer_id",
+    "gadsCustomerId",
+)
 
 
 def _emoji_for_log(message: str) -> str:
@@ -901,19 +917,57 @@ def _route_from_meta_client(c: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _route_from_google_client(c: Dict[str, Any]) -> Dict[str, Any]:
+    tpl = str(c.get("google_template", "")).strip() or "default"
     return {
         "client_name": str(c.get("client_name", "")).strip() or "Cliente",
         "group_id": str(c.get("group_id") or "").strip(),
         "phone_number": str(c.get("lead_phone_number", "")).strip(),
-        "template": "default",
+        "template": tpl,
         "exclude_exact": [],
         "exclude_contains": [],
         "exclude_regex": [],
         "internal_notify_group_id": str(c.get("internal_notify_group_id", "")).strip(),
-        "internal_lead_template": "",
+        "internal_lead_template": str(c.get("internal_lead_template", "")).strip(),
         "internal_weekly_template": str(c.get("internal_weekly_template", "")).strip(),
         "internal_notify_message": str(c.get("internal_notify_message", "")).strip(),
+        "template_channel": "meta_lead",
+        "route_origin": "google_customer_id",
+        "google_customer_id": str(c.get("google_customer_id", "")).strip(),
     }
+
+
+def _configured_google_customers_hint(max_pairs: int = 10) -> str:
+    """Lista cliente:customer_id Google configurados (ajuda a corrigir rota)."""
+    try:
+        clients = _load_google_clients()
+        parts: List[str] = []
+        for c in clients:
+            if c.get("enabled", True) is False:
+                continue
+            cid = str(c.get("google_customer_id", "")).strip()
+            nm = str(c.get("client_name", "")).strip() or "Cliente"
+            if cid:
+                parts.append(f"{nm}:{cid}")
+        if not parts:
+            return "google_customers_configurados=(nenhum com google_customer_id)"
+        head = parts[:max_pairs]
+        tail = f" ...(+{len(parts) - max_pairs})" if len(parts) > max_pairs else ""
+        return "google_customers_configurados=" + "; ".join(head) + tail
+    except Exception as exc:
+        return f"google_customers_configurados=(erro_leitura:{exc!s})"
+
+
+def _resolve_google_lead_route(customer_id_raw: str) -> Optional[Dict[str, Any]]:
+    want = _normalize_google_customer_id_digits(customer_id_raw)
+    if not want:
+        return None
+    for c in _load_google_clients():
+        if c.get("enabled", True) is False:
+            continue
+        cid = _normalize_google_customer_id_digits(str(c.get("google_customer_id", "")))
+        if cid and cid == want:
+            return _route_from_google_client(c)
+    return None
 
 
 def _extract_codi_id_from_body(body: Dict[str, Any]) -> str:
@@ -962,6 +1016,38 @@ def _extract_native_form_id_from_body(body: Dict[str, Any]) -> str:
             if txt:
                 return txt
     for key in _NATIVE_FORM_ID_KEYS:
+        txt = _mappable_lookup(mappable, key).strip()
+        if txt:
+            return txt
+    return ""
+
+
+def _normalize_google_customer_id_digits(raw: str) -> str:
+    """Comparação de customer id Google Ads: só dígitos (aceita 123-456-7890 ou act_123)."""
+    s = str(raw or "").strip()
+    if s.lower().startswith("act_"):
+        s = s[4:]
+    return "".join(ch for ch in s if ch.isdigit())
+
+
+def _extract_google_customer_id_from_body(body: Dict[str, Any]) -> str:
+    if not isinstance(body, dict):
+        return ""
+    data = body.get("data") if isinstance(body.get("data"), dict) else {}
+    mappable = _ensure_mappable(body, data)
+    for key in _GOOGLE_CUSTOMER_ID_KEYS:
+        raw = _pick_ci(data, key)
+        if raw not in (None, ""):
+            txt = _format_field_value(raw).strip()
+            if txt:
+                return txt
+    for key in _GOOGLE_CUSTOMER_ID_KEYS:
+        raw = _pick_ci(body, key)
+        if raw not in (None, ""):
+            txt = _format_field_value(raw).strip()
+            if txt:
+                return txt
+    for key in _GOOGLE_CUSTOMER_ID_KEYS:
         txt = _mappable_lookup(mappable, key).strip()
         if txt:
             return txt
@@ -1125,14 +1211,20 @@ def _resolve_route_with_context(page_id: str, codi_id: str) -> Tuple[Optional[Di
 
 
 def _resolve_route_with_mode(
-    route_mode: str, page_id: str, codi_id: str
+    route_mode: str,
+    page_id: str,
+    codi_id: str,
+    *,
+    google_customer_id: str = "",
 ) -> Tuple[Optional[Dict[str, Any]], str, str, str]:
     """
     route_mode:
-      - auto: comportamento atual (site por codi_id, senão native_ads por page_id)
-      - site_only: exige codi_id válido e ignora page_id
+      - meta_only: só page_id (Meta); ignora codi_id
+      - google_only: só google_customer_id (conta Google Ads)
+      - site_only: só codi_id (lead site)
+      - auto: site por codi_id, senão Meta por page_id (compat. com payloads antigos mistos)
     """
-    mode = str(route_mode or "auto").strip().lower()
+    mode = str(route_mode or "meta_only").strip().lower()
     if mode == "site_only":
         cid = (codi_id or "").strip()
         if not cid:
@@ -1148,51 +1240,82 @@ def _resolve_route_with_mode(
         if route:
             return route, "site", "", ""
         return None, "site", "CODI_ID_ROUTE_NOT_FOUND", f"codi_id_recebido={cid}"
+    if mode == "google_only":
+        g = _normalize_google_customer_id_digits(google_customer_id)
+        if not g:
+            return (
+                None,
+                "google",
+                "GOOGLE_CUSTOMER_ID_OBRIGATORIO",
+                "Envie google_customer_id (ID da conta Google Ads, só dígitos ou formato 123-456-7890)",
+            )
+        route = _resolve_google_lead_route(google_customer_id)
+        if route:
+            return route, "google", "", ""
+        return (
+            None,
+            "google",
+            "GOOGLE_CUSTOMER_ID_ROUTE_NOT_FOUND",
+            f"google_customer_id_recebido={google_customer_id!r} | {_configured_google_customers_hint()}",
+        )
+    if mode == "meta_only":
+        pid = (page_id or "").strip()
+        if not pid:
+            return (
+                None,
+                "native_ads",
+                "PAGE_ID_OBRIGATORIO",
+                "Este endpoint aceita apenas page_id (Meta). Leads de site: POST /site-new-lead",
+            )
+        route = _resolve_lead_route(pid)
+        if route:
+            return route, "native_ads", "", ""
+        return None, "native_ads", "PAGE_ID_SEM_CLIENTE_NA_PULSEBOARD", _configured_meta_pages_hint()
     return _resolve_route_with_context(page_id, codi_id)
 
 
-def _resolve_legacy_lorena_route() -> Optional[Dict[str, Any]]:
+def _human_route_error_detail(route_error_code: str) -> str:
+    return {
+        "PAGE_ID_SEM_CLIENTE_NA_PULSEBOARD": "Lead ignorado por page_id não mapeado na Pulseboard",
+        "PAGE_ID_OBRIGATORIO": "Lead Meta sem page_id (este endpoint exige apenas page_id)",
+        "CODI_ID_INVALID_FORMAT": "Lead de site ignorado por codi_id fora do padrão",
+        "CODI_ID_ROUTE_NOT_FOUND": "Lead de site ignorado por codi_id sem rota cadastrada",
+        "CODI_ID_OBRIGATORIO": "Lead de site sem codi_id (obrigatório neste endpoint)",
+        "GOOGLE_CUSTOMER_ID_OBRIGATORIO": "Lead Google sem google_customer_id no payload",
+        "GOOGLE_CUSTOMER_ID_ROUTE_NOT_FOUND": "Lead ignorado: google_customer_id sem cliente em google_clients",
+        "ROUTING_KEY_MISSING": "Lead ignorado sem page_id e sem codi_id (payload misto: use o endpoint dedicado)",
+    }.get(route_error_code, f"Lead ignorado (código: {route_error_code})")
+
+
+def _lead_webhook_expected_secret(endpoint_label: str) -> str:
     """
-    Compatibilidade do endpoint legado:
-    se payload antigo nao trouxer page_id, cai no cliente Lorena.
+    Segredo HTTP por endpoint: uma variável .env por URL (Meta / Google / Site independentes).
+    Vazio = esse POST não exige segredo.
     """
-    clients = _load_clients()
-    for c in clients:
-        client_name = str(c.get("client_name", "")).strip()
-        template = str(c.get("lead_template", "")).strip()
-        if client_name != "Lorena Carvalho" and template != "lorena":
-            continue
-        group_id = str(c.get("group_id") or "").strip()
-        return {
-            "client_name": client_name or "Lorena Carvalho",
-            "group_id": group_id,
-            "phone_number": "",
-            "template": template or "lorena",
-            "exclude_exact": [],
-            "exclude_contains": [],
-            "exclude_regex": [],
-            "internal_notify_group_id": str(c.get("internal_notify_group_id", "")).strip(),
-            "internal_lead_template": str(c.get("internal_lead_template", "")).strip(),
-            "internal_weekly_template": str(c.get("internal_weekly_template", "")).strip(),
-            "internal_notify_message": str(c.get("internal_notify_message", "")).strip(),
-        }
-    return None
+    if endpoint_label == "/site-new-lead":
+        return (os.getenv("SITE_LEAD_WEBHOOK_SECRET") or "").strip()
+    if endpoint_label == "/google-new-lead":
+        return (os.getenv("GOOGLE_LEAD_WEBHOOK_SECRET") or "").strip()
+    if endpoint_label == "/meta-new-lead":
+        return (os.getenv("META_LEAD_WEBHOOK_SECRET") or "").strip()
+    return ""
 
 
-def _allow_default_no_page_legacy_fallback() -> bool:
+def _lead_webhook_secret_from_query() -> str:
     """
-    Compatibilidade: no endpoint padrão, payloads antigos sem page_id
-    podem cair no roteamento legado da Lorena.
-
-    Para desativar explicitamente:
-      META_LEAD_ALLOW_DEFAULT_NO_PAGE_FALLBACK=0|false|no
+    Segredo na query string (útil quando a plataforma não envia cabeçalhos), alinhado à Evolution:
+    ?secret=... ou ?webhook_secret=... (primeiro não vazio ganha).
+    Atenção: URLs com segredo aparecem em logs de proxy e histórico do browser.
     """
-    raw = (os.getenv("META_LEAD_ALLOW_DEFAULT_NO_PAGE_FALLBACK") or "false").strip().lower()
-    return raw not in {"0", "false", "no"}
+    q = request.args or {}
+    return (
+        (q.get("webhook_secret") or "").strip()
+        or (q.get("secret") or "").strip()
+    )
 
 
-def _check_webhook_secret() -> Optional[Tuple[Any, int]]:
-    secret = (os.getenv("META_LEAD_WEBHOOK_SECRET") or os.getenv("LORENA_LEAD_WEBHOOK_SECRET") or "").strip()
+def _check_webhook_secret(endpoint_label: str) -> Optional[Tuple[Any, int]]:
+    secret = _lead_webhook_expected_secret(endpoint_label)
     if not secret:
         return None
     hdr = (request.headers.get("X-Webhook-Secret") or "").strip()
@@ -1200,7 +1323,8 @@ def _check_webhook_secret() -> Optional[Tuple[Any, int]]:
     bearer = ""
     if auth.lower().startswith("bearer "):
         bearer = auth[7:].strip()
-    if hdr == secret or bearer == secret:
+    qs = _lead_webhook_secret_from_query()
+    if hdr == secret or bearer == secret or qs == secret:
         return None
     return jsonify({"ok": False, "error": "unauthorized"}), 401
 
@@ -1268,12 +1392,14 @@ def _base_message_fields(body: Dict[str, Any], route: Optional[Dict[str, Any]] =
         utm_term,
         utm_content,
     )
+    site_routed = str((route or {}).get("route_origin", "")).strip() == "site_codi_id"
+    google_routed = str((route or {}).get("route_origin", "")).strip() == "google_customer_id"
     out: Dict[str, str] = {
         "nome": nome or "(nao informado)",
         "email": email or "(nao informado)",
         "whatsapp": wa_link,
         "telefone_digitos": telefone_digitos or "(nao informado)",
-        "form_name": _extract_form_name(body),
+        "form_name": _extract_form_name(body, allow_meta_graph=not (site_routed or google_routed)),
         "page_path": page_path,
         "utm_source": utm_source,
         "utm_medium": utm_medium,
@@ -1380,7 +1506,13 @@ def _mappable_form_name_by_row_alias(mappable: List[Dict[str, Any]]) -> str:
     return ""
 
 
-def _extract_form_name(body: Dict[str, Any]) -> str:
+def _extract_form_name(body: Dict[str, Any], *, allow_meta_graph: bool = True) -> str:
+    """
+    Nome amigável do formulário para templates ({{form_name}}).
+
+    Leads roteados por `site_codi_id` não devem consultar a Graph: `form_id` no JSON do site
+    costuma ser texto (ex.: nome do cliente), não um object id numérico do Meta.
+    """
     data = body.get("data") if isinstance(body.get("data"), dict) else {}
     mappable = _ensure_mappable(body, data)
 
@@ -1395,6 +1527,12 @@ def _extract_form_name(body: Dict[str, Any]) -> str:
     name_from_mappable_alias = _mappable_form_name_by_row_alias(mappable)
     if name_from_mappable_alias:
         return name_from_mappable_alias
+
+    if not allow_meta_graph:
+        cid = _extract_codi_id_from_body(body).strip()
+        if cid:
+            return cid
+        return "(nao informado)"
 
     # Fallback robusto: resolve nome do formulário na Graph API via form_id/leadgenId.
     nested_form_id = ""
@@ -1585,14 +1723,13 @@ def _format_lead_message(
 
 def _handle_meta_new_lead(
     endpoint_label: str,
-    allow_legacy_lorena_fallback: bool = False,
-    route_mode: str = "auto",
+    route_mode: str = "meta_only",
     channel_label: str = "leads_meta",
 ) -> Tuple[Any, int]:
-    denied = _check_webhook_secret()
+    denied = _check_webhook_secret(endpoint_label)
     if denied:
         _wh_log(
-            f"POST {endpoint_label} | ERRO_AUTH | canal={channel_label} | cod=WEBHOOK_SECRET_META_NEGADO | "
+            f"POST {endpoint_label} | ERRO_AUTH | canal={channel_label} | cod=WEBHOOK_SECRET_NEGADO | "
             f"ip={_client_ip()} | content_length={request.content_length}",
             level=logging.WARNING,
         )
@@ -1733,79 +1870,44 @@ def _handle_meta_new_lead(
         body = event["body"]
         page_id = str(event.get("page_id", "")).strip()
         codi_id = _extract_codi_id_from_body(body)
+        google_cid = _extract_google_customer_id_from_body(body)
         native_form_id = _extract_native_form_id_from_body(body)
-        # Guard rail: alguns payloads Meta trazem form_id (15-16 dígitos) e isso não é codi_id de site.
-        # Se codi_id == form_id nativo e está fora do padrão de site, roteia por page_id.
-        if (
-            codi_id
-            and native_form_id
-            and codi_id == native_form_id
-            and not is_valid_site_codi_id(codi_id)
-        ):
-            _wh_log(
-                f"LEAD_{idx} | AVISO_ROTA | canal={channel_label} | cod=IGNORA_CODI_ID_EQ_FORM_ID_META | "
-                f"form_id={native_form_id} | page_id={page_id or 'vazio'} | acao=usar_page_id"
-            )
-            codi_id = ""
-        route, route_context, route_error_code, route_error_hint = _resolve_route_with_mode(route_mode, page_id, codi_id)
-        route_error_detail = (
-            "Lead ignorado por page_id não mapeado"
-            if route_error_code == "PAGE_ID_SEM_CLIENTE_NA_PULSEBOARD"
-            else (
-                "Lead de site ignorado por codi_id fora do padrão"
-                if route_error_code == "CODI_ID_INVALID_FORMAT"
-                else (
-                    "Lead de site ignorado por codi_id sem rota cadastrada"
-                    if route_error_code == "CODI_ID_ROUTE_NOT_FOUND"
-                    else (
-                        "Lead de site sem codi_id (endpoint site dedicado)"
-                        if route_error_code == "CODI_ID_OBRIGATORIO"
-                        else "Lead ignorado sem page_id e sem codi_id"
-                    )
+        # Guard rail (payloads mistos com codi_id + form_id Meta): só em modo auto.
+        if route_mode == "auto":
+            if (
+                codi_id
+                and native_form_id
+                and codi_id == native_form_id
+                and not is_valid_site_codi_id(codi_id)
+            ):
+                _wh_log(
+                    f"LEAD_{idx} | AVISO_ROTA | canal={channel_label} | cod=IGNORA_CODI_ID_EQ_FORM_ID_META | "
+                    f"form_id={native_form_id} | page_id={page_id or 'vazio'} | acao=usar_page_id"
                 )
-            )
+                codi_id = ""
+        route, route_context, route_error_code, route_error_hint = _resolve_route_with_mode(
+            route_mode, page_id, codi_id, google_customer_id=google_cid
         )
+        route_error_detail = _human_route_error_detail(route_error_code)
         if route and route_context == "site":
             _wh_log(
                 f"LEAD_{idx} | ROTA_CODI_ID_OK | canal={channel_label} | cod=CODI_ID_ROUTE_MATCH | "
                 f"codi_id={codi_id} | cliente={route.get('client_name','')}"
             )
-        should_try_legacy_no_page = (
-            route_mode == "auto"
-            and
-            not page_id
-            and not codi_id
-            and (
-                allow_legacy_lorena_fallback
-                or (
-                    endpoint_label == "/meta-new-lead"
-                    and _allow_default_no_page_legacy_fallback()
-                )
+        if route and route_context == "google":
+            _wh_log(
+                f"LEAD_{idx} | ROTA_GOOGLE_OK | canal={channel_label} | cod=GOOGLE_CUSTOMER_ROUTE_MATCH | "
+                f"google_customer_id={google_cid} | cliente={route.get('client_name','')}"
             )
-        )
-        if not route and should_try_legacy_no_page:
-            route = _resolve_legacy_lorena_route()
-            if route:
-                _wh_log(
-                f"LEAD_{idx} | AVISO_ROTA | canal={channel_label} | cod=FALLBACK_LEGADO_LORENA | "
-                    f"endpoint={endpoint_label} | cliente={route['client_name']}"
-                )
-                _emit_runtime_event(
-                    stage="FALLBACK_LEGADO_APLICADO",
-                    status="warning",
-                    detail="Roteamento sem page_id via fallback legado",
-                    client_name=route["client_name"],
-                    page_id=page_id,
-                    group_id=route["group_id"],
-                    payload={"lead_index": idx, "endpoint": endpoint_label},
-                )
         if not route:
             skipped.append(
-                f"lead_index_{idx}: rota_nao_mapeada (page_id={page_id or 'vazio'}; codi_id={codi_id or 'vazio'})"
+                f"lead_index_{idx}: rota_nao_mapeada (page_id={page_id or 'vazio'}; codi_id={codi_id or 'vazio'}; "
+                f"google_customer_id={google_cid or 'vazio'})"
             )
             _wh_log(
                 f"LEAD_{idx} | ERRO_ROTA_CLIENTE | canal={channel_label} | cod={route_error_code} | "
                 f"page_id_recebido={page_id or 'vazio'} | codi_id_recebido={codi_id or 'vazio'} | "
+                f"google_customer_id_recebido={google_cid or 'vazio'} | "
                 f"native_form_id={native_form_id or 'vazio'} | contexto={route_context} | "
                 f"cliente_mapeado=(nenhum) | {route_error_hint}",
                 level=logging.WARNING,
@@ -1821,6 +1923,7 @@ def _handle_meta_new_lead(
                     "cod": route_error_code,
                     "meta_pages_hint": route_error_hint,
                     "codi_id": codi_id,
+                    "google_customer_id": google_cid,
                     "native_form_id": native_form_id,
                     "route_context": route_context,
                 },
@@ -1839,6 +1942,7 @@ def _handle_meta_new_lead(
                 "lead_index": idx,
                 "template": route.get("template", ""),
                 "codi_id": codi_id,
+                "google_customer_id": google_cid,
                 "native_form_id": native_form_id,
                 "route_origin": route.get("route_origin", "meta_page_id"),
                 "route_target_type": route.get("route_target_type", "meta"),
@@ -2043,9 +2147,180 @@ def _handle_meta_new_lead(
     return jsonify({"ok": True, "sent": sent, "skipped": skipped}), 200
 
 
+def _normalize_cors_origin(origin: str) -> str:
+    """Origin não deve ter path; remove barra final por tolerância a configs."""
+    o = (origin or "").strip()
+    while o.endswith("/"):
+        o = o[:-1]
+    return o
+
+
+def _cors_origins_from_site_lead_routes() -> List[str]:
+    """Origens guardadas no Pulseboard (Leads Site), só cadastros ativos."""
+    try:
+        from execution import persistence
+
+        if persistence.db_enabled():
+            persistence.ensure_db_ready()
+        routes = persistence.list_site_lead_routes()
+    except Exception as exc:
+        logger.debug("CORS: não foi possível carregar cors_allowed_origins das rotas site: %s", exc)
+        return []
+    out: List[str] = []
+    seen: set = set()
+    for r in routes:
+        if not r.get("enabled", True):
+            continue
+        for o in r.get("cors_allowed_origins") or []:
+            n = _normalize_cors_origin(str(o))
+            if not n:
+                continue
+            kl = n.lower()
+            if kl in seen:
+                continue
+            seen.add(kl)
+            out.append(n)
+    return out
+
+
+def _lead_webhook_cors_origins_config() -> Tuple[str, ...]:
+    """
+    Allowlist de origens (sem barra no final na lista). Vazio = sem CORS nos webhooks de lead.
+    "*" só permitido se META_LEAD_WEBHOOK_CORS_CREDENTIALS não for true (cookies / fetch credentials).
+    Unifica META_LEAD_WEBHOOK_CORS_ORIGINS com origens dos cadastros Leads Site ativos (Pulseboard).
+    """
+    raw = (os.getenv("META_LEAD_WEBHOOK_CORS_ORIGINS") or "").strip()
+    db_origins = _cors_origins_from_site_lead_routes()
+    if raw == "*":
+        if _lead_webhook_cors_credentials_enabled():
+            logger.warning(
+                "META_LEAD_WEBHOOK_CORS_ORIGINS=* é incompatível com META_LEAD_WEBHOOK_CORS_CREDENTIALS=true; "
+                "use uma lista explícita de origens."
+            )
+            return ()
+        return ("*",)
+    env_parts = [_normalize_cors_origin(o) for o in raw.split(",") if o.strip()] if raw else []
+    merged: List[str] = []
+    seen: set = set()
+    for o in env_parts + db_origins:
+        if not o:
+            continue
+        kl = o.lower()
+        if kl in seen:
+            continue
+        seen.add(kl)
+        merged.append(o)
+    return tuple(merged)
+
+
+def _lead_webhook_cors_credentials_enabled() -> bool:
+    v = (os.getenv("META_LEAD_WEBHOOK_CORS_CREDENTIALS") or "").strip().lower()
+    return v in ("1", "true", "yes")
+
+
+def _lead_webhook_cors_allow_headers_value() -> str:
+    raw = (os.getenv("META_LEAD_WEBHOOK_CORS_ALLOW_HEADERS") or "").strip()
+    if raw:
+        return raw
+    return "Content-Type, Authorization, X-Webhook-Secret, X-Request-Id, Accept, Accept-Language"
+
+
+def _lead_webhook_cors_allow_methods_value() -> str:
+    raw = (os.getenv("META_LEAD_WEBHOOK_CORS_ALLOW_METHODS") or "").strip()
+    if raw:
+        return raw
+    return "POST, OPTIONS"
+
+
+def _lead_webhook_cors_max_age() -> str:
+    return (os.getenv("META_LEAD_WEBHOOK_CORS_MAX_AGE") or "86400").strip() or "86400"
+
+
+def _lead_webhook_cors_expose_headers_value() -> str:
+    return (os.getenv("META_LEAD_WEBHOOK_CORS_EXPOSE_HEADERS") or "").strip()
+
+
+def _lead_webhook_cors_allow_origin_value() -> Optional[str]:
+    cfg = _lead_webhook_cors_origins_config()
+    if not cfg:
+        return None
+    if cfg == ("*",):
+        return "*"
+    origin = _normalize_cors_origin(request.headers.get("Origin") or "")
+    if origin and origin in cfg:
+        return origin
+    return None
+
+
+def _apply_lead_webhook_cors_to_response(
+    response: Response, allow_origin: str, *, preflight: bool = False
+) -> None:
+    response.headers["Access-Control-Allow-Origin"] = allow_origin
+    if allow_origin != "*":
+        response.headers["Vary"] = "Origin"
+    response.headers["Access-Control-Allow-Methods"] = _lead_webhook_cors_allow_methods_value()
+    response.headers["Access-Control-Allow-Headers"] = _lead_webhook_cors_allow_headers_value()
+    if preflight:
+        response.headers["Access-Control-Max-Age"] = _lead_webhook_cors_max_age()
+    if _lead_webhook_cors_credentials_enabled():
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    expose = _lead_webhook_cors_expose_headers_value()
+    if expose:
+        response.headers["Access-Control-Expose-Headers"] = expose
+
+
+def _apply_lead_webhook_cors_headers(response: Response) -> Response:
+    allow = _lead_webhook_cors_allow_origin_value()
+    if not allow:
+        return response
+    _apply_lead_webhook_cors_to_response(response, allow)
+    return response
+
+
+@app.before_request
+def _lead_webhook_cors_preflight() -> Optional[Any]:
+    if request.method != "OPTIONS":
+        return None
+    path = request.path or ""
+    if path not in _LEAD_WEBHOOK_PATHS:
+        return None
+    cfg = _lead_webhook_cors_origins_config()
+    if not cfg:
+        return None
+    allow = _lead_webhook_cors_allow_origin_value()
+    if not allow:
+        return Response(status=403)
+    resp = Response(status=204)
+    _apply_lead_webhook_cors_to_response(resp, allow, preflight=True)
+    return resp
+
+
+@app.after_request
+def _lead_webhook_cors_after(response: Response) -> Response:
+    path = request.path or ""
+    if path not in _LEAD_WEBHOOK_PATHS:
+        return response
+    return _apply_lead_webhook_cors_headers(response)
+
+
 @app.route("/meta-new-lead", methods=["POST"])
 def meta_new_lead():
-    response, status = _handle_meta_new_lead("/meta-new-lead")
+    response, status = _handle_meta_new_lead(
+        "/meta-new-lead",
+        route_mode="meta_only",
+        channel_label="leads_meta",
+    )
+    return response, status
+
+
+@app.route("/google-new-lead", methods=["POST"])
+def google_new_lead():
+    """Leads Google Ads: roteamento por google_customer_id → tabela google_clients."""
+    response, status = _handle_meta_new_lead(
+        "/google-new-lead",
+        route_mode="google_only",
+        channel_label="leads_google",
+    )
     return response, status
 
 
@@ -2065,12 +2340,23 @@ def site_new_lead():
 
 
 @app.route("/lorena-new-lead", methods=["POST"])
-def lorena_new_lead_legacy():
-    response, status = _handle_meta_new_lead(
-        "/lorena-new-lead",
-        allow_legacy_lorena_fallback=True,
+def lorena_new_lead_deprecated():
+    return (
+        jsonify(
+            {
+                "ok": False,
+                "error": "gone",
+                "code": "LORENA_ENDPOINT_DEPRECATED",
+                "message": "O endpoint /lorena-new-lead foi descontinuado. Use um dos endpoints dedicados.",
+                "use": {
+                    "meta": "POST /meta-new-lead (segredo: META_LEAD_WEBHOOK_SECRET; chave: page_id)",
+                    "google": "POST /google-new-lead (segredo: GOOGLE_LEAD_WEBHOOK_SECRET; chave: google_customer_id)",
+                    "site": "POST /site-new-lead (segredo: SITE_LEAD_WEBHOOK_SECRET ou META_LEAD_WEBHOOK_SECRET; chave: codi_id)",
+                },
+            }
+        ),
+        410,
     )
-    return response, status
 
 
 @app.get("/health")
@@ -2283,8 +2569,8 @@ def main() -> None:
     port = int(os.getenv("WEBHOOK_PORT", "8080"))
     _wh_log(
         "SERVICO_INICIADO | "
-        f"escutando 0.0.0.0:{port} | GET /health | POST /meta-new-lead | POST /site-new-lead | dashboard /dash | "
-        f"catalogo grupos POST /evolution-webhook"
+        f"escutando 0.0.0.0:{port} | GET /health | POST /meta-new-lead | POST /google-new-lead | POST /site-new-lead | "
+        f"dashboard /dash | catalogo grupos POST /evolution-webhook"
     )
     serve_flask_app(app, port=port)
 

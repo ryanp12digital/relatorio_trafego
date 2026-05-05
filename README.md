@@ -138,7 +138,7 @@ No **Easypanel** (ou similar):
 1. Modelo completo de variáveis: **[`ENV_TEMPLATE.txt`](ENV_TEMPLATE.txt)** (organizado por blocos para o Easypanel). O [`entrypoint.sh`](entrypoint.sh) gera `/app/.env` a partir do `printenv` se não existir ficheiro montado — inclui `META_*`, `EVOLUTION_*`, `DASHBOARD_*`, `GOOGLE_*`, **`DATABASE_URL`** / `SUPABASE_DATABASE_URL`, `FLASK_SECRET_KEY`, `SUPABASE_*`.
 2. Garanta **`META_BUSINESS_ID`** e **`META_ACCESS_TOKEN`** — sem Business ID o fluxo multi-client do cron aborta.
 3. Para números alinhados ao Ads Manager, defina em produção: **`META_ACTION_REPORT_TIME`**, **`META_ATTRIBUTION_WINDOWS`**, **`REPORT_RESULT_ACTION_TYPE`** (ver `ENV_TEMPLATE.txt`).
-4. Webhook de leads: mapear **`WEBHOOK_PORT`** (ex. 8080) no HTTPS; opcional **`META_LEAD_WEBHOOK_SECRET`**; **`META_LEAD_FALLBACK_WHATSAPP`** só se quiser um texto fixo quando o lead não tiver telefone com dígitos.
+4. Webhooks de lead: mapear **`WEBHOOK_PORT`** (ex. 8080) no HTTPS; segredos opcionais por canal — **`META_LEAD_WEBHOOK_SECRET`**, **`GOOGLE_LEAD_WEBHOOK_SECRET`**, **`SITE_LEAD_WEBHOOK_SECRET`** (ver secção Webhooks abaixo); **`META_LEAD_FALLBACK_WHATSAPP`** só se quiser texto fixo quando o lead não tiver telefone com dígitos.
 5. Dashboard viva: manter **`ENABLE_DASHBOARD=true`** e mapear um domínio/subdomínio separado para **`DASHBOARD_PORT`** (padrão `8091`), sem alterar o domínio do webhook em `8080`. Opcional: **`DASHBOARD_AUTH_PASSWORD`** + **`DASHBOARD_SESSION_SECRET`** (login na Pulseboard; ver `ENV_TEMPLATE.txt`).
 6. **Postgres (Supabase):** executar **`supabase/migrations/001_initial_pulseboard.sql`**; para **Grupos WhatsApp**, **`002_whatsapp_catalog_groups.sql`** e **`003_whatsapp_catalog_groups_supabase.sql`** (trigger e metadados no painel); depois definir **`DATABASE_URL`** (pooler Transaction). Com BD ativa, clientes/templates deixam de depender só dos JSON no deploy (ver [`supabase/README.md`](supabase/README.md)).
 7. Para **incluir cliente novo** sem BD: edite `data/clients.json`, faça commit/deploy **ou** monte volume em `/app/data/clients.json` (ou a pasta `/app/data`). Com **`DATABASE_URL`**, use a dashboard (dados na tabela).
@@ -149,32 +149,60 @@ No **Easypanel** (ou similar):
   - **`.tmp/webhook_meta_leads.log`** — cópia do stdout do webhook (o mesmo fluxo também vai para o **stdout do container** via `tee`, visível nos logs do Easypanel).
   - **Filtro de eventos do webhook:** busque por **`P12_META_LEAD_WEBHOOK`** — cada hit do Make gera linhas como `RECEBIDO`, `PAYLOAD_OK`, `WHATSAPP_ENVIADO_OK` / `CONCLUIDO_OK`.
 
-### Webhooks de lead (Make) — endpoints dedicados
+### Webhooks de lead (Make / n8n / browser) — três canais separados
 
-O container sobe um servidor HTTP em background (porta **`WEBHOOK_PORT`**, padrão **8080**) com:
+O mesmo processo HTTP (porta **`WEBHOOK_PORT`**, padrão **8080**) expõe **três URLs de lead** com segredos e chaves de rota **independentes**:
 
-- **Lead Meta/Ads (por `page_id`):** `POST /meta-new-lead`
-- **Lead Site (por `codi_id`):** `POST /site-new-lead`
-- **Alias legado (compatibilidade):** `POST /lorena-new-lead`
-- **URL pública padrão (após mapear a porta no Easypanel):** `https://<domínio-do-app>/meta-new-lead`
-- **URL pública de site:** `https://<domínio-do-app>/site-new-lead`
-- **Compatibilidade antiga:** no alias legado, se o payload vier sem `page_id`, o sistema tenta rotear para o cliente Lorena.
+| Endpoint | Chave de rota | Cadastro na Pulseboard | Segredo `.env` |
+|----------|----------------|-------------------------|----------------|
+| `POST /meta-new-lead` | `page_id` (página Meta) | Clientes Meta (`meta_page_id`, …) | `META_LEAD_WEBHOOK_SECRET` |
+| `POST /google-new-lead` | `google_customer_id` (conta Google Ads) | `google_clients` | `GOOGLE_LEAD_WEBHOOK_SECRET` |
+| `POST /site-new-lead` | `codi_id` (28–36 dígitos) | **Leads Site** (`site_lead_routes`) | `SITE_LEAD_WEBHOOK_SECRET` |
 
-**Variáveis de ambiente:** ver `ENV_TEMPLATE.txt` (`META_LEAD_WEBHOOK_SECRET`, `META_LEAD_FALLBACK_WHATSAPP`, `WEBHOOK_PORT`). Há fallback para variáveis legadas `LORENA_*`.
+- **Catálogo Evolution (outro fluxo):** `POST /evolution-webhook` com `EVOLUTION_CATALOG_WEBHOOK_SECRET` — só eventos de grupos/WhatsApp da Evolution, não é lead.
+- **Legado:** `POST /lorena-new-lead` responde **410 Gone** com JSON a indicar os três endpoints acima.
 
-**Roteamento Meta (endpoint `/meta-new-lead`):** separa cliente por `page_id` e lê em `data/clients.json` (ou tabela com `DATABASE_URL`):
-- `meta_page_id`: ID da página Meta (ex.: `102086421781424`)
-- `lead_group_id`: grupo WhatsApp do lead (fallback para `group_id`)
-- `lead_template`: template da mensagem (ex.: `default`, `lorena`, `pratical_life`)
+**URLs públicas (Easypanel):** `https://<domínio>/meta-new-lead`, `…/google-new-lead`, `…/site-new-lead`.
 
-**Roteamento Site (endpoint `/site-new-lead`):**
-- exige `codi_id` válido (28–36 dígitos numéricos)
-- ignora `page_id` para roteamento
-- usa cadastros da aba **Leads Site** (`site_lead_routes`)
+**Variáveis:** ver `ENV_TEMPLATE.txt` (`META_LEAD_WEBHOOK_SECRET`, `GOOGLE_LEAD_WEBHOOK_SECRET`, `SITE_LEAD_WEBHOOK_SECRET`, `META_LEAD_FALLBACK_WHATSAPP`, `WEBHOOK_PORT`).
 
-**Payload:** o Make pode enviar o JSON no formato envelope (array de objetos com `body`, contendo `data` e `mappable_field_data`, como no lead Meta). O servidor monta a mensagem WhatsApp (nome, link `wa.me` a partir de `telefone`, e-mail, bloco de respostas).
+**Roteamento Meta:** `page_id` → cliente com o mesmo `meta_page_id`; `lead_group_id` / `group_id`; `lead_template`.
 
-**Segurança:** se `META_LEAD_WEBHOOK_SECRET` estiver definido, cada requisição deve incluir o mesmo valor em `X-Webhook-Secret` ou `Authorization: Bearer <valor>`.
+**Roteamento Google:** `google_customer_id` (dígitos, com ou sem hífens) → linha em `google_clients`; template `google_template`.
+
+**Roteamento Site:** só `codi_id`; `page_id` no JSON **não** rouba a rota neste endpoint.
+
+**Payload:** envelope Make (`body` + `data` + `mappable_field_data`) ou JSON plano; ver `docs/LEADS_SITE_PAYLOAD.md` para site.
+
+**Segurança:** cada endpoint valida **apenas** o seu segredo (tabela acima). Podes enviar o mesmo valor por **cabeçalho** (`X-Webhook-Secret` ou `Authorization: Bearer <valor>`) ou na **URL**, como na Evolution: `?secret=<valor>` ou `?webhook_secret=<valor>` (ex.: `…/site-new-lead?secret=…`). **Cuidado:** segredo na query aparece em logs de proxy, histórico do browser e referrers — prefere cabeçalho quando a ferramenta permitir.
+
+**CORS (SPA / landing no browser → webhook):** stack **Flask** + **Waitress** (ver `execution/flask_server.py`). O reverse proxy (Easypanel / Nginx / Traefik) deve **encaminhar** `OPTIONS` e **não remover** os cabeçalhos `Access-Control-*` da resposta.
+
+Variáveis (`.env`):
+
+- **`META_LEAD_WEBHOOK_CORS_ORIGINS`** — lista **fechada** separada por vírgulas, **sem barra no final** (ex.: `https://www.cliente.com,https://cliente.com,http://localhost:5173`). O servidor **reflete** o header `Origin` na resposta **só** se estiver na allowlist efetiva (nunca lista inteira no header). A allowlist **unifica** esta variável com o campo **Origens CORS permitidas** de cada cadastro **ativo** na aba Pulseboard **Leads Site** (várias URLs por cliente).
+- **`META_LEAD_WEBHOOK_CORS_CREDENTIALS`** — `true` só se o front usar `fetch(..., { credentials: 'include' })` ou cookies cross-site; com `true`, **não** uses `*` em `CORS_ORIGINS` (o código recusa essa combinação).
+- **`META_LEAD_WEBHOOK_CORS_ALLOW_HEADERS`** — opcional; default inclui `Content-Type`, `Authorization`, `X-Webhook-Secret`, `X-Request-Id`, `Accept`, `Accept-Language`.
+- **`META_LEAD_WEBHOOK_CORS_ALLOW_METHODS`** — opcional; default `POST, OPTIONS`.
+- **`META_LEAD_WEBHOOK_CORS_MAX_AGE`** — opcional; default `86400`.
+- **`META_LEAD_WEBHOOK_CORS_EXPOSE_HEADERS`** — opcional; só preencher se o front precisar ler cabeçalhos de resposta no JS.
+
+Comportamento: preflight `OPTIONS` → **204** com os cabeçalhos CORS; origem fora da lista → **403** (preflight falha). Respostas reais (`POST`) repetem `Access-Control-Allow-Origin` quando aplicável.
+
+Validação (substitui host e origem):
+
+```bash
+curl -sS -D - -o /dev/null -X OPTIONS "https://SEU_HOST/site-new-lead" \
+  -H "Origin: https://www.cliente.com" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: content-type"
+```
+
+(No PowerShell podes usar `-o NUL` em vez de `-o /dev/null`.)
+
+Esperado (entre outros): `HTTP/2 204` ou `HTTP/1.1 204`, `access-control-allow-origin: https://www.cliente.com`, `access-control-allow-methods: …`, `access-control-allow-headers: …`. Se a origem **não** estiver na allowlist: **403** e sem `access-control-allow-origin`.
+
+**Nota:** CORS só é enviado se a allowlist efetiva tiver pelo menos uma origem (variável de ambiente **ou** origens nos cadastros Leads Site ativos). Make/n8n em servidor normalmente não precisam. Alternativa sem CORS: o front chama **o teu backend** no mesmo domínio e o backend faz `POST` ao webhook (servidor a servidor). Com `META_LEAD_WEBHOOK_CORS_ORIGINS=*`, só o wildcard conta (origens do Pulseboard são ignoradas).
 
 **Easypanel:** publique a porta interna `WEBHOOK_PORT` no reverse proxy HTTPS do app (igual a qualquer serviço web). Sem mapeamento, o Make não alcança o webhook.
 

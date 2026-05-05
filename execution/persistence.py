@@ -475,6 +475,7 @@ def _migrate_db_schema() -> None:
         "ALTER TABLE site_lead_routes ADD COLUMN IF NOT EXISTS lead_exclude_regex jsonb NOT NULL DEFAULT '[]'::jsonb",
         "ALTER TABLE site_lead_routes ADD COLUMN IF NOT EXISTS origem_anuncio text NOT NULL DEFAULT ''",
         "ALTER TABLE site_lead_routes ADD COLUMN IF NOT EXISTS cliente_origem text NOT NULL DEFAULT ''",
+        "ALTER TABLE site_lead_routes ADD COLUMN IF NOT EXISTS cors_allowed_origins jsonb NOT NULL DEFAULT '[]'::jsonb",
     ]
     with _connect() as conn:
         with conn.cursor() as cur:
@@ -980,6 +981,7 @@ def _site_route_row(row: Dict[str, Any]) -> Dict[str, Any]:
         "lead_exclude_fields": _json_list(row.get("lead_exclude_fields")),
         "lead_exclude_contains": _json_list(row.get("lead_exclude_contains")),
         "lead_exclude_regex": _json_list(row.get("lead_exclude_regex")),
+        "cors_allowed_origins": [str(x).strip() for x in _json_list(row.get("cors_allowed_origins")) if str(x).strip()],
         "lead_template": str(row.get("lead_template") or "default").strip() or "default",
         "internal_lead_template": str(row.get("internal_lead_template") or "").strip(),
         "enabled": bool(row.get("enabled", True)),
@@ -1002,6 +1004,7 @@ def list_site_lead_routes() -> List[Dict[str, Any]]:
                            group_id, lead_group_id, lead_phone_number, internal_notify_group_id,
                            origem_anuncio, cliente_origem,
                            lead_exclude_fields, lead_exclude_contains, lead_exclude_regex,
+                           cors_allowed_origins,
                            lead_template, internal_lead_template, enabled, notes
                     FROM site_lead_routes
                     ORDER BY lower(form_id) ASC, id ASC
@@ -1024,6 +1027,7 @@ def get_site_lead_route(route_id: int) -> Optional[Dict[str, Any]]:
                            group_id, lead_group_id, lead_phone_number, internal_notify_group_id,
                            origem_anuncio, cliente_origem,
                            lead_exclude_fields, lead_exclude_contains, lead_exclude_regex,
+                           cors_allowed_origins,
                            lead_template, internal_lead_template, enabled, notes
                     FROM site_lead_routes
                     WHERE id = %s
@@ -1054,12 +1058,14 @@ def insert_site_lead_route(data: Dict[str, Any]) -> int:
                       lead_phone_number, internal_notify_group_id, source_type,
                       origem_anuncio, cliente_origem,
                       lead_exclude_fields, lead_exclude_contains, lead_exclude_regex,
+                      cors_allowed_origins,
                       lead_template, internal_lead_template, enabled, notes
                     ) VALUES (
                       %(form_id)s, %(target_type)s, %(target_client_name)s, %(group_id)s, %(lead_group_id)s,
                       %(lead_phone_number)s, %(internal_notify_group_id)s, %(source_type)s,
                       %(origem_anuncio)s, %(cliente_origem)s,
                       %(lead_exclude_fields)s, %(lead_exclude_contains)s, %(lead_exclude_regex)s,
+                      %(cors_allowed_origins)s,
                       %(lead_template)s, %(internal_lead_template)s, %(enabled)s, %(notes)s
                     )
                     RETURNING id
@@ -1078,6 +1084,7 @@ def insert_site_lead_route(data: Dict[str, Any]) -> int:
                         "lead_exclude_fields": Json(data.get("lead_exclude_fields") or []),
                         "lead_exclude_contains": Json(data.get("lead_exclude_contains") or []),
                         "lead_exclude_regex": Json(data.get("lead_exclude_regex") or []),
+                        "cors_allowed_origins": Json(data.get("cors_allowed_origins") or []),
                         "lead_template": str(data.get("lead_template") or "default").strip() or "default",
                         "internal_lead_template": str(data.get("internal_lead_template") or "").strip(),
                         "enabled": bool(data.get("enabled", True)),
@@ -1111,6 +1118,7 @@ def insert_site_lead_route(data: Dict[str, Any]) -> int:
                 "lead_exclude_fields": _norm_str_list(data.get("lead_exclude_fields")),
                 "lead_exclude_contains": _norm_str_list(data.get("lead_exclude_contains")),
                 "lead_exclude_regex": _norm_str_list(data.get("lead_exclude_regex")),
+                "cors_allowed_origins": _norm_str_list(data.get("cors_allowed_origins")),
                 "lead_template": str(data.get("lead_template") or "default").strip() or "default",
                 "internal_lead_template": str(data.get("internal_lead_template") or "").strip(),
                 "enabled": bool(data.get("enabled", True)),
@@ -1148,6 +1156,7 @@ def update_site_lead_route(route_id: int, data: Dict[str, Any]) -> None:
                       lead_exclude_fields = %(lead_exclude_fields)s,
                       lead_exclude_contains = %(lead_exclude_contains)s,
                       lead_exclude_regex = %(lead_exclude_regex)s,
+                      cors_allowed_origins = %(cors_allowed_origins)s,
                       lead_template = %(lead_template)s,
                       internal_lead_template = %(internal_lead_template)s,
                       enabled = %(enabled)s,
@@ -1170,6 +1179,7 @@ def update_site_lead_route(route_id: int, data: Dict[str, Any]) -> None:
                         "lead_exclude_fields": Json(data.get("lead_exclude_fields") or []),
                         "lead_exclude_contains": Json(data.get("lead_exclude_contains") or []),
                         "lead_exclude_regex": Json(data.get("lead_exclude_regex") or []),
+                        "cors_allowed_origins": Json(data.get("cors_allowed_origins") or []),
                         "lead_template": str(data.get("lead_template") or "default").strip() or "default",
                         "internal_lead_template": str(data.get("internal_lead_template") or "").strip(),
                         "enabled": bool(data.get("enabled", True)),
@@ -1202,6 +1212,7 @@ def update_site_lead_route(route_id: int, data: Dict[str, Any]) -> None:
             "lead_exclude_fields": _norm_str_list(data.get("lead_exclude_fields")),
             "lead_exclude_contains": _norm_str_list(data.get("lead_exclude_contains")),
             "lead_exclude_regex": _norm_str_list(data.get("lead_exclude_regex")),
+            "cors_allowed_origins": _norm_str_list(data.get("cors_allowed_origins")),
             "lead_template": str(data.get("lead_template") or "default").strip() or "default",
             "internal_lead_template": str(data.get("internal_lead_template") or "").strip(),
             "enabled": bool(data.get("enabled", True)),

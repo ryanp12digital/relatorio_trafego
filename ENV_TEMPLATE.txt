@@ -30,12 +30,31 @@ EVOLUTION_INSTANCE=
 META_ACCESS_TOKEN=
 META_BUSINESS_ID=
 
-# Webhook Make → leads Meta (POST /meta-new-lead). Mapear HTTPS → WEBHOOK_PORT
+# Webhooks de lead: POST /meta-new-lead | /google-new-lead | /site-new-lead (mapear HTTPS → WEBHOOK_PORT)
 WEBHOOK_PORT=8080
 # HTTP: Waitress (recomendado). false = servidor Flask de desenvolvimento.
 USE_WAITRESS=1
 # Health check sem auth: GET http://<host>:8080/health (configure no Easypanel em vez de POST vazio em /meta-new-lead).
 META_LEAD_WEBHOOK_SECRET=
+# Segredo só POST /google-new-lead (google_clients).
+# GOOGLE_LEAD_WEBHOOK_SECRET=
+# Segredo só POST /site-new-lead (landings).
+# SITE_LEAD_WEBHOOK_SECRET=
+# Auth por URL (plataformas sem cabeçalhos), mesmo valor da variável do endpoint:
+#   …/meta-new-lead?secret=<META_LEAD_WEBHOOK_SECRET>
+#   …/google-new-lead?secret=<GOOGLE_LEAD_WEBHOOK_SECRET>
+#   …/site-new-lead?secret=<SITE_LEAD_WEBHOOK_SECRET>
+# Alternativa: ?webhook_secret=<valor>. Cabeçalhos X-Webhook-Secret / Bearer também valem.
+# CORS — só para fetch do browser (landings) → /meta-new-lead | /google-new-lead | /site-new-lead (Flask + Waitress).
+# Allowlist sem barra final; vários clientes: origens separadas por vírgula (ou use o campo por codi_id na aba Leads Site).
+# META_LEAD_WEBHOOK_CORS_ORIGINS=https://www.cliente-a.com,https://cliente-a.com,http://localhost:5173
+# Com cookies / credentials: true e NUNCA use * em CORS_ORIGINS
+# META_LEAD_WEBHOOK_CORS_CREDENTIALS=false
+# Opcional: cabeçalhos pedidos no preflight (default já inclui Content-Type, Authorization, X-Webhook-Secret, X-Request-Id)
+# META_LEAD_WEBHOOK_CORS_ALLOW_HEADERS=
+# META_LEAD_WEBHOOK_CORS_ALLOW_METHODS=POST, OPTIONS
+# META_LEAD_WEBHOOK_CORS_MAX_AGE=86400
+# META_LEAD_WEBHOOK_CORS_EXPOSE_HEADERS=
 
 # Webhook Evolution → catálogo de grupos na Pulseboard (POST /evolution-webhook no mesmo host/porta do webhook ou da dashboard).
 # O mesmo valor de EVOLUTION_CATALOG_WEBHOOK_SECRET pode ser enviado por:
@@ -111,10 +130,11 @@ DEFAULT_REPORT_TIMEZONE=America/Sao_Paulo
 # Webhook leads — opcional
 # -----------------------------------------------------------------------------
 META_LEAD_FALLBACK_WHATSAPP=
-META_LEAD_ALLOW_DEFAULT_NO_PAGE_FALLBACK=true
+# Removido: fallback Lorena sem page_id em /meta-new-lead. POST /lorena-new-lead responde 410.
+# META_LEAD_ALLOW_DEFAULT_NO_PAGE_FALLBACK=
 
 # -----------------------------------------------------------------------------
-# Legado Lorena (só se ainda usares estes nomes no .env antigo)
+# Legado Lorena (variáveis já não usadas pelo webhook HTTP; mantidas só por compat. com scripts antigos)
 # -----------------------------------------------------------------------------
 LORENA_LEAD_WEBHOOK_SECRET=
 LORENA_FALLBACK_WHATSAPP=

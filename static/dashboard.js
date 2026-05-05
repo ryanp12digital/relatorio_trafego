@@ -407,6 +407,7 @@ const MESSAGES_SECTION_HELP = {
     <dt>Grupo cliente</dt><dd>WhatsApp que recebe o novo lead do site.</dd>
     <dt>Telefone cliente</dt><dd>Envio extra quando aplicável.</dd>
     <dt>Observações</dt><dd>Notas opcionais.</dd>
+    <dt>Origens CORS permitidas</dt><dd>URLs do site do cliente (uma por linha ou vírgula) · mesma forma que o browser envia no header <code>Origin</code> · funde com <code>META_LEAD_WEBHOOK_CORS_ORIGINS</code> no worker · cadastro pausado não conta.</dd>
   </dl>
   <h4>Template — mensagem ao cliente</h4>
   <dl class="cadastro-help-defs">
@@ -2395,6 +2396,9 @@ function renderSiteLeadRoutes() {
       const exFields = escHtml(((r.lead_exclude_fields || []).map((x) => String(x).trim()).filter(Boolean)).join(", "));
       const exContains = escHtml(((r.lead_exclude_contains || []).map((x) => String(x).trim()).filter(Boolean)).join(", "));
       const exRegex = escHtml(((r.lead_exclude_regex || []).map((x) => String(x).trim()).filter(Boolean)).join(", "));
+      const corsOrigins = escHtml(
+        ((r.cors_allowed_origins || []).map((x) => String(x).trim()).filter(Boolean)).join("\n"),
+      );
       const enabled = !!r.enabled;
       const checks = siteRouteChecks(r);
       const statusLabel =
@@ -2439,6 +2443,7 @@ function renderSiteLeadRoutes() {
             <div><dt>Excluir perguntas (exato)</dt><dd>${exFields || "—"}</dd></div>
             <div><dt>Excluir se contiver</dt><dd>${exContains || "—"}</dd></div>
             <div><dt>Excluir por regex</dt><dd>${exRegex || "—"}</dd></div>
+            <div><dt>Origens CORS</dt><dd>${corsOrigins ? `<pre class="cors-origins-preview">${corsOrigins}</pre>` : "—"}</dd></div>
             <div><dt>Observações</dt><dd>${notes || "—"}</dd></div>
             <div><dt>Enabled</dt><dd>${enabled ? "true" : "false"}</dd></div>
           </dl>
@@ -2505,6 +2510,11 @@ function renderSiteLeadRoutes() {
               <label class="edit-field edit-field--full">
                 Observações
                 <input name="notes" placeholder="Opcional" />
+              </label>
+              <label class="edit-field edit-field--full">
+                Origens CORS permitidas
+                <span class="field-micro">Uma por linha ou vírgula · ex.: https://www.cliente.com.br</span>
+                <textarea name="cors_allowed_origins" rows="3" placeholder="https://www.exemplo.com.br"></textarea>
               </label>
             </div>
             <div class="new-client-filters">
@@ -2611,6 +2621,9 @@ function renderSiteLeadRoutes() {
     }
     setupChipFields(editForm, ["lead_exclude_fields", "lead_exclude_contains", "lead_exclude_regex"]);
     editForm.elements.notes.value = route.notes || "";
+    if (editForm.elements.cors_allowed_origins) {
+      editForm.elements.cors_allowed_origins.value = (route.cors_allowed_origins || []).join("\n");
+    }
     editForm.elements.enabled.checked = !!route.enabled;
 
     card.querySelector('[data-action="toggle-edit-site"]')?.addEventListener("click", () => {
@@ -2687,6 +2700,9 @@ function fillSiteLeadRouteForm(route) {
   if (form.elements.lead_exclude_regex) form.elements.lead_exclude_regex.value = (route.lead_exclude_regex || []).join(", ");
   setupChipFields(form, ["lead_exclude_fields", "lead_exclude_contains", "lead_exclude_regex"]);
   form.elements.notes.value = route.notes || "";
+  if (form.elements.cors_allowed_origins) {
+    form.elements.cors_allowed_origins.value = (route.cors_allowed_origins || []).join("\n");
+  }
   form.elements.enabled.checked = !!route.enabled;
   const submitBtn = form.querySelector('button[type="submit"]');
   if (submitBtn) submitBtn.textContent = "Atualizar cliente do site";
@@ -2714,6 +2730,7 @@ function resetSiteLeadRouteForm() {
   if (form.elements.lead_exclude_fields) form.elements.lead_exclude_fields.value = "";
   if (form.elements.lead_exclude_contains) form.elements.lead_exclude_contains.value = "";
   if (form.elements.lead_exclude_regex) form.elements.lead_exclude_regex.value = "";
+  if (form.elements.cors_allowed_origins) form.elements.cors_allowed_origins.value = "";
   setupChipFields(form, ["lead_exclude_fields", "lead_exclude_contains", "lead_exclude_regex"]);
   const submitBtn = form.querySelector('button[type="submit"]');
   if (submitBtn) submitBtn.textContent = "Salvar cliente do site";

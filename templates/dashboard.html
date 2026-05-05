@@ -811,6 +811,19 @@
                   Observações
                   <input name="notes" placeholder="Opcional" />
                 </label>
+                <label class="new-client-field-full">
+                  Origens CORS permitidas (navegador → webhook)
+                  <span class="field-micro"
+                    >Uma origem por linha ou separadas por vírgula · esquema + host (ex.:
+                    <code>https://www.cliente.com.br</code>) · sem barra no fim · só cadastros ativos entram na lista do
+                    servidor.</span
+                  >
+                  <textarea
+                    name="cors_allowed_origins"
+                    rows="3"
+                    placeholder="https://www.exemplo.com.br&#10;https://exemplo.com.br"
+                  ></textarea>
+                </label>
               </div>
             </section>
             <section class="new-client-section" aria-labelledby="newSiteSectionTemplates">

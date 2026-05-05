@@ -26,7 +26,7 @@ mkdir -p /app/.tmp /app/data
 touch /app/.tmp/cron.log
 
 # 4. Webhook Make -> WhatsApp (leads Meta multi-cliente). Porta: WEBHOOK_PORT (default 8080).
-#    POST /meta-new-lead (padrao) e /lorena-new-lead (alias legado).
+#    POST /meta-new-lead, /google-new-lead, /site-new-lead (leads). POST /evolution-webhook (catálogo).
 WEBHOOK_PORT="${WEBHOOK_PORT:-8080}"
 export WEBHOOK_PORT
 echo "P12 Relatorios: 🚀 Webhook Meta Leads na porta ${WEBHOOK_PORT} (background + tee)"
