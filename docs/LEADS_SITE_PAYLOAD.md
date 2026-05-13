@@ -1,5 +1,7 @@
 # Leads Site via n8n: contrato de payload
 
+Fluxo recomendado: o **site** envia o lead ao **n8n** (body inalterado); o **n8n** acrescenta `codi_id` e faz `POST /site-new-lead`. O browser não deve chamar `/site-new-lead` em paralelo com outros webhooks. Formato JSON do HTTP no n8n: [N8N_SITE_NEW_LEAD_HTTP.json.md](N8N_SITE_NEW_LEAD_HTTP.json.md).
+
 Use **sempre** `POST /site-new-lead` para leads de formulário por `codi_id`. O endpoint `/meta-new-lead` aceita **apenas** roteamento por `page_id` (Meta).
 
 ## Endpoint de produção
