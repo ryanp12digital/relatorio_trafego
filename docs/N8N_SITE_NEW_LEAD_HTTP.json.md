@@ -7,7 +7,7 @@ Corpo JSON para configurar o node **HTTP Request** no n8n após o webhook do sit
 | Campo | Valor |
 |-------|--------|
 | Método | `POST` |
-| URL | `https://<domínio-do-app>/site-new-lead` |
+| URL | `https://python-auto-relatorio-trafego.axmxa0.easypanel.host/site-new-lead` |
 | `Content-Type` | `application/json` |
 | Autenticação (opcional) | `Authorization: Bearer <SITE_LEAD_WEBHOOK_SECRET>` |
 

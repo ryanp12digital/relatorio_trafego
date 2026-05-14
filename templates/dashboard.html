@@ -84,7 +84,7 @@
               ?
             </button>
           </div>
-          <form id="newClientForm" class="new-client-form">
+          <form id="newClientForm" class="new-client-form" data-field-context="meta">
             <section class="new-client-section" aria-labelledby="newMetaSectionCliente">
               <h3 id="newMetaSectionCliente" class="new-client-section-title">Cliente</h3>
               <div class="new-client-fields" aria-label="Dados do cliente">
@@ -281,7 +281,7 @@
               ?
             </button>
           </div>
-          <form id="newGoogleClientForm" class="new-client-form">
+          <form id="newGoogleClientForm" class="new-client-form" data-field-context="google">
             <section class="new-client-section" aria-labelledby="newGoogleSectionCliente">
               <h3 id="newGoogleSectionCliente" class="new-client-section-title">Cliente</h3>
               <div class="new-client-fields" aria-label="Dados do cliente Google">
@@ -770,7 +770,7 @@
               ?
             </button>
           </div>
-          <form id="siteLeadRouteForm" class="new-client-form">
+          <form id="siteLeadRouteForm" class="new-client-form" data-field-context="site">
             <section class="new-client-section" aria-labelledby="newSiteSectionCliente">
               <h3 id="newSiteSectionCliente" class="new-client-section-title">Cliente e roteamento</h3>
               <div class="new-client-fields" aria-label="Cadastro leads site por codi_id">
@@ -1110,23 +1110,21 @@
             </div>
           </div>
           <dl class="meta-grid">
-            <div><dt>Conta</dt><dd class="f-ad_account_id"></dd></div>
-            <div><dt>Grupo relatório</dt><dd class="f-group_id"></dd></div>
-            <div><dt>Page ID</dt><dd class="f-meta_page_id"></dd></div>
-            <div><dt>Telefone cliente</dt><dd class="f-lead_phone_number"></dd></div>
-            <div><dt>Lead group ID</dt><dd class="f-lead_group_id"></dd></div>
-            <div><dt>Grupo P12</dt><dd class="f-p12_report_group_id"></dd></div>
-            <div><dt>Template P12</dt><dd class="f-p12_report_template"></dd></div>
-            <div><dt>Template dados P12</dt><dd class="f-p12_data_report_template"></dd></div>
-            <div><dt>Grupo interno</dt><dd class="f-internal_notify_group_id"></dd></div>
-            <div><dt>Template lead</dt><dd class="f-lead_template"></dd></div>
-            <div><dt>Template interno (lead)</dt><dd class="f-internal_lead_template"></dd></div>
-            <div><dt>Template interno (após relatório)</dt><dd class="f-internal_weekly_template"></dd></div>
-            <div><dt>Excluir perguntas (exato)</dt><dd class="f-lead_exclude_fields"></dd></div>
-            <div><dt>Excluir se contiver</dt><dd class="f-lead_exclude_contains"></dd></div>
-            <div><dt>Excluir por regex</dt><dd class="f-lead_exclude_regex"></dd></div>
-            <div><dt>Enabled</dt><dd class="f-enabled"></dd></div>
-            <div><dt>Interno (lead)</dt><dd class="f-internal_short"></dd></div>
+            <div><dt data-field-key="ad_account_id">Conta Meta</dt><dd class="f-ad_account_id"></dd></div>
+            <div><dt data-field-key="group_id">Grupo do cliente</dt><dd class="f-group_id"></dd></div>
+            <div><dt data-field-key="meta_page_id">Página Meta</dt><dd class="f-meta_page_id"></dd></div>
+            <div><dt data-field-key="lead_phone_number">Telefone do cliente</dt><dd class="f-lead_phone_number"></dd></div>
+            <div><dt data-field-key="p12_report_group_id">Grupo P12</dt><dd class="f-p12_report_group_id"></dd></div>
+            <div><dt data-field-key="p12_report_template">Template P12 (resumo)</dt><dd class="f-p12_report_template"></dd></div>
+            <div><dt data-field-key="p12_data_report_template">Template P12 (dados)</dt><dd class="f-p12_data_report_template"></dd></div>
+            <div><dt data-field-key="internal_notify_group_id">Grupo interno</dt><dd class="f-internal_notify_group_id"></dd></div>
+            <div><dt data-field-key="lead_template">Template do lead</dt><dd class="f-lead_template"></dd></div>
+            <div><dt data-field-key="internal_lead_template">Template interno (lead)</dt><dd class="f-internal_lead_template"></dd></div>
+            <div><dt data-field-key="internal_weekly_template">Template interno (relatório)</dt><dd class="f-internal_weekly_template"></dd></div>
+            <div><dt data-field-key="lead_exclude_fields">Excluir perguntas (exato)</dt><dd class="f-lead_exclude_fields"></dd></div>
+            <div><dt data-field-key="lead_exclude_contains">Excluir se contiver</dt><dd class="f-lead_exclude_contains"></dd></div>
+            <div><dt data-field-key="lead_exclude_regex">Excluir por regex</dt><dd class="f-lead_exclude_regex"></dd></div>
+            <div><dt data-field-key="enabled">Automação ativa</dt><dd class="f-enabled"></dd></div>
           </dl>
           <div class="checks"></div>
           <div class="actions">
@@ -1134,14 +1132,16 @@
             <button data-scenario="send_fail" class="small action-warn">Harness falha envio</button>
             <button data-scenario="route_fail" class="small action-err">Harness falha rota</button>
           </div>
-          <form class="edit-form edit-sheet hidden">
+          <form class="edit-form edit-sheet hidden" data-field-context="meta">
             <header class="edit-sheet-head">
               <h4 class="edit-sheet-title">Editar cliente Meta</h4>
               <p class="edit-sheet-sub">Ajuste envio de lead, template e filtros de campos do formulário.</p>
             </header>
-            <div class="edit-field-grid">
+            <section class="edit-section" aria-labelledby="editMetaSectionCliente">
+              <h5 class="edit-section-title" id="editMetaSectionCliente">Cliente</h5>
+              <div class="edit-field-grid">
               <label class="edit-field">
-                Nome
+                Nome do cliente
                 <input name="client_name" autocomplete="organization" />
               </label>
               <label class="edit-field">
@@ -1151,45 +1151,59 @@
                 </select>
               </label>
               <label class="edit-field">
-                Grupo relatório
+                Grupo do cliente
                 <select name="group_id" class="field-select catalog-group-select" data-catalog-optional="0">
                   <option value="">Nenhum</option>
                 </select>
               </label>
               <label class="edit-field">
-                Meta page id
+                Página Meta
                 <select name="meta_page_id" class="field-select meta-catalog-page-select">
                   <option value="">Nenhum</option>
                 </select>
               </label>
               <label class="edit-field">
-                Telefone cliente
+                Telefone do cliente
                 <input name="lead_phone_number" inputmode="tel" placeholder="Ex.: 5511999999999" />
               </label>
+              </div>
+            </section>
+            <section class="edit-section" aria-labelledby="editMetaSectionTemplates">
+              <h5 class="edit-section-title" id="editMetaSectionTemplates">Template — mensagem ao cliente</h5>
+              <div class="edit-field-grid">
+              <label class="edit-field edit-field--full">
+                Template do lead
+                <select name="lead_template" class="field-select lead-template-select"></select>
+              </label>
+              </div>
+            </section>
+            <section class="edit-section" aria-labelledby="editMetaSectionInterno">
+              <h5 class="edit-section-title" id="editMetaSectionInterno">Notificações internas</h5>
+              <div class="edit-field-grid">
               <label class="edit-field">
-                Grupo P12 relatório
+                Grupo P12
                 <select name="p12_report_group_id" class="field-select catalog-group-select" data-catalog-optional="1">
                   <option value="">Nenhum</option>
                 </select>
               </label>
               <label class="edit-field">
-                Template P12 relatório
+                Template P12 (resumo)
                 <select name="p12_report_template" class="field-select meta-report-template-select"></select>
               </label>
               <label class="edit-field">
-                Template relatório de dados
+                Template P12 (dados)
                 <select name="p12_data_report_template" class="field-select meta-report-data-template-select">
                   <option value="">Nenhum</option>
                 </select>
               </label>
               <label class="edit-field">
-                Grupo mensagem interna
+                Grupo interno
                 <select name="internal_notify_group_id" class="field-select catalog-group-select" data-catalog-optional="0">
                   <option value="">Nenhum</option>
                 </select>
               </label>
               <label class="edit-field">
-                Template interno (novo lead)
+                Template interno (lead)
                 <select
                   name="internal_lead_template"
                   class="field-select internal-lead-template-select"
@@ -1198,7 +1212,7 @@
                 </select>
               </label>
               <label class="edit-field">
-                Template interno (após relatório)
+                Template interno (relatório)
                 <select
                   name="internal_weekly_template"
                   class="field-select internal-weekly-template-select"
@@ -1206,12 +1220,8 @@
                   <option value="">Nenhum</option>
                 </select>
               </label>
-              <label class="edit-field edit-field--full">
-                Template lead
-                <select name="lead_template" class="field-select lead-template-select"></select>
-                <span class="field-hint">Padrão integrado ou template personalizado da aba Templates.</span>
-              </label>
-            </div>
+              </div>
+            </section>
             <div class="edit-section">
               <div class="filters-block-head edit-section-filters-head">
                 <div class="filters-block-head-text">
@@ -1328,21 +1338,21 @@
             </div>
           </div>
           <dl class="meta-grid">
-            <div><dt>Customer ID</dt><dd class="g-google_customer_id"></dd></div>
-            <div><dt>Grupo</dt><dd class="g-group_id"></dd></div>
-            <div><dt>Telefone cliente</dt><dd class="g-lead_phone_number"></dd></div>
-            <div><dt>Grupo P12</dt><dd class="g-p12_report_group_id"></dd></div>
-            <div><dt>Template P12</dt><dd class="g-p12_report_template"></dd></div>
-            <div><dt>Template dados P12</dt><dd class="g-p12_data_report_template"></dd></div>
-            <div><dt>Grupo interno</dt><dd class="g-internal_notify_group_id"></dd></div>
-            <div><dt>Template interno (após relatório)</dt><dd class="g-internal_weekly_template"></dd></div>
-            <div><dt>Template</dt><dd class="g-google_template"></dd></div>
-            <div><dt>Enabled</dt><dd class="g-enabled"></dd></div>
-            <div><dt>Conversões</dt><dd class="g-primary_conversions"></dd></div>
-            <div><dt>Notas</dt><dd class="g-notes"></dd></div>
+            <div><dt data-field-key="google_customer_id">ID Google Ads</dt><dd class="g-google_customer_id"></dd></div>
+            <div><dt data-field-key="group_id">Grupo do cliente</dt><dd class="g-group_id"></dd></div>
+            <div><dt data-field-key="lead_phone_number">Telefone do cliente</dt><dd class="g-lead_phone_number"></dd></div>
+            <div><dt data-field-key="p12_report_group_id">Grupo P12</dt><dd class="g-p12_report_group_id"></dd></div>
+            <div><dt data-field-key="p12_report_template">Template P12 (resumo)</dt><dd class="g-p12_report_template"></dd></div>
+            <div><dt data-field-key="p12_data_report_template">Template P12 (dados)</dt><dd class="g-p12_data_report_template"></dd></div>
+            <div><dt data-field-key="internal_notify_group_id">Grupo interno</dt><dd class="g-internal_notify_group_id"></dd></div>
+            <div><dt data-field-key="internal_weekly_template">Template interno (relatório)</dt><dd class="g-internal_weekly_template"></dd></div>
+            <div><dt data-field-key="google_template">Template do lead</dt><dd class="g-google_template"></dd></div>
+            <div><dt data-field-key="enabled">Automação ativa</dt><dd class="g-enabled"></dd></div>
+            <div><dt data-field-key="primary_conversions">Conversões primárias</dt><dd class="g-primary_conversions"></dd></div>
+            <div><dt data-field-key="notes">Observações</dt><dd class="g-notes"></dd></div>
           </dl>
           <div class="checks"></div>
-          <form class="edit-form edit-sheet hidden">
+          <form class="edit-form edit-sheet hidden" data-field-context="google">
             <header class="edit-sheet-head">
               <h4 class="edit-sheet-title">Editar cliente Google Ads</h4>
               <p class="edit-sheet-sub">Grupos WhatsApp, templates P12 e aviso interno após relatório semanal.</p>

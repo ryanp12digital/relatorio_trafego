@@ -250,6 +250,234 @@ async function fetchMetaCatalogs() {
   syncMetaCatalogSelects();
 }
 
+const FIELD_COPY_COMMON = {
+  client_name: {
+    label: "Nome do cliente",
+    hint: "Nome exibido no painel e nas mensagens.",
+  },
+  group_id: {
+    label: "Grupo do cliente",
+    hint: "WhatsApp que recebe o novo lead do cliente.",
+  },
+  lead_phone_number: {
+    label: "Telefone do cliente",
+    hint: "Uso em fluxos extras, quando configurado.",
+  },
+  lead_template: {
+    label: "Template do lead",
+    hint: "Texto enviado ao grupo do cliente quando chega um lead.",
+  },
+  p12_report_group_id: {
+    label: "Grupo P12",
+    hint: "WhatsApp da equipe para o relatório semanal.",
+  },
+  p12_report_template: {
+    label: "Template P12 (resumo)",
+    hint: "Primeira mensagem do relatório semanal.",
+  },
+  p12_data_report_template: {
+    label: "Template P12 (dados)",
+    hint: "Segunda mensagem com dados do relatório.",
+  },
+  internal_notify_group_id: {
+    label: "Grupo interno",
+    hint: "Cópia para a equipe quando chega um lead.",
+  },
+  internal_lead_template: {
+    label: "Template interno (lead)",
+    hint: "Texto da cópia interna quando chega um lead.",
+  },
+  internal_weekly_template: {
+    label: "Template interno (relatório)",
+    hint: "Texto interno após o relatório semanal, quando aplicável.",
+  },
+  lead_exclude_fields: {
+    label: "Excluir perguntas (exato)",
+    hint: "Igual ao nome ou chave da pergunta; ignora maiúsculas.",
+  },
+  lead_exclude_contains: {
+    label: "Excluir se o nome contiver",
+    hint: "Remove a linha se o nome da pergunta contiver este trecho.",
+  },
+  lead_exclude_regex: {
+    label: "Excluir por regex",
+    hint: "Regex sobre o nome da pergunta; inválida é ignorada no envio.",
+  },
+  enabled: {
+    label: "Automação ativa",
+    hint: "Com pausa, o envio automático deixa de rodar para este cadastro.",
+  },
+  notes: {
+    label: "Observações",
+    hint: "Notas internas opcionais.",
+  },
+};
+
+const FIELD_COPY_CONTEXT = {
+  meta: {
+    ad_account_id: {
+      label: "Conta Meta",
+      hint: "Conta de anúncios ligada a este cliente.",
+    },
+    meta_page_id: {
+      label: "Página Meta",
+      hint: "Página que identifica o lead no webhook.",
+    },
+    internal_notify_group_id: {
+      hint: "Cópia para a equipe quando chega um lead; também usada em avisos internos configurados.",
+    },
+  },
+  google: {
+    google_customer_id: {
+      label: "ID Google Ads",
+      hint: "Customer ID da conta Google Ads.",
+    },
+    google_template: {
+      label: "Template do lead",
+      hint: "Template enviado ao grupo do cliente nos envios Google.",
+    },
+    primary_conversions: {
+      label: "Conversões primárias",
+      hint: "Lista CSV usada nos relatórios (ex.: formulário, WhatsApp).",
+    },
+    internal_notify_group_id: {
+      hint: "Grupo que recebe o aviso interno após o relatório semanal.",
+    },
+  },
+  site: {
+    codi_id: {
+      label: "CODI ID",
+      hint: "Identificador do formulário no site (28 a 36 dígitos).",
+    },
+    cliente_origem: {
+      label: "Rótulo interno",
+      hint: "Só organização no painel; não roteia envio.",
+    },
+    origem_anuncio: {
+      label: "Origem do anúncio",
+      hint: "Referência opcional de campanha ou canal.",
+    },
+    cors_allowed_origins: {
+      label: "Origens CORS",
+      hint: "URLs do site autorizadas a chamar o webhook.",
+    },
+    internal_notify_group_id: {
+      hint: "Cópia para a equipe quando chega um lead do site.",
+    },
+  },
+};
+
+function fieldCopyFor(context, fieldName) {
+  const common = FIELD_COPY_COMMON[fieldName];
+  const specific = (FIELD_COPY_CONTEXT[context] || {})[fieldName];
+  if (!common && !specific) return null;
+  return {
+    label: specific?.label || common?.label || fieldName,
+    hint: specific?.hint || common?.hint || "",
+  };
+}
+
+function fieldLabelText(context, fieldName) {
+  return fieldCopyFor(context, fieldName)?.label || fieldName;
+}
+
+function fieldCopyDtLabel(context, fieldName) {
+  return escHtml(fieldLabelText(context, fieldName));
+}
+
+function applyFieldCopy(root, context) {
+  if (!root || !context) return;
+  root.querySelectorAll("label").forEach((label) => {
+    if (label.closest(".chips-control")) return;
+    const control = label.querySelector(
+      ":scope > input[name], :scope > select[name], :scope > textarea[name]",
+    );
+    if (!control) return;
+    const fieldName = label.dataset.fieldKey || control.getAttribute("name");
+    const copy = fieldCopyFor(context, fieldName);
+    if (!copy) return;
+
+    let titleEl = label.querySelector(":scope > .field-label-text");
+    if (!titleEl) {
+      titleEl = document.createElement("span");
+      titleEl.className = "field-label-text";
+      label.insertBefore(titleEl, control);
+      let node = label.firstChild;
+      while (node && node !== titleEl) {
+        const next = node.nextSibling;
+        if (node.nodeType === Node.TEXT_NODE) {
+          if (!titleEl.textContent.trim() && node.textContent.trim()) {
+            titleEl.textContent = node.textContent.trim();
+          }
+          label.removeChild(node);
+        } else if (
+          node.nodeType === Node.ELEMENT_NODE &&
+          !node.classList.contains("field-hint") &&
+          !node.classList.contains("field-micro")
+        ) {
+          if (
+            !titleEl.textContent.trim() &&
+            node.textContent.trim() &&
+            !node.matches("input, select, textarea, .chips-control")
+          ) {
+            titleEl.textContent = node.textContent.trim();
+          }
+          if (!node.matches("input, select, textarea, .chips-control")) {
+            label.removeChild(node);
+          }
+        }
+        node = next;
+      }
+    }
+    titleEl.textContent = copy.label;
+
+    let hintEl = label.querySelector(":scope > .field-hint");
+    const microEl = label.querySelector(":scope > .field-micro");
+    if (copy.hint) {
+      if (microEl && !hintEl) {
+        microEl.textContent = copy.hint;
+        microEl.classList.add("field-hint");
+      } else {
+        if (!hintEl) {
+          hintEl = document.createElement("span");
+          hintEl.className = "field-hint";
+          label.insertBefore(hintEl, control);
+        }
+        hintEl.textContent = copy.hint;
+      }
+    } else if (hintEl) {
+      hintEl.remove();
+    }
+  });
+
+  root.querySelectorAll(".meta-grid dt[data-field-key]").forEach((dt) => {
+    const copy = fieldCopyFor(context, dt.dataset.fieldKey);
+    if (copy) dt.textContent = copy.label;
+  });
+}
+
+function applyAllFieldCopy() {
+  document.querySelectorAll("[data-field-context]").forEach((root) => {
+    applyFieldCopy(root, root.dataset.fieldContext);
+  });
+}
+
+function buildCadastroHelpBody(introHtml, sections) {
+  const parts = [`<div class="cadastro-help-body"><p>${introHtml}</p>`];
+  sections.forEach((section) => {
+    parts.push(`<h4>${section.title}</h4><dl class="cadastro-help-defs">`);
+    section.fields.forEach((field) => {
+      const copy = fieldCopyFor(section.context, field.key);
+      const label = escHtml(copy?.label || field.key);
+      const desc = field.desc ? escHtml(field.desc) : escHtml(copy?.hint || "");
+      parts.push(`<dt>${label}</dt><dd>${desc}</dd>`);
+    });
+    parts.push("</dl>");
+  });
+  parts.push("</div>");
+  return parts.join("");
+}
+
 function bindFiltersHelpModal() {
   const dlg = document.getElementById("filtersHelpDialog");
   if (!dlg) return;
@@ -344,85 +572,172 @@ const MESSAGES_SECTION_HELP = {
   },
   cadastro_meta_client: {
     title: "Ajuda: Novo cliente Meta",
-    bodyHtml: `
-<div class="cadastro-help-body">
-  <p>O cadastro vai para <code>data/clients.json</code>. O catálogo de contas e páginas usa a Business API onde configurado.</p>
-  <h4>Cliente</h4>
-  <dl class="cadastro-help-defs">
-    <dt>Nome do cliente</dt><dd>Identificação no painel.</dd>
-    <dt>Conta Meta</dt><dd>Contas do Business (API) mais contas já guardadas neste projeto.</dd>
-    <dt>Grupo relatório</dt><dd>Grupo WhatsApp do cliente (lista na aba Grupos WhatsApp · webhook Evolution).</dd>
-    <dt>Meta page id</dt><dd>Página ligada aos leads · páginas da API mais páginas já cadastradas.</dd>
-    <dt>Telefone cliente</dt><dd>Número para fluxos com envio extra, quando aplicável.</dd>
-  </dl>
-  <h4>Template — mensagem ao cliente</h4>
-  <dl class="cadastro-help-defs">
-    <dt>Template lead</dt><dd>Mensagem para o grupo do cliente · integrados ou templates da aba Templates (<code>meta_lead</code>).</dd>
-  </dl>
-  <h4>Notificações internas</h4>
-  <dl class="cadastro-help-defs">
-    <dt>Grupo P12 relatório</dt><dd>Onde vai o relatório semanal Meta (resumo + dados) para a equipe P12.</dd>
-    <dt>Template P12 relatório</dt><dd>Canal <code>meta_report</code> · em vazio usa <code>default</code>.</dd>
-    <dt>Template relatório de dados</dt><dd>Segunda mensagem de dados ao grupo P12, canal <code>meta_report</code>.</dd>
-    <dt>Grupo mensagem interna</dt><dd>Cópia opcional para a equipe · texto definido nos templates <code>internal_lead</code> e <code>internal_report</code>.</dd>
-    <dt>Template interno (novo lead)</dt><dd>Aba Templates, canal <code>internal_lead</code> — mesmas variáveis do lead.</dd>
-    <dt>Template interno (após relatório semanal)</dt><dd>Canal <code>internal_report</code>, após o envio P12 Meta.</dd>
-  </dl>
-</div>`,
+    bodyHtml: buildCadastroHelpBody(
+      "O cadastro vai para <code>data/clients.json</code>. O catálogo de contas e páginas usa a Business API onde configurado.",
+      [
+        {
+          title: "Cliente",
+          context: "meta",
+          fields: [
+            { key: "client_name" },
+            {
+              key: "ad_account_id",
+              desc: "Contas do Business (API) mais contas já guardadas neste projeto.",
+            },
+            {
+              key: "group_id",
+              desc: "Grupo WhatsApp do cliente (lista na aba Grupos WhatsApp · webhook Evolution).",
+            },
+            {
+              key: "meta_page_id",
+              desc: "Página ligada aos leads · páginas da API mais páginas já cadastradas.",
+            },
+            { key: "lead_phone_number" },
+          ],
+        },
+        {
+          title: "Template — mensagem ao cliente",
+          context: "meta",
+          fields: [
+            {
+              key: "lead_template",
+              desc: "Mensagem para o grupo do cliente · integrados ou templates da aba Templates (<code>meta_lead</code>).",
+            },
+          ],
+        },
+        {
+          title: "Notificações internas",
+          context: "meta",
+          fields: [
+            {
+              key: "p12_report_group_id",
+              desc: "Onde vai o relatório semanal Meta (resumo + dados) para a equipe P12.",
+            },
+            {
+              key: "p12_report_template",
+              desc: "Canal <code>meta_report</code> · em vazio usa <code>default</code>.",
+            },
+            {
+              key: "p12_data_report_template",
+              desc: "Segunda mensagem de dados ao grupo P12, canal <code>meta_report</code>.",
+            },
+            {
+              key: "internal_notify_group_id",
+              desc: "Cópia opcional para a equipe · texto definido nos templates <code>internal_lead</code> e <code>internal_report</code>.",
+            },
+            {
+              key: "internal_lead_template",
+              desc: "Aba Templates, canal <code>internal_lead</code> — mesmas variáveis do lead.",
+            },
+            {
+              key: "internal_weekly_template",
+              desc: "Canal <code>internal_report</code>, após o envio P12 Meta.",
+            },
+          ],
+        },
+      ],
+    ),
   },
   cadastro_google_client: {
     title: "Ajuda: Novo cliente Google Ads",
-    bodyHtml: `
-<div class="cadastro-help-body">
-  <p>Cadastro em <code>data/google_clients.json</code>.</p>
-  <h4>Cliente</h4>
-  <dl class="cadastro-help-defs">
-    <dt>Nome do cliente</dt><dd>Identificação no painel.</dd>
-    <dt>Google customer id</dt><dd>ID da conta Google Ads.</dd>
-    <dt>Grupo WhatsApp</dt><dd>Lista da aba Grupos WhatsApp.</dd>
-    <dt>Telefone cliente</dt><dd>Fluxos com envio extra, quando aplicável.</dd>
-    <dt>Conversões primárias</dt><dd>Lista CSV útil para relatórios (ex.: formulário, WhatsApp).</dd>
-    <dt>Observações</dt><dd>Notas internas opcionais.</dd>
-  </dl>
-  <h4>Template — mensagem ao cliente</h4>
-  <dl class="cadastro-help-defs">
-    <dt>Template Google (cliente)</dt><dd>Identificador do template ligado aos envios Google para o cliente (ex.: <code>default</code>).</dd>
-  </dl>
-  <h4>Notificações internas</h4>
-  <dl class="cadastro-help-defs">
-    <dt>Grupo P12 relatório</dt><dd>Destino dos relatórios semanais da equipe P12.</dd>
-    <dt>Template P12 relatório</dt><dd>Canal <code>google_report</code> · ex.: <code>p12_resumo</code> · vazio usa <code>default</code>.</dd>
-    <dt>Template relatório de dados</dt><dd>Segunda mensagem aos P12 (ex.: <code>p12_dados</code>).</dd>
-    <dt>Grupo mensagem interna</dt><dd>Aviso após envio do relatório · conteúdo no canal <code>internal_report</code>.</dd>
-    <dt>Template interno (após relatório semanal)</dt><dd>Templates da aba <code>internal_report</code> · variáveis Google.</dd>
-  </dl>
-</div>`,
+    bodyHtml: buildCadastroHelpBody("Cadastro em <code>data/google_clients.json</code>.", [
+      {
+        title: "Cliente",
+        context: "google",
+        fields: [
+          { key: "client_name" },
+          { key: "google_customer_id" },
+          { key: "group_id", desc: "Lista da aba Grupos WhatsApp." },
+          { key: "lead_phone_number" },
+          { key: "primary_conversions" },
+          { key: "notes" },
+        ],
+      },
+      {
+        title: "Template — mensagem ao cliente",
+        context: "google",
+        fields: [
+          {
+            key: "google_template",
+            desc: "Identificador do template ligado aos envios Google para o cliente (ex.: <code>default</code>).",
+          },
+        ],
+      },
+      {
+        title: "Notificações internas",
+        context: "google",
+        fields: [
+          { key: "p12_report_group_id", desc: "Destino dos relatórios semanais da equipe P12." },
+          {
+            key: "p12_report_template",
+            desc: "Canal <code>google_report</code> · ex.: <code>p12_resumo</code> · vazio usa <code>default</code>.",
+          },
+          {
+            key: "p12_data_report_template",
+            desc: "Segunda mensagem aos P12 (ex.: <code>p12_dados</code>).",
+          },
+          {
+            key: "internal_notify_group_id",
+            desc: "Aviso após envio do relatório · conteúdo no canal <code>internal_report</code>.",
+          },
+          {
+            key: "internal_weekly_template",
+            desc: "Templates da aba <code>internal_report</code> · variáveis Google.",
+          },
+        ],
+      },
+    ]),
   },
   cadastro_site_lead: {
     title: "Ajuda: Leads Site",
-    bodyHtml: `
-<div class="cadastro-help-body">
-  <p>Roteamento por <code>codi_id</code> · origem Meta/Google pode aparecer em <code>{{traffic_source}}</code> na mensagem.</p>
-  <h4>Cliente e roteamento</h4>
-  <dl class="cadastro-help-defs">
-    <dt>CODI ID</dt><dd>Obrigatório: 28 a 36 dígitos · identifica o formulário/rota no site.</dd>
-    <dt>Rótulo identificação / campanha</dt><dd>Não roteia envio · painel e variáveis <code>{{cliente_origem}}</code> / relacionadas.</dd>
-    <dt>Rótulo origem do anúncio</dt><dd>Opcional · qual anúncio ou canal associa a este <code>codi_id</code>.</dd>
-    <dt>Grupo cliente</dt><dd>WhatsApp que recebe o novo lead do site.</dd>
-    <dt>Telefone cliente</dt><dd>Envio extra quando aplicável.</dd>
-    <dt>Observações</dt><dd>Notas opcionais.</dd>
-    <dt>Origens CORS permitidas</dt><dd>URLs do site do cliente (uma por linha ou vírgula) · mesma forma que o browser envia no header <code>Origin</code> · funde com <code>META_LEAD_WEBHOOK_CORS_ORIGINS</code> no worker · cadastro pausado não conta.</dd>
-  </dl>
-  <h4>Template — mensagem ao cliente</h4>
-  <dl class="cadastro-help-defs">
-    <dt>Template de mensagem</dt><dd>Canal <code>site_lead</code> na aba Templates.</dd>
-  </dl>
-  <h4>Notificações internas</h4>
-  <dl class="cadastro-help-defs">
-    <dt>Grupo mensagem interna</dt><dd>Cópia ao time quando chega um lead.</dd>
-    <dt>Template de mensagem interno</dt><dd>Canal <code>internal_lead</code> na aba Templates.</dd>
-  </dl>
-</div>`,
+    bodyHtml: buildCadastroHelpBody(
+      "Roteamento por <code>codi_id</code> · origem Meta/Google pode aparecer em <code>{{traffic_source}}</code> na mensagem.",
+      [
+        {
+          title: "Cliente e roteamento",
+          context: "site",
+          fields: [
+            { key: "codi_id" },
+            {
+              key: "cliente_origem",
+              desc: "Não roteia envio · painel e variáveis <code>{{cliente_origem}}</code> / relacionadas.",
+            },
+            {
+              key: "origem_anuncio",
+              desc: "Opcional · qual anúncio ou canal associa a este <code>codi_id</code>.",
+            },
+            { key: "group_id" },
+            { key: "lead_phone_number" },
+            { key: "notes" },
+            {
+              key: "cors_allowed_origins",
+              desc: "URLs do site do cliente (uma por linha ou vírgula) · mesma forma que o browser envia no header <code>Origin</code> · funde com <code>META_LEAD_WEBHOOK_CORS_ORIGINS</code> no worker · cadastro pausado não conta.",
+            },
+          ],
+        },
+        {
+          title: "Template — mensagem ao cliente",
+          context: "site",
+          fields: [
+            {
+              key: "lead_template",
+              desc: "Canal <code>site_lead</code> na aba Templates.",
+            },
+          ],
+        },
+        {
+          title: "Notificações internas",
+          context: "site",
+          fields: [
+            { key: "internal_notify_group_id", desc: "Cópia ao time quando chega um lead." },
+            {
+              key: "internal_lead_template",
+              desc: "Canal <code>internal_lead</code> na aba Templates.",
+            },
+          ],
+        },
+      ],
+    ),
   },
 };
 
@@ -1247,8 +1562,6 @@ function renderMetaClients() {
     card.querySelector(".f-meta_page_id").textContent = client.meta_page_id || "(vazio)";
     const fPhone = card.querySelector(".f-lead_phone_number");
     if (fPhone) fPhone.textContent = client.lead_phone_number || "—";
-    const fLeadGroup = card.querySelector(".f-lead_group_id");
-    if (fLeadGroup) fLeadGroup.textContent = client.lead_group_id || "—";
     const fP12 = card.querySelector(".f-p12_report_group_id");
     if (fP12) fP12.textContent = client.p12_report_group_id || "—";
     const fP12Tpl = card.querySelector(".f-p12_report_template");
@@ -1257,8 +1570,6 @@ function renderMetaClients() {
     if (fP12DataTpl) fP12DataTpl.textContent = client.p12_data_report_template || "—";
     const fIntGroup = card.querySelector(".f-internal_notify_group_id");
     if (fIntGroup) fIntGroup.textContent = client.internal_notify_group_id || "—";
-    const fInt = card.querySelector(".f-internal_short");
-    if (fInt) fInt.textContent = client.internal_notify_group_id ? "configurado" : "—";
     card.querySelector(".f-lead_template").textContent = client.lead_template || "default";
     const fIntLeadTpl = card.querySelector(".f-internal_lead_template");
     if (fIntLeadTpl) fIntLeadTpl.textContent = client.internal_lead_template || "—";
@@ -1346,6 +1657,7 @@ function renderMetaClients() {
     });
 
     grid.appendChild(node);
+    applyFieldCopy(card, "meta");
   });
   refreshMetaReportTemplateSelects();
   state.metaClients.forEach((client) => {
@@ -1455,6 +1767,7 @@ function renderGoogleClients() {
     });
 
     grid.appendChild(node);
+    applyFieldCopy(card, "google");
   });
   refreshGoogleP12TemplateSelects();
   state.googleClients.forEach((client) => {
@@ -2631,22 +2944,22 @@ function renderSiteLeadRoutes() {
             </div>
           </div>
           <dl class="meta-grid">
-            <div><dt>CODI ID</dt><dd><code>${formId}</code></dd></div>
-            <div><dt>Rótulo interno</dt><dd>${clienteOrigem || "—"}</dd></div>
-            <div><dt>Origem anúncio</dt><dd>${origemAnuncio || "—"}</dd></div>
-            <div><dt>Grupo cliente</dt><dd>${groupId || "—"}</dd></div>
-            <div><dt>Telefone cliente</dt><dd>${leadPhone || "—"}</dd></div>
-            <div><dt>Grupo msg interna</dt><dd>${internalNotifyGroup || "—"}</dd></div>
-            <div><dt>Template site</dt><dd>${leadTemplate}</dd></div>
-            <div><dt>Template interno</dt><dd>${internalLeadTemplate || "Nenhum"}</dd></div>
+            <div><dt data-field-key="codi_id">${fieldCopyDtLabel("site", "codi_id")}</dt><dd><code>${formId}</code></dd></div>
+            <div><dt data-field-key="cliente_origem">${fieldCopyDtLabel("site", "cliente_origem")}</dt><dd>${clienteOrigem || "—"}</dd></div>
+            <div><dt data-field-key="origem_anuncio">${fieldCopyDtLabel("site", "origem_anuncio")}</dt><dd>${origemAnuncio || "—"}</dd></div>
+            <div><dt data-field-key="group_id">${fieldCopyDtLabel("site", "group_id")}</dt><dd>${groupId || "—"}</dd></div>
+            <div><dt data-field-key="lead_phone_number">${fieldCopyDtLabel("site", "lead_phone_number")}</dt><dd>${leadPhone || "—"}</dd></div>
+            <div><dt data-field-key="internal_notify_group_id">${fieldCopyDtLabel("site", "internal_notify_group_id")}</dt><dd>${internalNotifyGroup || "—"}</dd></div>
+            <div><dt data-field-key="lead_template">${fieldCopyDtLabel("site", "lead_template")}</dt><dd>${leadTemplate}</dd></div>
+            <div><dt data-field-key="internal_lead_template">${fieldCopyDtLabel("site", "internal_lead_template")}</dt><dd>${internalLeadTemplate || "Nenhum"}</dd></div>
             <div><dt>Tipo de rota</dt><dd>${targetType}</dd></div>
             <div><dt>Tipo de origem</dt><dd>${sourceType || "—"}</dd></div>
-            <div><dt>Excluir perguntas (exato)</dt><dd>${exFields || "—"}</dd></div>
-            <div><dt>Excluir se contiver</dt><dd>${exContains || "—"}</dd></div>
-            <div><dt>Excluir por regex</dt><dd>${exRegex || "—"}</dd></div>
-            <div><dt>Origens CORS</dt><dd>${corsOrigins ? `<pre class="cors-origins-preview">${corsOrigins}</pre>` : "—"}</dd></div>
-            <div><dt>Observações</dt><dd>${notes || "—"}</dd></div>
-            <div><dt>Enabled</dt><dd>${enabled ? "true" : "false"}</dd></div>
+            <div><dt data-field-key="lead_exclude_fields">${fieldCopyDtLabel("site", "lead_exclude_fields")}</dt><dd>${exFields || "—"}</dd></div>
+            <div><dt data-field-key="lead_exclude_contains">${fieldCopyDtLabel("site", "lead_exclude_contains")}</dt><dd>${exContains || "—"}</dd></div>
+            <div><dt data-field-key="lead_exclude_regex">${fieldCopyDtLabel("site", "lead_exclude_regex")}</dt><dd>${exRegex || "—"}</dd></div>
+            <div><dt data-field-key="cors_allowed_origins">${fieldCopyDtLabel("site", "cors_allowed_origins")}</dt><dd>${corsOrigins ? `<pre class="cors-origins-preview">${corsOrigins}</pre>` : "—"}</dd></div>
+            <div><dt data-field-key="notes">${fieldCopyDtLabel("site", "notes")}</dt><dd>${notes || "—"}</dd></div>
+            <div><dt data-field-key="enabled">${fieldCopyDtLabel("site", "enabled")}</dt><dd>${enabled ? "true" : "false"}</dd></div>
           </dl>
           <div class="checks">
             <span class="check-pill ${checks.codiOk ? "ok" : "error"}">${checks.codiOk ? "OK" : "ERRO"} · codi_id</span>
@@ -2657,7 +2970,7 @@ function renderSiteLeadRoutes() {
             <span class="check-pill ${checks.leadTemplateOk ? "ok" : "error"}">${checks.leadTemplateOk ? "OK" : "ERRO"} · template site</span>
             <span class="check-pill ${checks.internalTemplateOk ? "ok" : "error"}">${checks.internalTemplateOk ? "OK" : "ERRO"} · template interno</span>
           </div>
-          <form class="edit-form edit-sheet hidden">
+          <form class="edit-form edit-sheet hidden" data-field-context="site">
             <header class="edit-sheet-head">
               <h4 class="edit-sheet-title">Editar cliente do site</h4>
               <p class="edit-sheet-sub">Ajuste codi_id, rótulos internos, grupos e templates. O envio roteia só por codi_id.</p>
@@ -2848,6 +3161,8 @@ function renderSiteLeadRoutes() {
       if (fb) fb.textContent = "Cadastro removido com sucesso.";
       await fetchSiteLeadRoutes();
     });
+
+    applyFieldCopy(card, "site");
 
     editForm.addEventListener("submit", async (ev) => {
       ev.preventDefault();
@@ -3717,6 +4032,7 @@ function bindUI() {
     "lead_exclude_contains",
     "lead_exclude_regex",
   ]);
+  applyAllFieldCopy();
   document.getElementById("varResSaveBtn")?.addEventListener("click", () =>
     saveVariableResolution().catch((e) => console.error(e)),
   );

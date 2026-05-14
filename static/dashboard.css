@@ -676,10 +676,17 @@ h1 {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   font-size: 12px;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--muted);
+}
+
+.field-label-text {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: rgba(200, 210, 232, 0.95);
 }
 
 .new-client-fields > label.new-client-field-full {
@@ -986,7 +993,9 @@ button:focus-visible {
 dt {
   color: var(--muted);
   font-size: 11px;
-  text-transform: uppercase;
+  text-transform: none;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 dd {
@@ -1155,6 +1164,9 @@ dd {
   display: grid;
   gap: 8px;
   min-width: 0;
+  font-size: 12px;
+  text-transform: none;
+  color: var(--muted);
 }
 
 .edit-field--full {
@@ -1167,6 +1179,10 @@ dd {
   padding: 18px 18px 16px;
   margin-top: 4px;
   background: rgba(0, 0, 0, 0.24);
+}
+
+.edit-form > .edit-section + .edit-section {
+  margin-top: 14px;
 }
 
 .edit-section-title {
@@ -1249,11 +1265,22 @@ textarea:focus-visible {
   box-shadow: 0 0 0 3px rgba(58, 247, 214, 0.22);
 }
 
-.field-hint {
+.field-hint,
+.field-micro {
   font-size: 11px;
-  color: var(--muted);
+  font-weight: 500;
   text-transform: none;
+  color: rgba(170, 178, 198, 0.92);
   line-height: 1.35;
+  letter-spacing: 0.01em;
+}
+
+.field-hint {
+  display: block;
+}
+
+.field-micro code {
+  font-size: 10px;
 }
 
 .btn-edit-save,
