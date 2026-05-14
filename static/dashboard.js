@@ -199,20 +199,24 @@ function syncMetaCatalogSelects() {
 
   document.querySelectorAll("select.meta-catalog-account-select").forEach((sel) => {
     let preferred = String(sel.value || "").trim();
-    const card = sel.closest(".client-card");
-    if (card?.dataset?.clientId) {
-      const cl = state.metaClients.find((x) => String(x.id) === String(card.dataset.clientId));
-      if (cl?.ad_account_id) preferred = String(cl.ad_account_id).trim();
+    if (!isOpenClientEditForm(sel)) {
+      const card = sel.closest(".client-card");
+      if (card?.dataset?.clientId) {
+        const cl = state.metaClients.find((x) => String(x.id) === String(card.dataset.clientId));
+        if (cl?.ad_account_id) preferred = String(cl.ad_account_id).trim();
+      }
     }
     fillMetaSelect(sel, accItems, preferred, "Nenhum");
   });
 
   document.querySelectorAll("select.meta-catalog-page-select").forEach((sel) => {
     let preferred = String(sel.value || "").trim();
-    const card = sel.closest(".client-card");
-    if (card?.dataset?.clientId) {
-      const cl = state.metaClients.find((x) => String(x.id) === String(card.dataset.clientId));
-      if (cl?.meta_page_id) preferred = String(cl.meta_page_id).trim();
+    if (!isOpenClientEditForm(sel)) {
+      const card = sel.closest(".client-card");
+      if (card?.dataset?.clientId) {
+        const cl = state.metaClients.find((x) => String(x.id) === String(card.dataset.clientId));
+        if (cl?.meta_page_id) preferred = String(cl.meta_page_id).trim();
+      }
     }
     fillMetaSelect(sel, pageItems, preferred, "Nenhum");
   });
@@ -1673,6 +1677,7 @@ function renderMetaClients() {
     if (ef.elements.internal_notify_group_id) ef.elements.internal_notify_group_id.value = client.internal_notify_group_id || "";
   });
   syncMetaCatalogSelects();
+  syncCatalogGroupSelects();
   refreshInternalTemplateSelects();
 }
 
@@ -1783,6 +1788,7 @@ function renderGoogleClients() {
     if (ef.elements.internal_notify_group_id) ef.elements.internal_notify_group_id.value = client.internal_notify_group_id || "";
   });
   refreshInternalTemplateSelects();
+  syncCatalogGroupSelects();
 }
 
 const LEAD_RESOLVABLE_SLOTS = [
@@ -3700,41 +3706,46 @@ function formatCatalogGroupLabel(g) {
   return `${sub} — ${short}`;
 }
 
+function isOpenClientEditForm(selectEl) {
+  const form = selectEl?.closest?.("form.edit-form");
+  return !!(form && !form.classList.contains("hidden"));
+}
+
 function syncCatalogGroupSelects() {
   const groups = Array.isArray(state.catalogGroups) ? state.catalogGroups : [];
   const activeGroups = groups.filter((g) => !!g?.monitoring_enabled);
   const optionsSource = activeGroups.length ? activeGroups : groups;
   document.querySelectorAll("select.catalog-group-select").forEach((sel) => {
-    const optional = sel.dataset.catalogOptional === "1";
-    let prev = (sel.value || "").trim();
-    if (!prev) {
-      const seeded = String(sel.dataset.currentValue || "").trim();
-      if (seeded) prev = seeded;
-    }
-    const card = sel.closest(".client-card");
     const fieldName = String(sel.name || "").trim();
-    if (card?.dataset?.clientId) {
-      const cid = String(card.dataset.clientId);
-      const metaClient = state.metaClients.find((x) => String(x.id) === cid);
-      const googleClient = state.googleClients.find((x) => String(x.id) === cid);
-      if (metaClient) {
-        if (fieldName === "group_id") prev = String(metaClient.group_id || "").trim();
-        else if (fieldName === "p12_report_group_id") prev = String(metaClient.p12_report_group_id || "").trim();
-        else if (fieldName === "internal_notify_group_id") prev = String(metaClient.internal_notify_group_id || "").trim();
+    const preserveLive = isOpenClientEditForm(sel);
+    let prev = String(sel.value || "").trim();
+    if (!preserveLive) {
+      const seeded = String(sel.dataset.currentValue || "").trim();
+      if (!prev && seeded) prev = seeded;
+      const card = sel.closest(".client-card");
+      if (card?.dataset?.clientId) {
+        const cid = String(card.dataset.clientId);
+        const metaClient = state.metaClients.find((x) => String(x.id) === cid);
+        const googleClient = state.googleClients.find((x) => String(x.id) === cid);
+        if (metaClient) {
+          if (fieldName === "group_id") prev = String(metaClient.group_id || "").trim();
+          else if (fieldName === "p12_report_group_id") prev = String(metaClient.p12_report_group_id || "").trim();
+          else if (fieldName === "internal_notify_group_id") prev = String(metaClient.internal_notify_group_id || "").trim();
+        }
+        if (googleClient) {
+          if (fieldName === "group_id") prev = String(googleClient.group_id || "").trim();
+          else if (fieldName === "p12_report_group_id") prev = String(googleClient.p12_report_group_id || "").trim();
+          else if (fieldName === "internal_notify_group_id") prev = String(googleClient.internal_notify_group_id || "").trim();
+        }
       }
-      if (googleClient) {
-        if (fieldName === "group_id") prev = String(googleClient.group_id || "").trim();
-        else if (fieldName === "p12_report_group_id") prev = String(googleClient.p12_report_group_id || "").trim();
-        else if (fieldName === "internal_notify_group_id") prev = String(googleClient.internal_notify_group_id || "").trim();
-      }
-    }
-    const siteCard = sel.closest(".site-client-card");
-    if (siteCard?.dataset?.routeId) {
-      const rid = Number(siteCard.dataset.routeId || 0);
-      const route = state.siteLeadRoutes.find((x) => Number(x.id) === rid);
-      if (route) {
-        if (fieldName === "group_id") prev = String(route.group_id || "").trim();
-        else if (fieldName === "internal_notify_group_id") prev = String(route.internal_notify_group_id || "").trim();
+      const siteCard = sel.closest(".site-client-card");
+      if (siteCard?.dataset?.routeId) {
+        const rid = Number(siteCard.dataset.routeId || 0);
+        const route = state.siteLeadRoutes.find((x) => Number(x.id) === rid);
+        if (route) {
+          if (fieldName === "group_id") prev = String(route.group_id || "").trim();
+          else if (fieldName === "internal_notify_group_id") prev = String(route.internal_notify_group_id || "").trim();
+        }
       }
     }
     const known = new Set([""]);
@@ -3760,9 +3771,12 @@ function syncCatalogGroupSelects() {
       o.title = prev;
       sel.appendChild(o);
     }
-    const hasPrev = prev && [...sel.options].some((o) => o.value === prev);
-    if (hasPrev) sel.value = prev;
-    sel.dataset.currentValue = "";
+    if (prev && [...sel.options].some((o) => o.value === prev)) {
+      sel.value = prev;
+    } else {
+      sel.value = "";
+    }
+    sel.dataset.currentValue = sel.value || "";
   });
 }
 
@@ -4032,6 +4046,11 @@ function bindUI() {
     "lead_exclude_contains",
     "lead_exclude_regex",
   ]);
+  document.addEventListener("change", (ev) => {
+    const sel = ev.target.closest?.("select.catalog-group-select");
+    if (!sel) return;
+    sel.dataset.currentValue = String(sel.value || "").trim();
+  });
   applyAllFieldCopy();
   document.getElementById("varResSaveBtn")?.addEventListener("click", () =>
     saveVariableResolution().catch((e) => console.error(e)),
